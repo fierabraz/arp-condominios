@@ -4,6 +4,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // pdfkit lee sus fuentes desde node_modules en tiempo de ejecución; no debe empaquetarse.
   serverExternalPackages: ["pdfkit"],
+  // Incluir esas fuentes en el despliegue (Vercel solo copia lo que detecta como usado).
+  outputFileTracingIncludes: {
+    "/**": ["./node_modules/pdfkit/js/data/**"],
+  },
   turbopack: {
     rules: {
       "*.css": {

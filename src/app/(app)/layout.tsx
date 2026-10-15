@@ -43,6 +43,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               {e.texto}
             </Link>
           ))}
+          <Link
+            href="/contrasena"
+            className="whitespace-nowrap rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 md:hidden"
+          >
+            Contraseña
+          </Link>
           <form action={cerrarSesion} className="md:hidden">
             <button className="whitespace-nowrap rounded-lg px-3 py-2 text-sm text-blue-700">Salir</button>
           </form>
@@ -50,7 +56,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <div className="hidden border-t border-gray-200 p-5 md:block">
           <p className="truncate text-sm font-medium">{usuario.nombre}</p>
           <p className="text-xs text-gray-500">{ETIQUETAS_ROL[usuario.rol]}</p>
-          <form action={cerrarSesion} className="mt-3">
+          <Link href="/contrasena" className="mt-3 block text-sm text-blue-700 hover:underline">
+            Cambiar contraseña
+          </Link>
+          <form action={cerrarSesion} className="mt-1">
             <button className="text-sm text-blue-700 hover:underline">Cerrar sesión</button>
           </form>
         </div>
