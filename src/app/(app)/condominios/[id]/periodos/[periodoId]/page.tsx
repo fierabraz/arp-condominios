@@ -5,13 +5,18 @@ import { BotonDocumento, Card, PageHeader, Tabla, Vacio } from "@/components/ui"
 import { formatoFecha, formatoMoneda, hoyISO } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
 import { ErrorCobro, previsualizarPeriodo } from "@/lib/cobro-servicio";
-import { agregarGasto, cerrarPeriodo, eliminarGasto } from "../../../cobro-actions";
+import { agregarGasto, cerrarPeriodo, eliminarGasto, enviarAvisos } from "../../../cobro-actions";
 import { condominioVisible } from "../../condominio-actual";
 import { NavCondominio } from "../../nav-condominio";
 import { GastoForm } from "./gasto-form";
 import { CerrarForm } from "./cerrar-form";
+import { EnviarForm } from "./enviar-form";
+import { smtpConfigurado } from "@/lib/correo";
 
-type Linea = { avisoId?: string; unidadId: string; gastoComun: number; fondoReserva: number; cargos: number; interes: number; total: number; saldo?: number };
+const ETIQUETAS_ENVIO = { ENVIADO: "Enviado", SIMULADO: "Prueba", ERROR: "Error" } as const;
+
+type Envio = { estado: string; creadoEn: Date };
+type Linea = { envio?: Envio; avisoId?: string; unidadId: string; gastoComun: number; fondoReserva: number; cargos: number; interes: number; total: number; saldo?: number };
 
 export default async function PeriodoPage({ params }: PageProps<"/condominios/[id]/periodos/[periodoId]">) {
   const { id, periodoId } = await params;
@@ -21,7 +26,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
     where: { id: periodoId, condominioId: id },
     include: {
       gastos: { orderBy: [{ fecha: "asc" }, { creadoEn: "asc" }], include: { unidad: { select: { numero: true } } } },
-      avisos: true,
+      avisos: { include: { envios: { orderBy: { creadoEn: "desc" } } } },
     },
   });
   if (!periodo) notFound();
@@ -50,6 +55,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
   } else {
     lineas = periodo.avisos.map((a) => ({
       avisoId: a.id,
+      envio: a.envios[0],
       unidadId: a.unidadId,
       gastoComun: Number(a.gastoComun),
       fondoReserva: Number(a.fondoReserva),
@@ -158,7 +164,16 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
       <div className="mb-3 mt-8 flex flex-wrap items-end justify-between gap-3">
         <h2 className="font-medium">{abierto ? "Vista previa de los cobros" : "Avisos de cobro emitidos"}</h2>
         {abierto && editable && !errorPrevia && <CerrarForm accion={cerrarPeriodo.bind(null, periodoId)} periodo={nombre} />}
+        {!abierto && editable && (
+          <EnviarForm accion={enviarAvisos.bind(null, periodoId)} yaEnviados={lineas.filter((l) => l.envio).length} />
+        )}
       </div>
+      {!abierto && editable && !smtpConfigurado() && (
+        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Modo de prueba: aún no hay un servidor de correo configurado, así que los correos no salen. Se guarda una
+          copia de cada uno en la carpeta correos-simulados para revisarlos.
+        </p>
+      )}
       {errorPrevia ? (
         <Vacio>
           No se puede calcular el cobro: {errorPrevia}{" "}
@@ -177,6 +192,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
               <th className="text-right">Interés mora</th>
               <th className="text-right">Total</th>
               {!abierto && <th className="text-right">Saldo</th>}
+              {!abierto && editable && <th>Correo</th>}
               {!abierto && <th></th>}
             </tr>
           </thead>
@@ -192,6 +208,13 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 {!abierto && (
                   <td className={`text-right tabular-nums ${l.saldo ? "text-amber-700" : "text-green-700"}`}>
                     {l.saldo ? $(l.saldo) : "Pagado"}
+                  </td>
+                )}
+                {!abierto && editable && (
+                  <td className="whitespace-nowrap text-xs text-gray-600">
+                    {l.envio
+                      ? `${ETIQUETAS_ENVIO[l.envio.estado as keyof typeof ETIQUETAS_ENVIO]} ${formatoFecha(l.envio.creadoEn)}`
+                      : "—"}
                   </td>
                 )}
                 {!abierto && (

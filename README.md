@@ -16,6 +16,11 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 - Estado de cuenta por unidad, listado de morosidad y portal del residente con sus avisos y pagos.
 - Aviso de cobro en PDF por unidad, con el detalle del mes, la deuda anterior y los gastos del condominio.
 - Rendición mensual en PDF por condominio: gastos por categoría, detalle con proveedores, fondo de reserva, recaudación y avisos impagos. La ven el administrador, el comité y los residentes del condominio.
+- Envío de los avisos de cobro por correo, con el PDF adjunto, a los propietarios y residentes que tengan correo registrado. Cada envío queda registrado.
+
+### Correo
+
+Para que los correos salgan de verdad, completa `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM` en `.env` con los datos de tu proveedor (Gmail, Brevo, Amazon SES, etc.). Mientras no estén, el sistema funciona en modo de prueba: no envía nada y guarda una copia de cada correo en la carpeta `correos-simulados/`.
 
 ## Cómo ejecutarlo en tu computador
 

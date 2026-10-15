@@ -41,6 +41,12 @@ enum TipoGasto {
   INDIVIDUAL // se carga a una unidad
 }
 
+enum EstadoEnvio {
+  ENVIADO // entregado al servidor de correo
+  SIMULADO // sin servidor de correo configurado: se guardó una copia local
+  ERROR
+}
+
 enum MedioPago {
   TRANSFERENCIA
   EFECTIVO
@@ -211,6 +217,7 @@ model AvisoCobro {
   emitidoEn        DateTime @default(now())
 
   aplicaciones AplicacionPago[]
+  envios       EnvioAviso[]
 
   @@unique([periodoId, unidadId])
   @@index([administradoraId])
@@ -240,4 +247,17 @@ model AplicacionPago {
   avisoId  String
   aviso    AvisoCobro @relation(fields: [avisoId], references: [id], onDelete: Cascade)
   monto    Decimal    @db.Decimal(14, 2)
+}
+
+// Registro de cada correo enviado con un aviso de cobro.
+model EnvioAviso {
+  id           String      @id @default(cuid())
+  avisoId      String
+  aviso        AvisoCobro  @relation(fields: [avisoId], references: [id], onDelete: Cascade)
+  destinatario String
+  estado       EstadoEnvio
+  error        String?
+  creadoEn     DateTime    @default(now())
+
+  @@index([avisoId])
 }
