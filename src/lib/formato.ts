@@ -27,3 +27,35 @@ export const ETIQUETAS_TIPO_UNIDAD = {
   ESTACIONAMIENTO: "Estacionamiento",
   BODEGA: "Bodega",
 } as const;
+
+export const CATEGORIAS_GASTO = [
+  "Remuneraciones",
+  "Electricidad",
+  "Agua",
+  "Gas",
+  "Aseo",
+  "Mantención",
+  "Reparaciones",
+  "Seguridad",
+  "Seguros",
+  "Administración",
+  "Multa",
+  "Consumo individual",
+  "Otros",
+];
+
+export const ETIQUETAS_MEDIO_PAGO = {
+  TRANSFERENCIA: "Transferencia",
+  EFECTIVO: "Efectivo",
+  CHEQUE: "Cheque",
+  OTRO: "Otro",
+} as const;
+
+export function formatoFecha(fecha: Date) {
+  return fecha.toLocaleDateString("es-CL", { timeZone: "UTC", day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/** Fecha de hoy como YYYY-MM-DD para inputs type=date. */
+export function hoyISO() {
+  return new Date().toISOString().slice(0, 10);
+}

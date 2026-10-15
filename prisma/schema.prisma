@@ -203,6 +203,8 @@ model AvisoCobro {
   gastoComun       Decimal  @db.Decimal(14, 2)
   fondoReserva     Decimal  @db.Decimal(14, 2)
   cargos           Decimal  @db.Decimal(14, 2)
+  // Interés por mora sobre la deuda vencida al momento de emitir
+  interes          Decimal  @default(0) @db.Decimal(14, 2)
   total            Decimal  @db.Decimal(14, 2)
   saldo            Decimal  @db.Decimal(14, 2)
   vencimiento      DateTime

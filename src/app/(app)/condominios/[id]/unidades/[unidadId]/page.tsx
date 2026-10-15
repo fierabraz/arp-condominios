@@ -6,10 +6,12 @@ import { Boton, Card, PageHeader, Vacio } from "@/components/ui";
 import { UnidadForm } from "../../../unidad-form";
 import { desvincularPersona, editarUnidad, eliminarUnidad, vincularPersona } from "../../../actions";
 import { VinculoForm } from "./vinculo-form";
+import { estadoCuenta } from "@/lib/cobro-servicio";
+import { EstadoCuenta } from "@/components/estado-cuenta";
 
 export default async function UnidadPage({ params }: PageProps<"/condominios/[id]/unidades/[unidadId]">) {
   const { id, unidadId } = await params;
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
 
   const [unidad, personas] = await Promise.all([
     db.unidad.findFirst({
@@ -26,6 +28,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
     }),
   ]);
   if (!unidad) notFound();
+  const estado = (await estadoCuenta(unidad.id, administradoraId))!;
 
   return (
     <>
@@ -37,6 +40,11 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
           </Link>
         }
       />
+
+      <section className="mb-8">
+        <h2 className="mb-4 font-medium">Estado de cuenta</h2>
+        <EstadoCuenta estado={estado} moneda={usuario.administradora?.moneda ?? "CLP"} />
+      </section>
 
       <Card className="mb-6">
         <h2 className="mb-4 font-medium">Datos de la unidad</h2>
