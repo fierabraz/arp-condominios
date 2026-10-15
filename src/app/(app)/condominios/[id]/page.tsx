@@ -6,6 +6,7 @@ import { BotonLink, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { ETIQUETAS_TIPO_UNIDAD, formatoPorcentaje } from "@/lib/formato";
 import { UnidadForm } from "../unidad-form";
 import { crearUnidad } from "../actions";
+import { NavCondominio } from "./nav-condominio";
 
 export default async function CondominioPage({ params }: PageProps<"/condominios/[id]">) {
   const { id } = await params;
@@ -40,6 +41,8 @@ export default async function CondominioPage({ params }: PageProps<"/condominios
           )
         }
       />
+
+      <NavCondominio id={id} actual="" />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-4">
         <Card>

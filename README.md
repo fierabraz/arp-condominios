@@ -10,8 +10,12 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 - Unidades con su alícuota; el sistema avisa si las alícuotas no suman 100 %.
 - Personas (propietarios y residentes) vinculadas a sus unidades.
 - Cuentas de usuario para administradores, comité y residentes.
+- Períodos mensuales: se registran gastos comunes y cargos individuales (multas, consumos) y al cerrar el período se emite un aviso de cobro por unidad.
+- Cálculo del aviso: gasto común × alícuota + fondo de reserva + cargos individuales + interés por mora sobre la deuda vencida. Los montos se reparten sin perder ni un peso por redondeo.
+- Pagos que se aplican a la deuda más antigua; lo que sobra queda como saldo a favor y se usa en el siguiente cobro. Un pago mal ingresado se puede anular.
+- Estado de cuenta por unidad, listado de morosidad y portal del residente con sus avisos y pagos.
 
-Los gastos, el cobro mensual, los pagos y los reportes llegan en los próximos pasos. La base de datos ya tiene las tablas para eso.
+Los reportes mensuales llegan en el próximo paso.
 
 ## Cómo ejecutarlo en tu computador
 
@@ -67,5 +71,6 @@ Toda consulta filtra por `administradoraId` del usuario conectado (ver `src/lib/
 | `npm run build` y `npm start` | Compilar y ejecutar en modo producción |
 | `npm run db:migrate` | Crear una migración tras cambiar el esquema |
 | `npm run db:deploy` | Aplicar migraciones pendientes |
-| `npm run db:seed` | Cargar datos de ejemplo |
+| `npm run db:seed` | Cargar datos de ejemplo (incluye septiembre cerrado con morosos y octubre abierto) |
+| `npm test` | Pruebas del cálculo de cobro |
 | `npm run lint` y `npm run typecheck` | Revisar el código |
