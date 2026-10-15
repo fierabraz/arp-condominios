@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { requireAdministradora } from "@/lib/auth";
 import { aMonto, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { anularPago, emitirPeriodo, ErrorCobro, registrarPago } from "@/lib/cobro-servicio";
+import { enviarAvisosPeriodo } from "@/lib/envio-avisos";
 import { MedioPago, TipoGasto } from "@/generated/prisma/enums";
 
 const PeriodoSchema = z.object({
@@ -140,4 +141,20 @@ export async function eliminarPago(pagoId: string) {
   if (!pago) return;
   const unidad = await db.unidad.findUniqueOrThrow({ where: { id: pago.unidadId } });
   revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
+}
+
+export async function enviarAvisos(periodoId: string): Promise<EstadoForm> {
+  const { administradoraId } = await requireAdministradora();
+  const periodo = await db.periodo.findFirst({ where: { id: periodoId, administradoraId } });
+  if (!periodo) return { mensaje: "Período no encontrado." };
+  if (periodo.estado !== "CERRADO") return { mensaje: "Primero cierra el período para emitir los avisos." };
+
+  const r = await enviarAvisosPeriodo(periodoId, administradoraId);
+  revalidatePath(`/condominios/${periodo.condominioId}/periodos/${periodoId}`);
+  const partes = [];
+  if (r.enviados) partes.push(`${r.enviados} correos enviados`);
+  if (r.simulados) partes.push(`${r.simulados} correos guardados en modo de prueba`);
+  if (r.errores) partes.push(`${r.errores} con error`);
+  if (r.sinCorreo.length) partes.push(`sin correo registrado: unidades ${r.sinCorreo.join(", ")}`);
+  return { ok: r.errores === 0, mensaje: partes.length ? `${partes.join("; ")}.` : "No hay avisos para enviar." };
 }
