@@ -1,0 +1,241 @@
+// Modelo de datos del ERP de condominios.
+// Toda tabla de negocio lleva administradoraId para aislar los datos de cada cliente.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Rol {
+  SUPERADMIN // dueño de la plataforma
+  ADMINISTRADOR // administra todo dentro de su administradora
+  COMITE // solo lectura de su condominio
+  RESIDENTE // ve sus avisos de cobro, pagos y saldo
+}
+
+enum TipoUnidad {
+  DEPARTAMENTO
+  CASA
+  OFICINA
+  LOCAL
+  ESTACIONAMIENTO
+  BODEGA
+}
+
+enum RelacionUnidad {
+  PROPIETARIO
+  RESIDENTE
+}
+
+enum EstadoPeriodo {
+  ABIERTO
+  CERRADO
+}
+
+enum TipoGasto {
+  COMUN // se reparte por alícuota
+  INDIVIDUAL // se carga a una unidad
+}
+
+enum MedioPago {
+  TRANSFERENCIA
+  EFECTIVO
+  CHEQUE
+  OTRO
+}
+
+model Administradora {
+  id        String   @id @default(cuid())
+  nombre    String
+  pais      String   @default("CL")
+  moneda    String   @default("CLP")
+  creadoEn  DateTime @default(now())
+
+  usuarios     Usuario[]
+  condominios  Condominio[]
+  personas     Persona[]
+  unidades     Unidad[]
+  periodos     Periodo[]
+  gastos       Gasto[]
+  avisos       AvisoCobro[]
+  pagos        Pago[]
+}
+
+model Usuario {
+  id               String   @id @default(cuid())
+  administradoraId String?
+  administradora   Administradora? @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  nombre           String
+  correo           String   @unique
+  claveHash        String
+  rol              Rol
+  // Para COMITE: condominio que puede ver. Para RESIDENTE: persona vinculada.
+  condominioId     String?
+  condominio       Condominio? @relation(fields: [condominioId], references: [id], onDelete: SetNull)
+  personaId        String?  @unique
+  persona          Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  creadoEn         DateTime @default(now())
+
+  @@index([administradoraId])
+}
+
+model Condominio {
+  id                 String   @id @default(cuid())
+  administradoraId   String
+  administradora     Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  nombre             String
+  direccion          String
+  comuna             String?
+  // Porcentaje del gasto común que va al fondo de reserva (ej. 5 = 5 %)
+  porcentajeReserva  Decimal  @default(5) @db.Decimal(5, 2)
+  // Tasa de interés mensual por mora (ej. 1.5 = 1,5 % mensual)
+  tasaInteresMora    Decimal  @default(0) @db.Decimal(5, 2)
+  diaVencimiento     Int      @default(10)
+  creadoEn           DateTime @default(now())
+
+  unidades  Unidad[]
+  periodos  Periodo[]
+  usuarios  Usuario[]
+
+  @@index([administradoraId])
+}
+
+model Persona {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  nombre           String
+  documento        String?  // RUT, DNI u otro
+  correo           String?
+  telefono         String?
+  creadoEn         DateTime @default(now())
+
+  unidades UnidadPersona[]
+  usuario  Usuario?
+
+  @@index([administradoraId])
+}
+
+model Unidad {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  numero           String
+  tipo             TipoUnidad @default(DEPARTAMENTO)
+  // Porcentaje de participación en el gasto común (ej. 1.25 = 1,25 %)
+  alicuota         Decimal  @db.Decimal(9, 6)
+  creadoEn         DateTime @default(now())
+
+  personas UnidadPersona[]
+  gastos   Gasto[]
+  avisos   AvisoCobro[]
+  pagos    Pago[]
+
+  @@unique([condominioId, numero])
+  @@index([administradoraId])
+}
+
+model UnidadPersona {
+  unidadId  String
+  unidad    Unidad  @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  personaId String
+  persona   Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  relacion  RelacionUnidad
+
+  @@id([unidadId, personaId, relacion])
+}
+
+model Periodo {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  anio             Int
+  mes              Int
+  estado           EstadoPeriodo @default(ABIERTO)
+  vencimiento      DateTime?
+  cerradoEn        DateTime?
+
+  gastos Gasto[]
+  avisos AvisoCobro[]
+
+  @@unique([condominioId, anio, mes])
+  @@index([administradoraId])
+}
+
+model Gasto {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  periodoId        String
+  periodo          Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  tipo             TipoGasto
+  // Solo para gastos INDIVIDUALES
+  unidadId         String?
+  unidad           Unidad?  @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  categoria        String
+  descripcion      String
+  proveedor        String?
+  documento        String?  // número de boleta o factura
+  monto            Decimal  @db.Decimal(14, 2)
+  fecha            DateTime
+  creadoEn         DateTime @default(now())
+
+  @@index([administradoraId])
+  @@index([periodoId])
+}
+
+model AvisoCobro {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  periodoId        String
+  periodo          Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  unidadId         String
+  unidad           Unidad   @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  gastoComun       Decimal  @db.Decimal(14, 2)
+  fondoReserva     Decimal  @db.Decimal(14, 2)
+  cargos           Decimal  @db.Decimal(14, 2)
+  total            Decimal  @db.Decimal(14, 2)
+  saldo            Decimal  @db.Decimal(14, 2)
+  vencimiento      DateTime
+  emitidoEn        DateTime @default(now())
+
+  aplicaciones AplicacionPago[]
+
+  @@unique([periodoId, unidadId])
+  @@index([administradoraId])
+}
+
+model Pago {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  unidadId         String
+  unidad           Unidad   @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  monto            Decimal  @db.Decimal(14, 2)
+  fecha            DateTime
+  medio            MedioPago
+  referencia       String?
+  creadoEn         DateTime @default(now())
+
+  aplicaciones AplicacionPago[]
+
+  @@index([administradoraId])
+}
+
+model AplicacionPago {
+  id       String     @id @default(cuid())
+  pagoId   String
+  pago     Pago       @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  avisoId  String
+  aviso    AvisoCobro @relation(fields: [avisoId], references: [id], onDelete: Cascade)
+  monto    Decimal    @db.Decimal(14, 2)
+}

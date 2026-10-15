@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
+// Un ERP es casi todo dinámico (depende del usuario), así que no usamos Cache Components.
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
   turbopack: {
     rules: {
       "*.css": {
