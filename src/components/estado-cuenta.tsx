@@ -41,6 +41,7 @@ export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: strin
               <th className="text-right">Cargos e intereses</th>
               <th className="text-right">Total</th>
               <th className="text-right">Saldo</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -61,6 +62,11 @@ export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: strin
                     }`}
                   >
                     {saldo === 0 ? "Pagado" : `${$(saldo)}${vencido ? " vencido" : ""}`}
+                  </td>
+                  <td className="text-right">
+                    <a href={`/avisos/${a.id}/pdf`} target="_blank" rel="noopener" className="text-sm text-blue-700 hover:underline">
+                      PDF
+                    </a>
                   </td>
                 </tr>
               );

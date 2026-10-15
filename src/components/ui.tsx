@@ -55,6 +55,15 @@ export function BotonLink({
   return <Link className={`${baseBoton} ${estilosBoton[variante]} ${className}`} {...props} />;
 }
 
+/** Enlace con estilo de botón para documentos (PDF) que no deben pasar por el enrutador. */
+export function BotonDocumento({
+  variante = "secundario",
+  className = "",
+  ...props
+}: ComponentProps<"a"> & { variante?: Variante }) {
+  return <a target="_blank" rel="noopener" className={`${baseBoton} ${estilosBoton[variante]} ${className}`} {...props} />;
+}
+
 export function Campo({
   etiqueta,
   error,
