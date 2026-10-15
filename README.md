@@ -14,8 +14,8 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 - Cálculo del aviso: gasto común × alícuota + fondo de reserva + cargos individuales + interés por mora sobre la deuda vencida. Los montos se reparten sin perder ni un peso por redondeo.
 - Pagos que se aplican a la deuda más antigua; lo que sobra queda como saldo a favor y se usa en el siguiente cobro. Un pago mal ingresado se puede anular.
 - Estado de cuenta por unidad, listado de morosidad y portal del residente con sus avisos y pagos.
-
-Los reportes mensuales llegan en el próximo paso.
+- Aviso de cobro en PDF por unidad, con el detalle del mes, la deuda anterior y los gastos del condominio.
+- Rendición mensual en PDF por condominio: gastos por categoría, detalle con proveedores, fondo de reserva, recaudación y avisos impagos. La ven el administrador, el comité y los residentes del condominio.
 
 ## Cómo ejecutarlo en tu computador
 

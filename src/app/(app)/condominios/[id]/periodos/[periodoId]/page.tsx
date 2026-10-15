@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
+import { BotonDocumento, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { formatoFecha, formatoMoneda, hoyISO } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
 import { ErrorCobro, previsualizarPeriodo } from "@/lib/cobro-servicio";
@@ -11,7 +11,7 @@ import { NavCondominio } from "../../nav-condominio";
 import { GastoForm } from "./gasto-form";
 import { CerrarForm } from "./cerrar-form";
 
-type Linea = { unidadId: string; gastoComun: number; fondoReserva: number; cargos: number; interes: number; total: number; saldo?: number };
+type Linea = { avisoId?: string; unidadId: string; gastoComun: number; fondoReserva: number; cargos: number; interes: number; total: number; saldo?: number };
 
 export default async function PeriodoPage({ params }: PageProps<"/condominios/[id]/periodos/[periodoId]">) {
   const { id, periodoId } = await params;
@@ -49,6 +49,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
     }
   } else {
     lineas = periodo.avisos.map((a) => ({
+      avisoId: a.id,
       unidadId: a.unidadId,
       gastoComun: Number(a.gastoComun),
       fondoReserva: Number(a.fondoReserva),
@@ -77,6 +78,9 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
           abierto
             ? "Período abierto: registra los gastos del mes y ciérralo para emitir los cobros."
             : `Cerrado. Los cobros vencen el ${formatoFecha(periodo.vencimiento!)}.`
+        }
+        acciones={
+          !abierto && <BotonDocumento href={`/rendiciones/${periodo.id}/pdf`}>Rendición en PDF</BotonDocumento>
         }
       />
       <NavCondominio id={id} actual="/periodos" />
@@ -173,6 +177,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
               <th className="text-right">Interés mora</th>
               <th className="text-right">Total</th>
               {!abierto && <th className="text-right">Saldo</th>}
+              {!abierto && <th></th>}
             </tr>
           </thead>
           <tbody>
@@ -187,6 +192,13 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 {!abierto && (
                   <td className={`text-right tabular-nums ${l.saldo ? "text-amber-700" : "text-green-700"}`}>
                     {l.saldo ? $(l.saldo) : "Pagado"}
+                  </td>
+                )}
+                {!abierto && (
+                  <td className="text-right">
+                    <a href={`/avisos/${l.avisoId}/pdf`} target="_blank" rel="noopener" className="text-sm text-blue-700 hover:underline">
+                      PDF
+                    </a>
                   </td>
                 )}
               </tr>
