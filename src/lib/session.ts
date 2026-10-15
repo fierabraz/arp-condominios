@@ -12,20 +12,32 @@ export type SessionPayload = {
 
 const COOKIE = "sesion";
 const DURACION_MS = 7 * 24 * 60 * 60 * 1000;
-const clave = new TextEncoder().encode(process.env.SESSION_SECRET);
+let clave: Uint8Array | undefined;
+
+// Se valida al usarla (no al importar) para que la compilación no exija el secreto.
+function claveSesion() {
+  if (!clave) {
+    const secreto = process.env.SESSION_SECRET ?? "";
+    if (secreto.length < 32) {
+      throw new Error("SESSION_SECRET debe tener al menos 32 caracteres. Revisa las variables de entorno.");
+    }
+    clave = new TextEncoder().encode(secreto);
+  }
+  return clave;
+}
 
 export async function encrypt(payload: SessionPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(clave);
+    .sign(claveSesion());
 }
 
 export async function decrypt(token: string | undefined) {
   if (!token) return null;
   try {
-    const { payload } = await jwtVerify<SessionPayload>(token, clave, {
+    const { payload } = await jwtVerify<SessionPayload>(token, claveSesion(), {
       algorithms: ["HS256"],
     });
     return payload;

@@ -1,5 +1,6 @@
 import "server-only";
 import { mkdir, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import nodemailer from "nodemailer";
 
@@ -13,7 +14,10 @@ export type Correo = {
 
 export type ResultadoEnvio = { estado: "ENVIADO" | "SIMULADO" | "ERROR"; error?: string };
 
-const CARPETA_SIMULADOS = path.join(process.cwd(), "correos-simulados");
+// En Vercel el disco es de solo lectura salvo la carpeta temporal.
+const CARPETA_SIMULADOS = process.env.VERCEL
+  ? path.join(os.tmpdir(), "correos-simulados")
+  : path.join(process.cwd(), "correos-simulados");
 
 export function smtpConfigurado() {
   return !!process.env.SMTP_HOST;
@@ -47,14 +51,22 @@ export async function enviarCorreo(correo: Correo): Promise<ResultadoEnvio> {
       attachments: correo.adjuntos?.map((a) => ({ filename: a.nombre, content: a.contenido })),
     });
     if (!smtpConfigurado()) {
-      await mkdir(CARPETA_SIMULADOS, { recursive: true });
-      const nombre = `${new Date().toISOString().replace(/[:.]/g, "-")}-${correo.para.replace(/[^\w.@-]/g, "_")}.eml`;
-      await writeFile(path.join(CARPETA_SIMULADOS, nombre), info.message as Buffer);
+      await guardarCopia(correo.para, info.message as Buffer);
       return { estado: "SIMULADO" };
     }
     return { estado: "ENVIADO" };
   } catch (e) {
     return { estado: "ERROR", error: (e as Error).message.slice(0, 500) };
+  }
+}
+
+async function guardarCopia(para: string, mensaje: Buffer) {
+  try {
+    await mkdir(CARPETA_SIMULADOS, { recursive: true });
+    const nombre = `${new Date().toISOString().replace(/[:.]/g, "-")}-${para.replace(/[^\w.@-]/g, "_")}.eml`;
+    await writeFile(path.join(CARPETA_SIMULADOS, nombre), mensaje);
+  } catch {
+    // La copia es solo para revisión; si no se puede guardar, el envío simulado sigue siendo válido.
   }
 }
 

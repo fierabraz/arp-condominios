@@ -16,6 +16,7 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 - Estado de cuenta por unidad, listado de morosidad y portal del residente con sus avisos y pagos.
 - Aviso de cobro en PDF por unidad, con el detalle del mes, la deuda anterior y los gastos del condominio.
 - Rendición mensual en PDF por condominio: gastos por categoría, detalle con proveedores, fondo de reserva, recaudación y avisos impagos. La ven el administrador, el comité y los residentes del condominio.
+- Cada usuario puede cambiar su contraseña.
 - Envío de los avisos de cobro por correo, con el PDF adjunto, a los propietarios y residentes que tengan correo registrado. Cada envío queda registrado.
 
 ### Correo
@@ -60,6 +61,25 @@ Todas usan la contraseña `demo1234`.
 | comite@demo.cl | Comité | El Edificio Los Aromos, sin poder editar |
 | maria@demo.cl | Residente | Sus unidades |
 
+## Publicarlo en internet (Vercel + Neon)
+
+Ambos servicios tienen plan gratuito suficiente para empezar. Vercel ejecuta el sistema y Neon guarda la base de datos.
+
+1. Entra a <https://vercel.com/signup> y crea la cuenta con **Continue with GitHub**.
+2. En Vercel pulsa **Add New… → Project**, elige el repositorio `arp-condominios` y pulsa **Import**. Antes de **Deploy**, abre **Environment Variables** y agrega:
+   - `SESSION_SECRET`: un texto aleatorio de 32 caracteres o más (puedes generarlo en <https://generate-secret.vercel.app/32>).
+   - `PLATAFORMA_CORREO`: tu correo, para la cuenta de plataforma.
+   - `PLATAFORMA_CLAVE`: la contraseña de esa cuenta (mínimo 8 caracteres).
+3. Pulsa **Deploy**. Esta primera vez fallará porque aún no hay base de datos; es normal.
+4. En el proyecto de Vercel ve a **Storage → Create Database → Neon**, acepta crear la cuenta de Neon y conecta la base al proyecto. Vercel agrega solo `DATABASE_URL` y `DATABASE_URL_UNPOOLED`.
+5. Ve a **Deployments**, abre el menú `…` del último despliegue y pulsa **Redeploy**.
+
+Cada despliegue aplica las migraciones pendientes y, la primera vez, crea la cuenta de plataforma. Desde ahí entras con tu correo, creas tu administradora y sus usuarios. Cada vez que se fusiona un cambio en `main`, Vercel publica la nueva versión sola.
+
+Para enviar correos de verdad, agrega también las variables `SMTP_*` (ver [Correo](#correo)) y vuelve a desplegar.
+
+Si quieres datos de ejemplo en la base publicada, copia `DATABASE_URL` de Vercel a tu `.env` local y ejecuta `npm run db:seed`. Las cuentas de ejemplo usan `demo1234`, así que cámbiales la contraseña o bórralas antes de usar el sistema con clientes reales.
+
 ## Tecnología
 
 - [Next.js](https://nextjs.org) 16 con TypeScript y Tailwind CSS.
@@ -76,6 +96,7 @@ Toda consulta filtra por `administradoraId` del usuario conectado (ver `src/lib/
 | `npm run build` y `npm start` | Compilar y ejecutar en modo producción |
 | `npm run db:migrate` | Crear una migración tras cambiar el esquema |
 | `npm run db:deploy` | Aplicar migraciones pendientes |
+| `npm run db:init` | Crear la cuenta de plataforma con `PLATAFORMA_CORREO` y `PLATAFORMA_CLAVE` |
 | `npm run db:seed` | Cargar datos de ejemplo (incluye septiembre cerrado con morosos y octubre abierto) |
 | `npm test` | Pruebas del cálculo de cobro |
 | `npm run lint` y `npm run typecheck` | Revisar el código |
