@@ -6,6 +6,7 @@ import { estadoCuenta } from "@/lib/cobro-servicio";
 import { nombrePeriodo } from "@/lib/cobro";
 import { EstadoCuenta } from "@/components/estado-cuenta";
 import { TarjetaPublicacion } from "@/components/publicacion";
+import { VotacionesResidente } from "./votaciones-residente";
 
 export default async function MiCuentaPage() {
   const usuario = await requireUsuario(["RESIDENTE"]);
@@ -37,6 +38,7 @@ export default async function MiCuentaPage() {
   return (
     <>
       <PageHeader titulo="Mi cuenta" descripcion={`Hola, ${usuario.nombre}`} />
+      {usuario.personaId && <VotacionesResidente personaId={usuario.personaId} condominioIds={condominioIds} />}
       {publicaciones.length > 0 && (
         <section className="mb-10">
           <h2 className="mb-3 text-xl font-semibold text-emerald-700">Muro de la comunidad</h2>

@@ -105,6 +105,46 @@ async function main() {
     ],
   });
 
+  // Una votación cerrada con resultados y otra abierta para probar el voto en línea.
+  const camaras = await db.votacion.create({
+    data: {
+      administradoraId: adm.id,
+      condominioId: condominio.id,
+      titulo: "Proyecto de cámaras de seguridad",
+      descripcion: "Instalar 8 cámaras en accesos y estacionamientos, prorrateado en 3 cuotas.",
+      estado: "CERRADA",
+      cierraEn: new Date("2026-09-20T02:59:59Z"),
+      publicadaEn: new Date("2026-09-10T12:00:00Z"),
+      cerradaEn: new Date("2026-09-20T02:59:59Z"),
+      opciones: { create: [{ texto: "A favor", orden: 0 }, { texto: "En contra", orden: 1 }, { texto: "Abstención", orden: 2 }] },
+    },
+    include: { opciones: { orderBy: { orden: "asc" } } },
+  });
+  const [aFavor, enContra] = camaras.opciones;
+  await db.voto.createMany({
+    data: [
+      ["101", aFavor], ["102", aFavor], ["201", enContra], ["202", aFavor], ["301", aFavor], ["E1", enContra], ["E2", enContra],
+    ].map(([numero, opcion]) => ({
+      votacionId: camaras.id,
+      opcionId: (opcion as { id: string }).id,
+      unidadId: unidad(numero as string),
+      emitidoPor: "Ana Administradora",
+      presencial: true,
+    })),
+  });
+  await db.votacion.create({
+    data: {
+      administradoraId: adm.id,
+      condominioId: condominio.id,
+      titulo: "Pintura de fachada",
+      descripcion: "Elegir el color para la pintura de fachada de 2027.",
+      estado: "ABIERTA",
+      cierraEn: new Date("2027-01-31T02:59:59Z"),
+      publicadaEn: new Date("2026-10-14T12:00:00Z"),
+      opciones: { create: [{ texto: "Blanco invierno", orden: 0 }, { texto: "Gris perla", orden: 1 }, { texto: "Terracota", orden: 2 }] },
+    },
+  });
+
   await db.proveedor.createMany({
     data: [
       { nombre: "Enel", rubro: "Electricidad", telefono: "600 696 0000" },
