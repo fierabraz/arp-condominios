@@ -39,8 +39,8 @@ export default async function InicioPage() {
       <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {tarjetas.map((t) => (
           <Link key={t.titulo} href={t.href}>
-            <Card className="transition hover:border-blue-300">
-              <p className="text-sm text-gray-600">{t.titulo}</p>
+            <Card className="transition hover:border-marca">
+              <p className="text-sm text-texto-suave">{t.titulo}</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{t.valor}</p>
             </Card>
           </Link>

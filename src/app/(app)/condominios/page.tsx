@@ -17,7 +17,7 @@ export default async function CondominiosPage() {
       {propiedades.length === 0 ? (
         <Vacio>Aún no tienes propiedades. Crea la primera para empezar.</Vacio>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 shadow-sm">
+        <div className="overflow-hidden rounded-xl border border-borde shadow-sm">
           {propiedades.map((p) => (
             <TarjetaPropiedad key={p.id} p={p} />
           ))}

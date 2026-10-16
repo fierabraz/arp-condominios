@@ -77,7 +77,7 @@ export default async function ReportesPage() {
           <div className="mb-6 grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
             {tarjetas.map((t) => (
               <Card key={t.titulo}>
-                <p className="text-sm text-gray-600">{t.titulo}</p>
+                <p className="text-sm text-texto-suave">{t.titulo}</p>
                 <p className="mt-1 text-xl font-semibold tabular-nums">{t.valor}</p>
               </Card>
             ))}
@@ -99,7 +99,7 @@ export default async function ReportesPage() {
               {filas.map((f) => (
                 <tr key={f.id}>
                   <td>
-                    <Link href={`/condominios/${f.id}`} className="font-medium text-blue-700 hover:underline">
+                    <Link href={`/condominios/${f.id}`} className="font-medium text-marca hover:underline">
                       {f.nombre}
                     </Link>
                   </td>
@@ -109,7 +109,7 @@ export default async function ReportesPage() {
                   <td className="text-right">{f.cobranza === null ? "—" : formatoPorcentaje(f.cobranza, 1)}</td>
                   <td className="text-right tabular-nums">
                     {f.deudaVencida > 0 ? (
-                      <Link href={`/condominios/${f.id}/morosidad`} className="text-red-700 hover:underline">
+                      <Link href={`/condominios/${f.id}/morosidad`} className="text-peligro hover:underline">
                         {$(f.deudaVencida)}
                       </Link>
                     ) : (

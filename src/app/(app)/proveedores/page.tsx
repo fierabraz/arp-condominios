@@ -50,17 +50,17 @@ export default async function ProveedoresPage() {
                 <tr key={p.id}>
                   <td>
                     <p className="font-medium">{p.nombre}</p>
-                    {p.rut && <p className="text-xs text-gray-500">RUT {p.rut}</p>}
+                    {p.rut && <p className="text-xs text-texto-suave">RUT {p.rut}</p>}
                   </td>
                   <td>{p.rubro ?? "—"}</td>
-                  <td className="text-gray-600">
+                  <td className="text-texto-suave">
                     {[p.contacto, p.telefono, p.correo].filter(Boolean).join(" · ") || "—"}
                   </td>
                   <td className="text-right">{g?._count ?? 0}</td>
                   <td className="text-right tabular-nums">{formatoMoneda(g?._sum.monto ?? 0, moneda)}</td>
                   <td className="text-right">
                     <form action={eliminarProveedor.bind(null, p.id)}>
-                      <button className="text-sm text-red-700 hover:underline">Quitar</button>
+                      <button className="text-sm text-peligro hover:underline">Quitar</button>
                     </form>
                   </td>
                 </tr>

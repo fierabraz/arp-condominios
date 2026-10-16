@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import nodemailer from "nodemailer";
+import { MARCA } from "@/lib/marca";
 
 export type Correo = {
   para: string;
@@ -43,7 +44,7 @@ function transporte() {
 export async function enviarCorreo(correo: Correo): Promise<ResultadoEnvio> {
   try {
     const info = await transporte().sendMail({
-      from: process.env.SMTP_FROM || "ERP Condominios <no-responder@localhost>",
+      from: process.env.SMTP_FROM || MARCA.remitente,
       to: correo.para,
       subject: correo.asunto,
       text: correo.texto,

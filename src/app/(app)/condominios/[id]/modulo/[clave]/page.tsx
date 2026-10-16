@@ -16,7 +16,7 @@ export default async function ModuloProximoPage({ params }: PageProps<"/condomin
         <Construction className="mt-1 shrink-0 text-amber-500" size={28} />
         <div>
           <p className="font-medium">Este módulo viene pronto.</p>
-          <p className="mt-1 text-gray-600">{modulo.descripcion}</p>
+          <p className="mt-1 text-texto-suave">{modulo.descripcion}</p>
         </div>
       </Card>
     </>

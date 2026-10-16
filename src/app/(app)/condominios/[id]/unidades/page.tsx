@@ -1,11 +1,13 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdministradora, puedeEditar } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
+import { Plus } from "lucide-react";
+import { Card, PageHeader, Vacio } from "@/components/ui";
+import { morosidad } from "@/lib/cobro-servicio";
 import { ETIQUETAS_TIPO_UNIDAD, formatoPorcentaje } from "@/lib/formato";
 import { UnidadForm } from "../../unidad-form";
 import { crearUnidad } from "../../actions";
+import { ListaUnidades } from "./lista-unidades";
 
 export default async function UnidadesPage({ params }: PageProps<"/condominios/[id]/unidades">) {
   const { id } = await params;
@@ -22,6 +24,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
     },
   });
   if (!condominio) notFound();
+  const conDeuda = new Set((await morosidad(id, administradoraId)).map((m) => m.unidadId));
 
   const editable = puedeEditar(usuario.rol);
   const sumaAlicuotas = condominio.unidades.reduce((s, u) => s + Number(u.alicuota), 0);
@@ -31,77 +34,70 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
     <>
       <PageHeader titulo="Residentes y unidades" descripcion={condominio.nombre} />
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
-          <p className="text-sm text-gray-600">Unidades</p>
-          <p className="mt-1 text-2xl font-semibold">{condominio.unidades.length}</p>
+          <p className="text-sm text-texto-suave">Unidades</p>
+          <p className="mt-1 text-2xl font-bold">{condominio.unidades.length}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Suma de alícuotas</p>
-          <p className={`mt-1 text-2xl font-semibold ${cuadra ? "" : "text-amber-600"}`}>
+          <p className="text-sm text-texto-suave">Suma de alícuotas</p>
+          <p className={`mt-1 text-2xl font-bold ${cuadra ? "" : "text-alerta"}`}>
             {formatoPorcentaje(sumaAlicuotas)}
           </p>
           {!cuadra && condominio.unidades.length > 0 && (
-            <p className="mt-1 text-xs text-amber-700">Debería sumar 100 % para cobrar correctamente.</p>
+            <p className="mt-1 text-xs text-alerta">Debería sumar 100 % para cobrar correctamente.</p>
           )}
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Fondo de reserva</p>
-          <p className="mt-1 text-2xl font-semibold">{formatoPorcentaje(condominio.porcentajeReserva, 2)}</p>
+          <p className="text-sm text-texto-suave">Fondo de reserva</p>
+          <p className="mt-1 text-2xl font-bold">{formatoPorcentaje(condominio.porcentajeReserva, 2)}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Vence el día</p>
-          <p className="mt-1 text-2xl font-semibold">{condominio.diaVencimiento}</p>
+          <p className="text-sm text-texto-suave">Vence el día</p>
+          <p className="mt-1 text-2xl font-bold">{condominio.diaVencimiento}</p>
         </Card>
       </div>
 
-      {editable && (
-        <Card className="mb-6">
-          <h2 className="mb-4 font-medium">Agregar unidad</h2>
-          <UnidadForm accion={crearUnidad.bind(null, id)} textoBoton="Agregar" limpiarAlGuardar />
-        </Card>
+      {condominio.unidades.length === 0 ? (
+        <Vacio>Esta propiedad aún no tiene unidades.</Vacio>
+      ) : (
+        <ListaUnidades
+          base={`/condominios/${id}/unidades`}
+          editable={editable}
+          unidades={condominio.unidades.map((u) => {
+            const nombres = (rel: string) =>
+              u.personas
+                .filter((p) => p.relacion === rel)
+                .map((p) => p.persona.nombre)
+                .join(", ");
+            return {
+              id: u.id,
+              numero: u.numero,
+              tipo: ETIQUETAS_TIPO_UNIDAD[u.tipo],
+              alicuota: formatoPorcentaje(u.alicuota),
+              propietarios: nombres("PROPIETARIO"),
+              residentes: nombres("RESIDENTE"),
+              deudaVencida: conDeuda.has(u.id),
+            };
+          })}
+        />
       )}
 
-      {condominio.unidades.length === 0 ? (
-        <Vacio>Este condominio aún no tiene unidades.</Vacio>
-      ) : (
-        <Tabla>
-          <thead>
-            <tr>
-              <th>Unidad</th>
-              <th>Tipo</th>
-              <th className="text-right">Alícuota</th>
-              <th>Propietario</th>
-              <th>Residente</th>
-            </tr>
-          </thead>
-          <tbody>
-            {condominio.unidades.map((u) => {
-              const nombres = (rel: string) =>
-                u.personas.filter((p) => p.relacion === rel).map((p) => p.persona.nombre).join(", ") || "—";
-              return (
-                <tr key={u.id}>
-                  <td>
-                    {editable ? (
-                      <Link
-                        href={`/condominios/${id}/unidades/${u.id}`}
-                        className="font-medium text-blue-700 hover:underline"
-                      >
-                        {u.numero}
-                      </Link>
-                    ) : (
-                      <span className="font-medium">{u.numero}</span>
-                    )}
-                  </td>
-                  <td>{ETIQUETAS_TIPO_UNIDAD[u.tipo]}</td>
-                  <td className="text-right tabular-nums">{formatoPorcentaje(u.alicuota)}</td>
-                  <td>{nombres("PROPIETARIO")}</td>
-                  <td>{nombres("RESIDENTE")}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Tabla>
+      {editable && (
+        <>
+          <Card className="mt-8 mb-20 md:mb-0">
+            <h2 id="agregar-unidad" className="mb-4 scroll-mt-24 text-lg font-bold">
+              Agregar unidad
+            </h2>
+            <UnidadForm accion={crearUnidad.bind(null, id)} textoBoton="Agregar" limpiarAlGuardar />
+          </Card>
+          <a
+            href="#agregar-unidad"
+            className="fixed right-4 bottom-6 z-20 inline-flex min-h-14 items-center gap-2 rounded-full bg-marca px-5 font-bold text-white shadow-lg hover:bg-marca-oscuro md:hidden"
+          >
+            <Plus size={20} aria-hidden="true" /> Agregar unidad
+          </a>
+        </>
       )}
     </>
   );

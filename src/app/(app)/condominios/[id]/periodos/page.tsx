@@ -51,14 +51,14 @@ export default async function PeriodosPage({ params }: PageProps<"/condominios/[
             {periodos.map((p) => (
               <tr key={p.id}>
                 <td>
-                  <Link href={`/condominios/${id}/periodos/${p.id}`} className="font-medium text-blue-700 hover:underline">
+                  <Link href={`/condominios/${id}/periodos/${p.id}`} className="font-medium text-marca hover:underline">
                     {nombrePeriodo(p.anio, p.mes)}
                   </Link>
                 </td>
                 <td>
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
-                      p.estado === "ABIERTO" ? "bg-amber-50 text-amber-700" : "bg-gray-100 text-gray-700"
+                      p.estado === "ABIERTO" ? "bg-alerta-suave text-alerta" : "bg-gray-100 text-texto"
                     }`}
                   >
                     {p.estado === "ABIERTO" ? "Abierto" : "Cerrado"}

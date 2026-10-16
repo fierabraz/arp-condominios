@@ -67,7 +67,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
   },
 ];
 
-export const FAVORITOS_INICIALES = ["egresos", "gasto-comun", "conciliacion", "residentes", "recaudacion", "votaciones"];
+export const FAVORITOS_INICIALES = ["gasto-comun", "recaudacion", "egresos", "residentes", "votaciones"];
 
 export const TODOS_LOS_MODULOS = GRUPOS_MODULOS.flatMap((g) => g.modulos);
 

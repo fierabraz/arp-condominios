@@ -42,7 +42,7 @@ export function VotacionForm({
           <textarea
             name="descripcion"
             rows={4}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-marca focus:outline-none focus:ring-1 focus:ring-marca"
             placeholder="Explica qué se vota, costos y plazos."
           />
         </Campo>
@@ -57,11 +57,11 @@ export function VotacionForm({
         </Select>
       </Campo>
       <fieldset className="sm:col-span-2">
-        <legend className="mb-1 text-sm font-medium text-gray-700">Opciones</legend>
+        <legend className="mb-1 text-sm font-medium text-texto">Opciones</legend>
         <div className="space-y-2">
           {opciones.map((o, i) => (
             <div key={o.id} className="flex items-center gap-2">
-              <span className="w-5 text-right text-sm text-gray-500">{i + 1}.</span>
+              <span className="w-5 text-right text-sm text-texto-suave">{i + 1}.</span>
               <Input
                 name="opcion"
                 aria-label={`Opción ${i + 1}`}
@@ -73,7 +73,7 @@ export function VotacionForm({
                   type="button"
                   onClick={() => setOpciones(opciones.filter((x) => x.id !== o.id))}
                   aria-label={`Quitar opción ${i + 1}`}
-                  className="rounded p-1.5 text-gray-500 hover:bg-gray-100"
+                  className="rounded p-1.5 text-texto-suave hover:bg-gray-100"
                 >
                   <X size={16} />
                 </button>
@@ -84,17 +84,17 @@ export function VotacionForm({
         <button
           type="button"
           onClick={() => setOpciones([...opciones, { id: Math.max(...opciones.map((x) => x.id)) + 1, texto: "" }])}
-          className="mt-2 inline-flex items-center gap-1 text-sm text-blue-700 hover:underline"
+          className="mt-2 inline-flex items-center gap-1 text-sm text-marca hover:underline"
         >
           <Plus size={15} /> Agregar opción
         </button>
-        {e.opciones && <p className="mt-1 text-sm text-red-600">{e.opciones[0]}</p>}
+        {e.opciones && <p className="mt-1 text-sm text-peligro">{e.opciones[0]}</p>}
       </fieldset>
       <div className="flex items-center gap-3 sm:col-span-2">
         <Boton type="submit" disabled={pendiente}>
           {pendiente ? "Guardando…" : "Guardar votación"}
         </Boton>
-        <span className="text-sm text-gray-500">Queda en “Por publicar” hasta que la publiques.</span>
+        <span className="text-sm text-texto-suave">Queda en “Por publicar” hasta que la publiques.</span>
         <Mensaje texto={estado.mensaje} />
       </div>
     </form>

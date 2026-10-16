@@ -15,11 +15,11 @@ export default async function MorosidadPage({ params }: PageProps<"/condominios/
       <PageHeader titulo="Morosidad" descripcion={`${condominio.nombre} · Unidades con cobros vencidos sin pagar.`} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Card>
-          <p className="text-sm text-gray-600">Unidades morosas</p>
+          <p className="text-sm text-texto-suave">Unidades morosas</p>
           <p className="mt-1 text-2xl font-semibold">{filas.length}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Deuda vencida total</p>
+          <p className="text-sm text-texto-suave">Deuda vencida total</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{formatoMoneda(total, moneda)}</p>
         </Card>
       </div>
@@ -40,7 +40,7 @@ export default async function MorosidadPage({ params }: PageProps<"/condominios/
               <tr key={f.unidadId}>
                 <td className="font-medium">
                   {editable ? (
-                    <Link href={`/condominios/${id}/unidades/${f.unidadId}`} className="text-blue-700 hover:underline">
+                    <Link href={`/condominios/${id}/unidades/${f.unidadId}`} className="text-marca hover:underline">
                       {f.numero}
                     </Link>
                   ) : (
@@ -49,7 +49,7 @@ export default async function MorosidadPage({ params }: PageProps<"/condominios/
                 </td>
                 <td className="text-right">{f.avisos}</td>
                 <td>{formatoFecha(f.desde)}</td>
-                <td className="text-right font-medium tabular-nums text-amber-700">{formatoMoneda(f.deuda, moneda)}</td>
+                <td className="text-right font-medium tabular-nums text-alerta">{formatoMoneda(f.deuda, moneda)}</td>
               </tr>
             ))}
           </tbody>

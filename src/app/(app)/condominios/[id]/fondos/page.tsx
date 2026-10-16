@@ -27,11 +27,11 @@ export default async function FondosPage({ params }: PageProps<"/condominios/[id
       <PageHeader titulo="Fondos" descripcion={`${condominio.nombre} · Fondo de reserva cobrado en cada aviso mensual.`} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Card>
-          <p className="text-sm text-gray-600">Fondo de reserva acumulado</p>
+          <p className="text-sm text-texto-suave">Fondo de reserva acumulado</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{$(acumulado)}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Aporte mensual</p>
+          <p className="text-sm text-texto-suave">Aporte mensual</p>
           <p className="mt-1 text-2xl font-semibold">{formatoPorcentaje(condominio.porcentajeReserva, 2)} del gasto común</p>
         </Card>
       </div>
@@ -57,7 +57,7 @@ export default async function FondosPage({ params }: PageProps<"/condominios/[id
           </tbody>
         </Tabla>
       )}
-      <p className="mt-3 text-xs text-gray-500">
+      <p className="mt-3 text-xs text-texto-suave">
         Muestra lo cobrado al fondo en los avisos. Los retiros del fondo y el saldo en banco llegarán con la conciliación bancaria.
       </p>
     </>

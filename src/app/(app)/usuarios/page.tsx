@@ -44,11 +44,11 @@ export default async function UsuariosPage() {
               <td className="font-medium">{u.nombre}</td>
               <td>{u.correo}</td>
               <td>{ETIQUETAS_ROL[u.rol]}</td>
-              <td className="text-gray-600">{u.condominio?.nombre ?? u.persona?.nombre ?? "Todo"}</td>
+              <td className="text-texto-suave">{u.condominio?.nombre ?? u.persona?.nombre ?? "Todo"}</td>
               <td className="text-right">
                 {u.id !== actual.id && (
                   <form action={eliminarUsuario.bind(null, u.id)}>
-                    <button className="text-sm text-red-700 hover:underline">Eliminar</button>
+                    <button className="text-sm text-peligro hover:underline">Eliminar</button>
                   </form>
                 )}
               </td>

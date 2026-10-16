@@ -94,17 +94,17 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-sm text-gray-600">Gastos comunes</p>
+          <p className="text-sm text-texto-suave">Gastos comunes</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{$(totalComun)}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Cargos individuales</p>
+          <p className="text-sm text-texto-suave">Cargos individuales</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{$(totalIndividual)}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">{abierto ? "Se cobrará en total" : "Por cobrar"}</p>
+          <p className="text-sm text-texto-suave">{abierto ? "Se cobrará en total" : "Por cobrar"}</p>
           <p className="mt-1 text-2xl font-semibold tabular-nums">{$(abierto ? totalLineas : totalSaldo)}</p>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-texto-suave">
             {abierto
               ? `Incluye fondo de reserva de ${condominio.porcentajeReserva.toString()} %`
               : `de ${$(totalLineas)} emitido`}
@@ -147,7 +147,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 <td>
                   {g.descripcion}
                   {(g.proveedor || g.documento) && (
-                    <span className="block text-xs text-gray-500">
+                    <span className="block text-xs text-texto-suave">
                       {[g.proveedor, g.documento && `doc. ${g.documento}`].filter(Boolean).join(" · ")}
                     </span>
                   )}
@@ -157,7 +157,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 {abierto && editable && (
                   <td className="text-right">
                     <form action={eliminarGasto.bind(null, g.id)}>
-                      <button className="text-sm text-red-700 hover:underline">Quitar</button>
+                      <button className="text-sm text-peligro hover:underline">Quitar</button>
                     </form>
                   </td>
                 )}
@@ -175,7 +175,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
         )}
       </div>
       {!abierto && editable && !smtpConfigurado() && (
-        <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="mb-3 rounded-lg bg-alerta-suave px-3 py-2 text-sm text-alerta">
           Modo de prueba: aún no hay un servidor de correo configurado, así que los correos no salen. Se guarda una
           copia de cada uno en la carpeta correos-simulados para revisarlos.
         </p>
@@ -183,7 +183,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
       {errorPrevia ? (
         <Vacio>
           No se puede calcular el cobro: {errorPrevia}{" "}
-          <Link href={`/condominios/${id}`} className="text-blue-700 hover:underline">
+          <Link href={`/condominios/${id}`} className="text-marca hover:underline">
             Revisar unidades
           </Link>
         </Vacio>
@@ -212,12 +212,12 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 <td className="text-right tabular-nums">{l.interes ? $(l.interes) : "—"}</td>
                 <td className="text-right font-medium tabular-nums">{$(l.total)}</td>
                 {!abierto && (
-                  <td className={`text-right tabular-nums ${l.saldo ? "text-amber-700" : "text-green-700"}`}>
+                  <td className={`text-right tabular-nums ${l.saldo ? "text-alerta" : "text-exito"}`}>
                     {l.saldo ? $(l.saldo) : "Pagado"}
                   </td>
                 )}
                 {!abierto && editable && (
-                  <td className="whitespace-nowrap text-xs text-gray-600">
+                  <td className="whitespace-nowrap text-xs text-texto-suave">
                     {l.envio
                       ? `${ETIQUETAS_ENVIO[l.envio.estado as keyof typeof ETIQUETAS_ENVIO]} ${formatoFecha(l.envio.creadoEn)}`
                       : "—"}
@@ -225,7 +225,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 )}
                 {!abierto && (
                   <td className="text-right">
-                    <a href={`/avisos/${l.avisoId}/pdf`} target="_blank" rel="noopener" className="text-sm text-blue-700 hover:underline">
+                    <a href={`/avisos/${l.avisoId}/pdf`} target="_blank" rel="noopener" className="text-sm text-marca hover:underline">
                       PDF
                     </a>
                   </td>

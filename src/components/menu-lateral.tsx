@@ -27,6 +27,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { Logo } from "@/components/logo";
 import { FAVORITOS_INICIALES, GRUPOS_MODULOS, TODOS_LOS_MODULOS, rutaModulo, type Modulo } from "@/lib/modulos";
 
 export const ICONOS = {
@@ -98,8 +99,8 @@ function activo(href: string, ruta: string, enlaces: EnlaceMenu[]) {
 }
 
 const claseEnlace = (activo: boolean) =>
-  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] transition ${
-    activo ? "bg-white/15 font-medium text-white" : "text-gray-300 hover:bg-white/10 hover:text-white"
+  `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-[15px] transition ${
+    activo ? "bg-marca-suave font-semibold text-marca" : "text-texto hover:bg-gray-100"
   }`;
 
 function MenuPrincipal({ enlaces, ruta }: { enlaces: EnlaceMenu[]; ruta: string }) {
@@ -136,7 +137,10 @@ function MenuPropiedad({
   const esActual = (href: string) => ruta === href || ruta.startsWith(href + "/");
   const grupoActual = GRUPOS_MODULOS.find((g) => g.modulos.some((m) => esActual(rutaModulo(propiedad.id, m))))?.clave;
   const [abiertos, setAbiertos] = useState<string[]>(grupoActual ? [grupoActual] : []);
-  const visibles = (m: Modulo) => editable || !m.soloAdmin;
+  // Solo se listan los módulos que ya funcionan; los que vienen van juntos al final.
+  const permitidos = (m: Modulo) => editable || !m.soloAdmin;
+  const visibles = (m: Modulo) => permitidos(m) && !!m.ruta;
+  const proximos = TODOS_LOS_MODULOS.filter((m) => permitidos(m) && !m.ruta);
 
   const filaModulo = (m: Modulo, sangria = true) => {
     const href = rutaModulo(propiedad.id, m);
@@ -147,19 +151,18 @@ function MenuPropiedad({
         <Link
           href={href}
           aria-current={actual ? "page" : undefined}
-          className={`flex-1 rounded-lg py-1.5 pr-2 text-[14px] transition ${sangria ? "pl-11" : "pl-3"} ${
-            actual ? "bg-white/15 font-medium text-white" : "text-gray-300 hover:bg-white/10 hover:text-white"
+          className={`flex min-h-10 flex-1 items-center rounded-xl py-1.5 pr-2 text-[15px] transition ${sangria ? "pl-11" : "pl-3"} ${
+            actual ? "bg-marca-suave font-semibold text-marca" : "text-texto hover:bg-gray-100"
           }`}
         >
           {m.texto}
-          {!m.ruta && <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-400">Pronto</span>}
         </Link>
         <button
           type="button"
           onClick={() => alternarFavorito(m.clave)}
           aria-label={fav ? `Quitar ${m.texto} de favoritos` : `Agregar ${m.texto} a favoritos`}
           aria-pressed={fav}
-          className={`rounded p-1.5 ${fav ? "text-amber-400" : "text-gray-500 opacity-0 hover:text-amber-300 group-hover:opacity-100 focus:opacity-100"}`}
+          className={`rounded-lg p-2 ${fav ? "text-amber-500" : "text-texto-suave hover:text-amber-500 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100"}`}
         >
           <Star size={15} fill={fav ? "currentColor" : "none"} />
         </button>
@@ -176,18 +179,19 @@ function MenuPropiedad({
   return (
     <nav className="flex flex-col gap-1 px-3 pb-3">
       {volver && (
-        <Link href="/condominios" className="mb-1 flex items-center gap-2 px-3 py-1 text-sm text-gray-400 hover:text-white">
+        <Link href="/condominios" className="mb-1 flex min-h-9 items-center gap-2 px-3 text-sm text-texto-suave hover:text-texto">
           <ArrowLeft size={15} /> Mis propiedades
         </Link>
       )}
-      <p className="px-3 pb-2 text-base font-semibold text-white">{propiedad.nombre}</p>
-      <label className="mx-1 mb-2 flex items-center gap-2 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm">
-        <Search size={15} className="text-gray-400" />
+      <p className="px-3 pb-2 text-base font-bold">{propiedad.nombre}</p>
+      <label className="mx-1 mb-2 flex min-h-11 items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 text-sm focus-within:border-marca">
+        <Search size={16} className="text-texto-suave" aria-hidden="true" />
         <input
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="Buscar módulos"
-          className="w-full bg-transparent text-gray-100 placeholder:text-gray-500 focus:outline-none"
+          aria-label="Buscar módulos"
+          className="w-full bg-transparent text-base text-texto placeholder:text-texto-suave focus:outline-none md:text-sm"
         />
       </label>
 
@@ -195,14 +199,14 @@ function MenuPropiedad({
         resultados.length ? (
           resultados.map((m) => filaModulo(m, false))
         ) : (
-          <p className="px-3 py-2 text-sm text-gray-500">Sin resultados.</p>
+          <p className="px-3 py-2 text-sm text-texto-suave">Sin resultados.</p>
         )
       ) : (
         <>
           {listaFavoritos.length > 0 && (
-            <div className="mb-1 border-b border-white/10 pb-2">
-              <p className="flex items-center gap-3 px-3 py-2 text-[15px] text-gray-200">
-                <Star size={18} className="text-amber-400" fill="currentColor" /> Favoritos
+            <div className="mb-1 border-b border-borde pb-2">
+              <p className="flex items-center gap-3 px-3 py-2 text-[15px] font-semibold">
+                <Star size={18} className="text-amber-500" fill="currentColor" /> Favoritos
               </p>
               {listaFavoritos.map((m) => filaModulo(m))}
             </div>
@@ -218,13 +222,13 @@ function MenuPropiedad({
           {GRUPOS_MODULOS.map((g) => {
             const Icono = ICONOS_GRUPO[g.icono];
             const modulos = g.modulos.filter(visibles);
+            if (modulos.length === 0) return null;
             if (modulos.length === 1) {
               const m = modulos[0];
               const href = rutaModulo(propiedad.id, m);
               return (
                 <Link key={g.clave} href={href} className={claseEnlace(esActual(href))}>
                   <Icono size={18} strokeWidth={2.2} /> {g.texto}
-                  {!m.ruta && <span className="ml-auto rounded bg-white/10 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-400">Pronto</span>}
                 </Link>
               );
             }
@@ -244,6 +248,20 @@ function MenuPropiedad({
               </div>
             );
           })}
+          {proximos.length > 0 && (
+            <details className="mt-3 rounded-xl border border-borde px-3 py-2 text-sm">
+              <summary className="cursor-pointer py-1 text-texto-suave">Próximamente ({proximos.length})</summary>
+              <ul className="mt-1 pb-1">
+                {proximos.map((m) => (
+                  <li key={m.clave}>
+                    <Link href={rutaModulo(propiedad.id, m)} className="block rounded-lg px-2 py-1.5 text-texto hover:bg-gray-100">
+                      {m.texto}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </>
       )}
     </nav>
@@ -252,7 +270,6 @@ function MenuPropiedad({
 
 export function MenuLateral({
   enlaces,
-  titulo,
   subtitulo,
   usuario,
   rol,
@@ -263,7 +280,6 @@ export function MenuLateral({
   propiedades?: PropiedadMenu[];
   editable?: boolean;
   enlaces: EnlaceMenu[];
-  titulo: string;
   subtitulo: string;
   usuario: string;
   rol: string;
@@ -281,16 +297,15 @@ export function MenuLateral({
   }
 
   return (
-    <aside className="bg-[#23232f] text-gray-200 md:sticky md:top-0 md:flex md:h-screen md:w-72 md:shrink-0 md:flex-col">
-      <div className="flex items-center justify-between gap-3 p-5">
+    <aside className="sticky top-0 z-30 border-b border-borde bg-white text-texto md:flex md:h-screen md:w-72 md:shrink-0 md:flex-col md:border-r md:border-b-0">
+      <div className="flex h-20 items-center justify-between gap-3 px-5">
         <div className="min-w-0">
-          <p className="text-lg font-semibold text-white">{titulo}</p>
-          <p className="truncate text-sm text-gray-400">{subtitulo}</p>
+          <Logo subtitulo={subtitulo} />
         </div>
         <button
           type="button"
           onClick={() => setAbierto(!abierto)}
-          className="rounded-lg p-2 text-gray-300 hover:bg-white/10 md:hidden"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-borde text-texto hover:bg-gray-100 md:hidden"
           aria-label={abierto ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={abierto}
         >
@@ -298,7 +313,9 @@ export function MenuLateral({
         </button>
       </div>
 
-      <div className={`${abierto ? "block" : "hidden"} md:flex md:min-h-0 md:flex-1 md:flex-col`}>
+      <div
+        className={`${abierto ? "fixed inset-x-0 bottom-0 top-20 z-40 flex flex-col overflow-y-auto border-t border-borde bg-white" : "hidden"} md:static md:flex md:min-h-0 md:flex-1 md:flex-col md:overflow-visible md:border-0`}
+      >
         <div className="md:min-h-0 md:flex-1 md:overflow-y-auto">
         {propiedad ? (
           <MenuPropiedad
@@ -313,17 +330,17 @@ export function MenuLateral({
         )}
         </div>
 
-        <div className="mt-auto shrink-0 border-t border-white/10 p-4">
-          <p className="truncate px-2 text-sm font-medium text-white">{usuario}</p>
-          <p className="px-2 text-xs text-gray-400">{rol}</p>
+        <div className="mt-auto shrink-0 border-t border-borde p-4">
+          <p className="truncate px-2 text-sm font-semibold">{usuario}</p>
+          <p className="px-2 text-xs text-texto-suave">{rol}</p>
           <Link
             href="/contrasena"
-            className="mt-3 flex items-center gap-3 rounded-lg px-2 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white"
+            className="mt-3 flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-gray-100"
           >
             <KeyRound size={16} /> Cambiar contraseña
           </Link>
           <form action={cerrarSesion}>
-            <button className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-white">
+            <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-gray-100">
               <LogOut size={16} /> Cerrar sesión
             </button>
           </form>

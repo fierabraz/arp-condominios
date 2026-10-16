@@ -38,13 +38,13 @@ export default async function PersonasPage() {
             {personas.map((p) => (
               <tr key={p.id}>
                 <td>
-                  <Link href={`/personas/${p.id}`} className="font-medium text-blue-700 hover:underline">
+                  <Link href={`/personas/${p.id}`} className="font-medium text-marca hover:underline">
                     {p.nombre}
                   </Link>
                 </td>
                 <td>{p.documento ?? "—"}</td>
                 <td>{p.correo ?? "—"}</td>
-                <td className="text-gray-600">
+                <td className="text-texto-suave">
                   {p.unidades
                     .map(
                       (v) =>
