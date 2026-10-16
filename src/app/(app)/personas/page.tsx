@@ -17,7 +17,7 @@ export default async function PersonasPage() {
 
   return (
     <>
-      <PageHeader titulo="Personas" descripcion="Propietarios y residentes de tus condominios" />
+      <PageHeader titulo="Propietarios y residentes" descripcion="Personas vinculadas a las unidades de tus propiedades" />
       <Card className="mb-6">
         <h2 className="mb-4 font-medium">Registrar persona</h2>
         <PersonaForm accion={crearPersona} textoBoton="Registrar" limpiarAlGuardar />

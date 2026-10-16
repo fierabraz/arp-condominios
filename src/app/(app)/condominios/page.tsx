@@ -15,11 +15,12 @@ export default async function CondominiosPage() {
   return (
     <>
       <PageHeader
-        titulo="Condominios"
-        acciones={<BotonLink href="/condominios/nuevo">Nuevo condominio</BotonLink>}
+        titulo="Mis propiedades"
+        descripcion="Edificios y condominios que administras"
+        acciones={<BotonLink href="/condominios/nuevo">Crear propiedad</BotonLink>}
       />
       {condominios.length === 0 ? (
-        <Vacio>Aún no tienes condominios. Crea el primero para empezar.</Vacio>
+        <Vacio>Aún no tienes propiedades. Crea la primera para empezar.</Vacio>
       ) : (
         <Tabla>
           <thead>

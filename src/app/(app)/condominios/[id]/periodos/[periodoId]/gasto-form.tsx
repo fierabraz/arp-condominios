@@ -9,10 +9,12 @@ export function GastoForm({
   accion,
   unidades,
   fecha,
+  proveedores = [],
 }: {
   accion: (estado: EstadoForm, formData: FormData) => Promise<EstadoForm>;
   unidades: { id: string; numero: string }[];
   fecha: string;
+  proveedores?: string[];
 }) {
   const [estado, enviar, pendiente] = useActionState(accion, {});
   const [tipo, setTipo] = useState("COMUN");
@@ -65,7 +67,12 @@ export function GastoForm({
         <Input name="monto" inputMode="decimal" placeholder="150.000" required />
       </Campo>
       <Campo etiqueta="Proveedor" error={e.proveedor}>
-        <Input name="proveedor" />
+        <Input name="proveedor" list="lista-proveedores" autoComplete="off" />
+        <datalist id="lista-proveedores">
+          {proveedores.map((p) => (
+            <option key={p} value={p} />
+          ))}
+        </datalist>
       </Campo>
       <Campo etiqueta="N° boleta o factura" error={e.documento}>
         <Input name="documento" />

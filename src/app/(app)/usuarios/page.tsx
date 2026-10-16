@@ -23,7 +23,7 @@ export default async function UsuariosPage() {
 
   return (
     <>
-      <PageHeader titulo="Usuarios" descripcion="Quién puede entrar al sistema y qué puede ver" />
+      <PageHeader titulo="Permisos" descripcion="Quién puede entrar al sistema y qué puede ver" />
       <Card className="mb-6">
         <h2 className="mb-4 font-medium">Nueva cuenta</h2>
         <UsuarioForm accion={crearUsuario} condominios={condominios} personas={personas} />

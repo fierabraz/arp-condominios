@@ -35,6 +35,9 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
     orderBy: { numero: "asc" },
     select: { id: true, numero: true },
   });
+  const proveedores = editable
+    ? await db.proveedor.findMany({ where: { administradoraId }, orderBy: { nombre: "asc" }, select: { nombre: true } })
+    : [];
   const numeroDe = new Map(unidades.map((u) => [u.id, u.numero]));
   const abierto = periodo.estado === "ABIERTO";
   const nombre = nombrePeriodo(periodo.anio, periodo.mes);
@@ -114,7 +117,12 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
       {abierto && editable && (
         <Card className="mb-6">
           <h2 className="mb-4 font-medium">Registrar gasto</h2>
-          <GastoForm accion={agregarGasto.bind(null, periodoId)} unidades={unidades} fecha={fechaGasto} />
+          <GastoForm
+            accion={agregarGasto.bind(null, periodoId)}
+            unidades={unidades}
+            fecha={fechaGasto}
+            proveedores={proveedores.map((p) => p.nombre)}
+          />
         </Card>
       )}
 
