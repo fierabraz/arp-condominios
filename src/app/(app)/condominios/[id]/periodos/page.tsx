@@ -5,7 +5,6 @@ import { formatoMoneda } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
 import { abrirPeriodo } from "../../cobro-actions";
 import { condominioVisible } from "../condominio-actual";
-import { NavCondominio } from "../nav-condominio";
 import { PeriodoForm } from "./periodo-form";
 
 export default async function PeriodosPage({ params }: PageProps<"/condominios/[id]/periodos">) {
@@ -28,8 +27,7 @@ export default async function PeriodosPage({ params }: PageProps<"/condominios/[
 
   return (
     <>
-      <PageHeader titulo={condominio.nombre} descripcion="Cada mes se abre un período, se cargan los gastos y se cierra para emitir los cobros." />
-      <NavCondominio id={id} actual="/periodos" />
+      <PageHeader titulo="Gasto común" descripcion={`${condominio.nombre} · Cada mes se abre un período, se cargan los gastos y se cierra para emitir los cobros.`} />
       {editable && (
         <Card className="mb-6">
           <h2 className="mb-4 font-medium">Abrir nuevo período</h2>

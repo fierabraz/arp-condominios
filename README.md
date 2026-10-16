@@ -19,6 +19,9 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 - Menú lateral con Mis propiedades, Propietarios y residentes, Permisos, Reportes globales, Panel de propiedades, Crear propiedad y Catálogo de proveedores (en el celular se despliega con el botón de menú).
 - Reportes globales: emitido, recaudado, porcentaje de cobranza, deuda vencida y morosos de todas las propiedades.
 - Catálogo de proveedores con RUT, rubro y contacto; aparecen como sugerencia al cargar un gasto y muestran cuánto se les ha pagado.
+- Mis propiedades en tarjetas: RUT, último gasto común emitido y si se notificó, recaudación del último mes y morosidad.
+- Panel de cada propiedad con el Muro de la comunidad (publicar, ver, editar, descargar en PDF, compartir por WhatsApp y eliminar) y accesos rápidos. Los residentes ven el muro en su cuenta.
+- Menú de la propiedad por módulos, con buscador y favoritos: Cobranza y recaudación, Conserjería, Contabilidad y finanzas (Egresos, Fondos, Rendiciones), Comunidad conectada y Remuneraciones. Los módulos marcados "Pronto" aún no existen y muestran qué harán.
 - Cada usuario puede cambiar su contraseña.
 - Envío de los avisos de cobro por correo, con el PDF adjunto, a los propietarios y residentes que tengan correo registrado. Cada envío queda registrado.
 

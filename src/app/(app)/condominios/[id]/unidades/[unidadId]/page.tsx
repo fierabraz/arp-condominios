@@ -35,7 +35,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
       <PageHeader
         titulo={`Unidad ${unidad.numero}`}
         descripcion={
-          <Link href={`/condominios/${id}`} className="text-blue-700 hover:underline">
+          <Link href={`/condominios/${id}/unidades`} className="text-blue-700 hover:underline">
             {unidad.condominio.nombre}
           </Link>
         }

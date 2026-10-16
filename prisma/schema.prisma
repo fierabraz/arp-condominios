@@ -70,6 +70,7 @@ model Administradora {
   avisos       AvisoCobro[]
   pagos        Pago[]
   proveedores  Proveedor[]
+  publicaciones Publicacion[]
 }
 
 model Usuario {
@@ -95,6 +96,7 @@ model Condominio {
   administradoraId   String
   administradora     Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   nombre             String
+  rut                String?
   direccion          String
   comuna             String?
   // Porcentaje del gasto común que va al fondo de reserva (ej. 5 = 5 %)
@@ -104,9 +106,10 @@ model Condominio {
   diaVencimiento     Int      @default(10)
   creadoEn           DateTime @default(now())
 
-  unidades  Unidad[]
-  periodos  Periodo[]
-  usuarios  Usuario[]
+  unidades      Unidad[]
+  periodos      Periodo[]
+  usuarios      Usuario[]
+  publicaciones Publicacion[]
 
   @@index([administradoraId])
 }
@@ -277,4 +280,20 @@ model Proveedor {
   creadoEn         DateTime @default(now())
 
   @@unique([administradoraId, nombre])
+}
+
+// Publicaciones del muro de la propiedad: avisos, convocatorias, noticias.
+model Publicacion {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  titulo           String
+  contenido        String
+  autor            String
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+
+  @@index([condominioId, creadoEn])
 }

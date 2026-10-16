@@ -7,7 +7,6 @@ import { nombrePeriodo } from "@/lib/cobro";
 import { ErrorCobro, previsualizarPeriodo } from "@/lib/cobro-servicio";
 import { agregarGasto, cerrarPeriodo, eliminarGasto, enviarAvisos } from "../../../cobro-actions";
 import { condominioVisible } from "../../condominio-actual";
-import { NavCondominio } from "../../nav-condominio";
 import { GastoForm } from "./gasto-form";
 import { CerrarForm } from "./cerrar-form";
 import { EnviarForm } from "./enviar-form";
@@ -92,7 +91,6 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
           !abierto && <BotonDocumento href={`/rendiciones/${periodo.id}/pdf`}>Rendición en PDF</BotonDocumento>
         }
       />
-      <NavCondominio id={id} actual="/periodos" />
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>

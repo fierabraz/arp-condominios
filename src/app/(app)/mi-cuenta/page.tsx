@@ -5,6 +5,7 @@ import { ETIQUETAS_TIPO_UNIDAD, formatoPorcentaje } from "@/lib/formato";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { nombrePeriodo } from "@/lib/cobro";
 import { EstadoCuenta } from "@/components/estado-cuenta";
+import { TarjetaPublicacion } from "@/components/publicacion";
 
 export default async function MiCuentaPage() {
   const usuario = await requireUsuario(["RESIDENTE"]);
@@ -23,6 +24,12 @@ export default async function MiCuentaPage() {
     take: 12,
     include: { condominio: { select: { nombre: true } } },
   });
+  const publicaciones = await db.publicacion.findMany({
+    where: { condominioId: { in: condominioIds } },
+    orderBy: { creadoEn: "desc" },
+    take: 5,
+    include: { condominio: { select: { id: true, nombre: true } } },
+  });
   const estados = await Promise.all(
     unidadesUnicas.map(async (v) => ({ v, estado: await estadoCuenta(v.unidadId, usuario.administradoraId!) })),
   );
@@ -30,6 +37,16 @@ export default async function MiCuentaPage() {
   return (
     <>
       <PageHeader titulo="Mi cuenta" descripcion={`Hola, ${usuario.nombre}`} />
+      {publicaciones.length > 0 && (
+        <section className="mb-10">
+          <h2 className="mb-3 text-xl font-semibold text-emerald-700">Muro de la comunidad</h2>
+          <div className="space-y-3">
+            {publicaciones.map((p) => (
+              <TarjetaPublicacion key={p.id} p={p} editable={false} completa />
+            ))}
+          </div>
+        </section>
+      )}
       {vinculos.length === 0 ? (
         <Vacio>Tu cuenta aún no está vinculada a ninguna unidad. Contacta a tu administración.</Vacio>
       ) : (

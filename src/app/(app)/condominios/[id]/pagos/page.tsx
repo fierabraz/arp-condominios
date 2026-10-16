@@ -3,7 +3,6 @@ import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { ETIQUETAS_MEDIO_PAGO, formatoFecha, formatoMoneda, hoyISO } from "@/lib/formato";
 import { eliminarPago, nuevoPago } from "../../cobro-actions";
 import { condominioVisible } from "../condominio-actual";
-import { NavCondominio } from "../nav-condominio";
 import { PagoForm } from "./pago-form";
 
 export default async function PagosPage({ params }: PageProps<"/condominios/[id]/pagos">) {
@@ -27,8 +26,7 @@ export default async function PagosPage({ params }: PageProps<"/condominios/[id]
 
   return (
     <>
-      <PageHeader titulo={condominio.nombre} descripcion="Cada pago se aplica primero a la deuda más antigua de la unidad." />
-      <NavCondominio id={id} actual="/pagos" />
+      <PageHeader titulo="Recaudación" descripcion={`${condominio.nombre} · Cada pago se aplica primero a la deuda más antigua de la unidad.`} />
       {editable && (
         <Card className="mb-6">
           <h2 className="mb-4 font-medium">Registrar pago</h2>

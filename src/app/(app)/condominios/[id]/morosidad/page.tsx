@@ -3,7 +3,6 @@ import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { morosidad } from "@/lib/cobro-servicio";
 import { condominioVisible } from "../condominio-actual";
-import { NavCondominio } from "../nav-condominio";
 
 export default async function MorosidadPage({ params }: PageProps<"/condominios/[id]/morosidad">) {
   const { id } = await params;
@@ -13,8 +12,7 @@ export default async function MorosidadPage({ params }: PageProps<"/condominios/
 
   return (
     <>
-      <PageHeader titulo={condominio.nombre} descripcion="Unidades con cobros vencidos sin pagar." />
-      <NavCondominio id={id} actual="/morosidad" />
+      <PageHeader titulo="Morosidad" descripcion={`${condominio.nombre} · Unidades con cobros vencidos sin pagar.`} />
       <div className="mb-6 grid gap-4 sm:grid-cols-2">
         <Card>
           <p className="text-sm text-gray-600">Unidades morosas</p>
