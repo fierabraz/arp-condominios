@@ -47,6 +47,17 @@ enum EstadoEnvio {
   ERROR
 }
 
+enum EstadoVotacion {
+  BORRADOR // aún no la ven los residentes
+  ABIERTA
+  CERRADA
+}
+
+enum PonderacionVoto {
+  ALICUOTA // cada unidad pesa según su alícuota (lo habitual en copropiedad)
+  UNIDAD // una unidad, un voto
+}
+
 enum MedioPago {
   TRANSFERENCIA
   EFECTIVO
@@ -71,6 +82,7 @@ model Administradora {
   pagos        Pago[]
   proveedores  Proveedor[]
   publicaciones Publicacion[]
+  votaciones   Votacion[]
 }
 
 model Usuario {
@@ -110,6 +122,7 @@ model Condominio {
   periodos      Periodo[]
   usuarios      Usuario[]
   publicaciones Publicacion[]
+  votaciones    Votacion[]
 
   @@index([administradoraId])
 }
@@ -146,6 +159,7 @@ model Unidad {
   gastos   Gasto[]
   avisos   AvisoCobro[]
   pagos    Pago[]
+  votos    Voto[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -296,4 +310,53 @@ model Publicacion {
   actualizadoEn    DateTime @updatedAt
 
   @@index([condominioId, creadoEn])
+}
+
+// Votaciones en línea de la propiedad. Vota una vez cada unidad; votan sus propietarios
+// desde su cuenta, o la administración registra el voto (por ejemplo, en una asamblea).
+model Votacion {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  titulo           String
+  descripcion      String?
+  estado           EstadoVotacion @default(BORRADOR)
+  ponderacion      PonderacionVoto @default(ALICUOTA)
+  cierraEn         DateTime
+  publicadaEn      DateTime?
+  cerradaEn        DateTime?
+  creadoEn         DateTime @default(now())
+
+  opciones OpcionVotacion[]
+  votos    Voto[]
+
+  @@index([condominioId, estado])
+}
+
+model OpcionVotacion {
+  id         String   @id @default(cuid())
+  votacionId String
+  votacion   Votacion @relation(fields: [votacionId], references: [id], onDelete: Cascade)
+  texto      String
+  orden      Int
+
+  votos Voto[]
+}
+
+model Voto {
+  id          String         @id @default(cuid())
+  votacionId  String
+  votacion    Votacion       @relation(fields: [votacionId], references: [id], onDelete: Cascade)
+  opcionId    String
+  opcion      OpcionVotacion @relation(fields: [opcionId], references: [id], onDelete: Cascade)
+  unidadId    String
+  unidad      Unidad         @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  // Quién emitió el voto: la persona (propietario) o la administración.
+  emitidoPor  String
+  presencial  Boolean        @default(false)
+  creadoEn    DateTime       @default(now())
+
+  @@unique([votacionId, unidadId])
 }

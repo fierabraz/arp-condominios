@@ -54,7 +54,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
     modulos: [
       { clave: "muro", texto: "Muro de la comunidad", ruta: "/muro", descripcion: "Publicaciones y avisos para los residentes." },
       { clave: "residentes", texto: "Residentes", ruta: "/unidades", descripcion: "Unidades, alícuotas, propietarios y residentes." },
-      { clave: "votaciones", texto: "Votaciones", descripcion: "Consultas y votaciones en línea para asambleas, ponderadas por alícuota." },
+      { clave: "votaciones", texto: "Votaciones", ruta: "/votaciones", descripcion: "Consultas y votaciones en línea para asambleas, ponderadas por alícuota." },
     ],
   },
   {

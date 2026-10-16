@@ -59,3 +59,41 @@ export function formatoFecha(fecha: Date) {
 export function hoyISO() {
   return new Date().toISOString().slice(0, 10);
 }
+
+export const ZONA_HORARIA = "America/Santiago";
+
+export function formatoFechaHora(fecha: Date) {
+  return new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short", timeZone: ZONA_HORARIA }).format(fecha);
+}
+
+/** Diferencia en milisegundos entre la hora de Chile y UTC en ese instante (negativa). */
+function desfaseChile(instante: Date) {
+  const partes = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: ZONA_HORARIA,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(instante)
+      .map((p) => [p.type, p.value]),
+  );
+  const local = Date.UTC(+partes.year, +partes.month - 1, +partes.day, +partes.hour, +partes.minute, +partes.second);
+  return local - Math.floor(instante.getTime() / 1000) * 1000;
+}
+
+/** Último segundo del día indicado ("AAAA-MM-DD"), en hora de Chile. */
+export function finDelDiaChile(fecha: string) {
+  const [a, m, d] = fecha.split("-").map(Number);
+  const comoUtc = Date.UTC(a, m - 1, d, 23, 59, 59);
+  return new Date(comoUtc - desfaseChile(new Date(comoUtc)));
+}
+
+/** Fecha de hoy en Chile, "AAAA-MM-DD". */
+export function hoyChile() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_HORARIA }).format(new Date());
+}
