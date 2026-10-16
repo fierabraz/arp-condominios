@@ -12,6 +12,7 @@ const CondominioSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
   direccion: z.string({ error: "Ingresa la dirección." }).min(3, { error: "Ingresa la dirección." }),
   comuna: z.string().optional(),
+  rut: z.string().optional(),
   porcentajeReserva: z
     .number({ error: "Ingresa un número." })
     .min(0, { error: "No puede ser negativo." })
@@ -32,6 +33,7 @@ function leerCondominio(formData: FormData) {
     nombre: aTexto(formData.get("nombre")),
     direccion: aTexto(formData.get("direccion")),
     comuna: aTexto(formData.get("comuna")),
+    rut: aTexto(formData.get("rut")),
     porcentajeReserva: aNumero(formData.get("porcentajeReserva")) ?? 5,
     tasaInteresMora: aNumero(formData.get("tasaInteresMora")) ?? 0,
     diaVencimiento: aNumero(formData.get("diaVencimiento")) ?? 10,
@@ -61,7 +63,7 @@ export async function editarCondominio(
     data: datos.data,
   });
   if (count === 0) return { mensaje: "Condominio no encontrado." };
-  revalidatePath(`/condominios/${id}`);
+  revalidatePath(`/condominios/${id}`, "layout");
   redirect(`/condominios/${id}`);
 }
 
@@ -100,7 +102,7 @@ export async function crearUnidad(
   if (existe) return { errores: { numero: ["Ya existe una unidad con ese número."] } };
 
   await db.unidad.create({ data: { ...datos.data, condominioId, administradoraId } });
-  revalidatePath(`/condominios/${condominioId}`);
+  revalidatePath(`/condominios/${condominioId}`, "layout");
   return { ok: true, mensaje: `Unidad ${datos.data.numero} agregada.` };
 }
 
@@ -122,7 +124,7 @@ export async function editarUnidad(
   if (repetida) return { errores: { numero: ["Ya existe una unidad con ese número."] } };
 
   await db.unidad.update({ where: { id: unidadId }, data: datos.data });
-  revalidatePath(`/condominios/${unidad.condominioId}`);
+  revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
   return { ok: true, mensaje: "Cambios guardados." };
 }
 
@@ -131,8 +133,8 @@ export async function eliminarUnidad(unidadId: string) {
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
   if (!unidad) return;
   await db.unidad.delete({ where: { id: unidadId } });
-  revalidatePath(`/condominios/${unidad.condominioId}`);
-  redirect(`/condominios/${unidad.condominioId}`);
+  revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
+  redirect(`/condominios/${unidad.condominioId}/unidades`);
 }
 
 const VinculoSchema = z.object({

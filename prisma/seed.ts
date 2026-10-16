@@ -27,6 +27,7 @@ async function main() {
     data: {
       administradoraId: adm.id,
       nombre: "Edificio Los Aromos",
+      rut: "65.123.456-7",
       direccion: "Av. Providencia 1234",
       comuna: "Providencia",
       porcentajeReserva: 5,
@@ -73,6 +74,34 @@ async function main() {
       { nombre: "Ana Administradora", correo: "admin@demo.cl", claveHash, rol: "ADMINISTRADOR", administradoraId: adm.id },
       { nombre: "Pedro Tesorero", correo: "comite@demo.cl", claveHash, rol: "COMITE", administradoraId: adm.id, condominioId: condominio.id },
       { nombre: "María González", correo: "maria@demo.cl", claveHash, rol: "RESIDENTE", administradoraId: adm.id, personaId: maria.id },
+    ],
+  });
+
+  const publicacion = (titulo: string, contenido: string, fecha: string) => ({
+    administradoraId: adm.id,
+    condominioId: condominio.id,
+    titulo,
+    contenido,
+    autor: "Ana Administradora",
+    creadoEn: new Date(fecha),
+  });
+  await db.publicacion.createMany({
+    data: [
+      publicacion(
+        "Corte de agua programado",
+        "Estimados residentes: el jueves 22 de octubre entre 10:00 y 14:00 horas Aguas Andinas hará trabajos en la red y no habrá agua en el edificio. Les sugerimos tomar precauciones.",
+        "2026-10-12T13:00:00Z",
+      ),
+      publicacion(
+        "Convocatoria a asamblea ordinaria",
+        "Se cita a asamblea ordinaria de copropietarios para el sábado 7 de noviembre a las 11:00 horas en la sala multiuso. Tabla: rendición anual, presupuesto 2027 y elección del comité.",
+        "2026-10-05T15:00:00Z",
+      ),
+      publicacion(
+        "Mantención de ascensores",
+        "Ascensores Chile realizará la mantención mensual el martes 29 de septiembre. Durante la mañana funcionará un ascensor a la vez.",
+        "2026-09-28T12:00:00Z",
+      ),
     ],
   });
 

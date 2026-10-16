@@ -1,4 +1,5 @@
-import { requireUsuario } from "@/lib/auth";
+import { puedeEditar, requireUsuario } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { cerrarSesion } from "@/app/login/actions";
 import { ETIQUETAS_ROL } from "@/lib/formato";
 import { MenuLateral, type EnlaceMenu } from "@/components/menu-lateral";
@@ -27,6 +28,17 @@ function enlaces(rol: Rol, condominioId: string | null): EnlaceMenu[] {
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const usuario = await requireUsuario();
+  // Propiedades cuyo menú de módulos puede ver: todas las de la administradora, o la del comité.
+  const propiedades =
+    usuario.administradoraId && (usuario.rol === "ADMINISTRADOR" || usuario.rol === "COMITE")
+      ? await db.condominio.findMany({
+          where: {
+            administradoraId: usuario.administradoraId,
+            ...(usuario.rol === "COMITE" ? { id: usuario.condominioId ?? "" } : {}),
+          },
+          select: { id: true, nombre: true },
+        })
+      : [];
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <MenuLateral
@@ -36,6 +48,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         usuario={usuario.nombre}
         rol={ETIQUETAS_ROL[usuario.rol]}
         cerrarSesion={cerrarSesion}
+        propiedades={propiedades}
+        editable={puedeEditar(usuario.rol)}
       />
       <main className="flex-1 p-4 md:p-8">
         <div className="mx-auto max-w-5xl">{children}</div>

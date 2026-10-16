@@ -8,6 +8,7 @@ type Valores = {
   nombre?: string;
   direccion?: string;
   comuna?: string | null;
+  rut?: string | null;
   porcentajeReserva?: string;
   tasaInteresMora?: string;
   diaVencimiento?: number;
@@ -32,11 +33,12 @@ export function CondominioForm({
       <Campo etiqueta="Comuna o ciudad" error={e.comuna}>
         <Input name="comuna" defaultValue={valores.comuna ?? ""} />
       </Campo>
-      <div className="sm:col-span-2">
-        <Campo etiqueta="Dirección" error={e.direccion}>
-          <Input name="direccion" defaultValue={valores.direccion} required />
-        </Campo>
-      </div>
+      <Campo etiqueta="Dirección" error={e.direccion}>
+        <Input name="direccion" defaultValue={valores.direccion} required />
+      </Campo>
+      <Campo etiqueta="RUT de la comunidad" error={e.rut}>
+        <Input name="rut" defaultValue={valores.rut ?? ""} placeholder="65.051.145-K" />
+      </Campo>
       <Campo etiqueta="Fondo de reserva (% del gasto común)" error={e.porcentajeReserva}>
         <Input name="porcentajeReserva" inputMode="decimal" defaultValue={valores.porcentajeReserva ?? "5"} />
       </Campo>

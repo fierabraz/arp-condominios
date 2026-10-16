@@ -13,7 +13,7 @@ export default async function EditarCondominioPage({ params }: PageProps<"/condo
 
   return (
     <>
-      <PageHeader titulo={`Editar ${c.nombre}`} />
+      <PageHeader titulo="Configurar propiedad" descripcion={c.nombre} />
       <Card>
         <CondominioForm
           accion={editarCondominio.bind(null, c.id)}
@@ -22,6 +22,7 @@ export default async function EditarCondominioPage({ params }: PageProps<"/condo
             nombre: c.nombre,
             direccion: c.direccion,
             comuna: c.comuna,
+            rut: c.rut,
             porcentajeReserva: c.porcentajeReserva.toString(),
             tasaInteresMora: c.tasaInteresMora.toString(),
             diaVencimiento: c.diaVencimiento,
