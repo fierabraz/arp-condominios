@@ -47,7 +47,7 @@ export default async function VotacionesPage({ params, searchParams }: PageProps
             <Link
               href={`${base}?estado=${p.clave}`}
               aria-current={p.clave === pestana ? "page" : undefined}
-              className={`px-1 ${p.clave === pestana ? "font-semibold text-blue-700" : "text-gray-600 hover:text-gray-900"}`}
+              className={`px-1 ${p.clave === pestana ? "font-semibold text-marca" : "text-texto-suave hover:text-texto"}`}
             >
               {p.texto}
             </Link>
@@ -75,7 +75,7 @@ export default async function VotacionesPage({ params, searchParams }: PageProps
                 </td>
                 <td>{formatoFechaHora(v.cierraEn)}</td>
                 <td className="text-right">
-                  <Link href={`${base}/${v.id}`} className="text-blue-700 hover:underline">
+                  <Link href={`${base}/${v.id}`} className="text-marca hover:underline">
                     {pestana === "borrador" ? "Revisar y publicar" : pestana === "abiertas" ? "Ver avance" : "Ver resultados"}
                   </Link>
                 </td>

@@ -35,7 +35,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
       <PageHeader
         titulo={`Unidad ${unidad.numero}`}
         descripcion={
-          <Link href={`/condominios/${id}/unidades`} className="text-blue-700 hover:underline">
+          <Link href={`/condominios/${id}/unidades`} className="text-marca hover:underline">
             {unidad.condominio.nombre}
           </Link>
         }
@@ -69,21 +69,21 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
               <li key={`${v.personaId}-${v.relacion}`} className="flex items-center justify-between py-2 text-sm">
                 <span>
                   <span className="font-medium">{v.persona.nombre}</span>
-                  <span className="ml-2 text-gray-500">
+                  <span className="ml-2 text-texto-suave">
                     {v.relacion === "PROPIETARIO" ? "Propietario" : "Residente"}
                   </span>
                 </span>
                 <form action={desvincularPersona.bind(null, unidad.id, v.personaId, v.relacion)}>
-                  <button className="text-sm text-red-700 hover:underline">Quitar</button>
+                  <button className="text-sm text-peligro hover:underline">Quitar</button>
                 </form>
               </li>
             ))}
           </ul>
         )}
         {personas.length === 0 ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-texto-suave">
             Primero registra personas en{" "}
-            <Link href="/personas" className="text-blue-700 hover:underline">
+            <Link href="/personas" className="text-marca hover:underline">
               Personas
             </Link>
             .

@@ -97,3 +97,10 @@ export function finDelDiaChile(fecha: string) {
 export function hoyChile() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: ZONA_HORARIA }).format(new Date());
 }
+
+/** "10 de noviembre" (o con año si no es el actual), para fechas de vencimiento. */
+export function formatoFechaLarga(fecha: Date) {
+  const anio = (d: Date) => new Intl.DateTimeFormat("en", { timeZone: ZONA_HORARIA, year: "numeric" }).format(d);
+  const conAnio = anio(fecha) !== anio(new Date());
+  return fecha.toLocaleDateString("es-CL", { timeZone: ZONA_HORARIA, day: "numeric", month: "long", ...(conAnio ? { year: "numeric" } : {}) });
+}

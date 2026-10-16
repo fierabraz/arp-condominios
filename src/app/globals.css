@@ -1,19 +1,37 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f6f7f9;
-  --foreground: #1a1d23;
+/* Marca: colores con nombre de uso. Las pantallas usan bg-marca, text-exito, etc.;
+   ninguna escribe un color directo. Para cambiar la identidad basta con editar aquí. */
+@theme {
+  --color-marca: #0e7c6b;
+  --color-marca-oscuro: #0a5c50;
+  --color-marca-suave: #e3f2ee;
+  --color-exito: #1f6b35;
+  --color-exito-suave: #e6f4ea;
+  --color-alerta: #8a4b08;
+  --color-alerta-suave: #fef3e2;
+  --color-peligro: #b42318;
+  --color-peligro-suave: #fdecea;
+  --color-texto: #1c2b2a;
+  --color-texto-suave: #52605e;
+  --color-fondo: #f4f6f5;
+  --color-borde: #e1e6e4;
+
+  /* Texto un poco más grande que el estándar para leer bien en el teléfono. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.25rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.4rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-background: var(--color-fondo);
+  --color-foreground: var(--color-texto);
+  --font-sans: var(--font-marca);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--font-marca), system-ui, sans-serif;
 }

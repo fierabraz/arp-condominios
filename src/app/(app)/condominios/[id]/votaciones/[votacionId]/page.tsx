@@ -16,9 +16,9 @@ import { condominioVisible } from "../../condominio-actual";
 
 const ETIQUETA = { BORRADOR: "Por publicar", ABIERTA: "Abierta", CERRADA: "Cerrada" } as const;
 const COLOR = {
-  BORRADOR: "bg-gray-100 text-gray-700",
-  ABIERTA: "bg-emerald-50 text-emerald-700",
-  CERRADA: "bg-blue-50 text-blue-700",
+  BORRADOR: "bg-gray-100 text-texto",
+  ABIERTA: "bg-exito-suave text-exito",
+  CERRADA: "bg-gray-100 text-texto",
 } as const;
 
 export default async function VotacionPage({ params }: PageProps<"/condominios/[id]/votaciones/[votacionId]">) {
@@ -34,7 +34,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
 
   return (
     <>
-      <Link href={`/condominios/${id}/votaciones`} className="mb-3 inline-block text-sm text-blue-700 hover:underline">
+      <Link href={`/condominios/${id}/votaciones`} className="mb-3 inline-block text-sm text-marca hover:underline">
         ← Votaciones
       </Link>
       <PageHeader
@@ -54,14 +54,14 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
                   <BotonConfirmar
                     accion={eliminarVotacion.bind(null, v.id)}
                     pregunta="¿Eliminar esta votación?"
-                    className={`${boton} border border-red-200 bg-white text-red-700 hover:bg-red-50`}
+                    className={`${boton} border border-peligro-suave bg-white text-peligro hover:bg-peligro-suave`}
                   >
                     Eliminar
                   </BotonConfirmar>
                   <BotonConfirmar
                     accion={publicarVotacion.bind(null, v.id)}
                     pregunta="¿Publicar la votación? Los propietarios podrán votar y se anunciará en el muro. Después no se puede editar."
-                    className={`${boton} bg-emerald-500 text-white hover:bg-emerald-600`}
+                    className={`${boton} bg-marca text-white hover:bg-marca-oscuro`}
                   >
                     Publicar
                   </BotonConfirmar>
@@ -81,21 +81,21 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
         }
       />
 
-      {v.descripcion && <p className="mb-6 whitespace-pre-line text-gray-700">{v.descripcion}</p>}
+      {v.descripcion && <p className="mb-6 whitespace-pre-line text-texto">{v.descripcion}</p>}
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <Card>
-          <p className="text-sm text-gray-600">Respuestas</p>
+          <p className="text-sm text-texto-suave">Respuestas</p>
           <p className="mt-1 text-2xl font-semibold">
             {r.unidadesVotaron} de {r.unidadesTotal}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">Participación{ponderada && " (por alícuota)"}</p>
+          <p className="text-sm text-texto-suave">Participación{ponderada && " (por alícuota)"}</p>
           <p className="mt-1 text-2xl font-semibold">{formatoPorcentaje(r.participacion, 1)}</p>
         </Card>
         <Card>
-          <p className="text-sm text-gray-600">{estado === "CERRADA" ? "Resultado" : "Va ganando"}</p>
+          <p className="text-sm text-texto-suave">{estado === "CERRADA" ? "Resultado" : "Va ganando"}</p>
           <p className="mt-1 text-2xl font-semibold">{r.ganadora?.texto ?? (r.unidadesVotaron ? "Empate" : "—")}</p>
         </Card>
       </div>
@@ -108,7 +108,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
       {editable && estado === "ABIERTA" && pendientes.length > 0 && (
         <Card className="mb-6">
           <h2 className="mb-1 font-medium">Registrar voto presencial</h2>
-          <p className="mb-4 text-sm text-gray-600">Para votos recibidos en asamblea, por escrito o por teléfono.</p>
+          <p className="mb-4 text-sm text-texto-suave">Para votos recibidos en asamblea, por escrito o por teléfono.</p>
           <VotoPresencialForm
             accion={registrarVotoPresencial.bind(null, v.id)}
             unidades={pendientes}
@@ -120,7 +120,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
       {estado === "BORRADOR" ? (
         <Card>
           <h2 className="mb-2 font-medium">Opciones</h2>
-          <ol className="list-decimal pl-5 text-gray-700">
+          <ol className="list-decimal pl-5 text-texto">
             {v.opciones.map((o) => (
               <li key={o.id}>{o.texto}</li>
             ))}
@@ -147,7 +147,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
                   <td>{x.opcion.texto}</td>
                   <td>
                     {x.emitidoPor}
-                    {x.presencial && <span className="text-gray-500"> (presencial)</span>}
+                    {x.presencial && <span className="text-texto-suave"> (presencial)</span>}
                   </td>
                   <td>{formatoFechaHora(x.creadoEn)}</td>
                 </tr>
@@ -155,7 +155,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
             </tbody>
           </Tabla>
           {pendientes.length > 0 && (
-            <p className="mt-3 text-sm text-gray-600">Sin votar: {pendientes.map((u) => u.numero).join(", ")}.</p>
+            <p className="mt-3 text-sm text-texto-suave">Sin votar: {pendientes.map((u) => u.numero).join(", ")}.</p>
           )}
         </>
       )}

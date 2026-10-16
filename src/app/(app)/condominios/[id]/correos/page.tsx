@@ -4,9 +4,9 @@ import { nombrePeriodo } from "@/lib/cobro";
 import { condominioVisible } from "../condominio-actual";
 
 const ESTADOS = {
-  ENVIADO: { texto: "Enviado", clase: "bg-emerald-50 text-emerald-700" },
-  SIMULADO: { texto: "Prueba", clase: "bg-gray-100 text-gray-700" },
-  ERROR: { texto: "Error", clase: "bg-red-50 text-red-700" },
+  ENVIADO: { texto: "Enviado", clase: "bg-exito-suave text-exito" },
+  SIMULADO: { texto: "Prueba", clase: "bg-gray-100 text-texto" },
+  ERROR: { texto: "Error", clase: "bg-peligro-suave text-peligro" },
 } as const;
 
 const fechaHora = (d: Date) =>

@@ -26,8 +26,8 @@ export function VotarForm({
       <fieldset className="space-y-2">
         <legend className="sr-only">{nombre}</legend>
         {opciones.map((o) => (
-          <label key={o.id} className="flex cursor-pointer items-center gap-3 rounded-lg border border-gray-200 px-3 py-2 hover:bg-gray-50">
-            <input type="radio" name="opcionId" value={o.id} required className="h-4 w-4 accent-emerald-600" />
+          <label key={o.id} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-borde px-4 py-2 hover:bg-fondo">
+            <input type="radio" name="opcionId" value={o.id} required className="h-4 w-4 accent-marca" />
             {o.texto}
           </label>
         ))}

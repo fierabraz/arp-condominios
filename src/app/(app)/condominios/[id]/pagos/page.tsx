@@ -66,13 +66,13 @@ export default async function PagosPage({ params }: PageProps<"/condominios/[id]
                   <td className="whitespace-nowrap">{formatoFecha(p.fecha)}</td>
                   <td className="font-medium">{p.unidad.numero}</td>
                   <td>{ETIQUETAS_MEDIO_PAGO[p.medio]}</td>
-                  <td className="text-gray-600">{p.referencia ?? "—"}</td>
+                  <td className="text-texto-suave">{p.referencia ?? "—"}</td>
                   <td className="text-right tabular-nums">{$(p.monto)}</td>
                   <td className="text-right tabular-nums">{aFavor > 0.004 ? $(aFavor) : "—"}</td>
                   {editable && (
                     <td className="text-right">
                       <form action={eliminarPago.bind(null, p.id)}>
-                        <button className="text-sm text-red-700 hover:underline">Anular</button>
+                        <button className="text-sm text-peligro hover:underline">Anular</button>
                       </form>
                     </td>
                   )}

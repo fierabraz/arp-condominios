@@ -36,16 +36,16 @@ export default async function EgresosPage({ params }: PageProps<"/condominios/[i
               <tr key={g.id}>
                 <td className="whitespace-nowrap">{formatoFecha(g.fecha)}</td>
                 <td className="whitespace-nowrap">
-                  <Link href={`/condominios/${id}/periodos/${g.periodo.id}`} className="text-blue-700 hover:underline">
+                  <Link href={`/condominios/${id}/periodos/${g.periodo.id}`} className="text-marca hover:underline">
                     {nombrePeriodo(g.periodo.anio, g.periodo.mes)}
                   </Link>
                 </td>
                 <td>{g.categoria}</td>
                 <td>
                   {g.descripcion}
-                  {g.tipo === "INDIVIDUAL" && g.unidad && <span className="text-gray-500"> · unidad {g.unidad.numero}</span>}
+                  {g.tipo === "INDIVIDUAL" && g.unidad && <span className="text-texto-suave"> · unidad {g.unidad.numero}</span>}
                 </td>
-                <td className="text-gray-600">{g.proveedor ?? "—"}</td>
+                <td className="text-texto-suave">{g.proveedor ?? "—"}</td>
                 <td className="text-right tabular-nums">{formatoMoneda(g.monto, moneda)}</td>
               </tr>
             ))}

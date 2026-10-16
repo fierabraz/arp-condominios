@@ -15,7 +15,7 @@ const fechaLarga = (d: Date) =>
   new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Santiago" }).format(d);
 
 const boton =
-  "inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1 text-sm text-gray-700 hover:bg-gray-50";
+  "inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-texto hover:bg-fondo";
 
 /** Tarjeta de una publicación del muro, con sus acciones. */
 export function TarjetaPublicacion({
@@ -32,19 +32,19 @@ export function TarjetaPublicacion({
   const base = `/condominios/${p.condominio.id}/muro/${p.id}`;
   const texto = `${p.titulo}\n\n${p.contenido}\n\n— ${p.condominio.nombre}`;
   return (
-    <article className="rounded-lg border border-gray-200 border-l-4 border-l-emerald-500 bg-white p-4 shadow-sm">
+    <article className="rounded-2xl border border-borde bg-white p-5">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-        <span className="flex items-center gap-2 text-gray-700">
+        <span className="flex items-center gap-2 text-texto">
           {p.condominio.nombre}
-          <span className="rounded bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Administración</span>
+          <span className="rounded-full bg-marca-suave px-2.5 py-0.5 text-xs font-bold text-marca">Administración</span>
         </span>
-        <time className="text-gray-500" dateTime={p.creadoEn.toISOString()}>
+        <time className="text-texto-suave" dateTime={p.creadoEn.toISOString()}>
           {fechaLarga(p.creadoEn)}
         </time>
       </div>
-      <h3 className="font-semibold uppercase tracking-tight">{p.titulo}</h3>
-      <p className={`mt-1 whitespace-pre-line text-sm text-gray-600 ${completa ? "" : "line-clamp-2"}`}>{p.contenido}</p>
-      {completa && <p className="mt-3 text-xs text-gray-500">Publicado por {p.autor}</p>}
+      <h3 className="text-lg font-bold">{p.titulo}</h3>
+      <p className={`mt-1 whitespace-pre-line text-texto-suave ${completa ? "" : "line-clamp-2"}`}>{p.contenido}</p>
+      {completa && <p className="mt-3 text-xs text-texto-suave">Publicado por {p.autor}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {!completa && (
           <Link href={base} className={boton}>
@@ -66,7 +66,7 @@ export function TarjetaPublicacion({
           <BotonConfirmar
             accion={eliminar}
             pregunta={`¿Eliminar la publicación "${p.titulo}"?`}
-            className={`${boton} !border-red-200 !text-red-600 hover:!bg-red-50`}
+            className={`${boton} !border-peligro-suave !text-peligro hover:!bg-peligro-suave`}
           >
             <Trash2 size={15} /> Eliminar
           </BotonConfirmar>

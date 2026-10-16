@@ -43,7 +43,6 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-screen flex-col md:flex-row">
       <MenuLateral
         enlaces={enlaces(usuario.rol, usuario.condominioId)}
-        titulo="ERP Condominios"
         subtitulo={usuario.administradora?.nombre ?? "Plataforma"}
         usuario={usuario.nombre}
         rol={ETIQUETAS_ROL[usuario.rol]}
@@ -51,7 +50,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         propiedades={propiedades}
         editable={puedeEditar(usuario.rol)}
       />
-      <main className="flex-1 p-4 md:p-8">
+      <main className="min-w-0 flex-1 p-4 md:p-8">
         <div className="mx-auto max-w-5xl">{children}</div>
       </main>
     </div>
