@@ -69,6 +69,7 @@ model Administradora {
   gastos       Gasto[]
   avisos       AvisoCobro[]
   pagos        Pago[]
+  proveedores  Proveedor[]
 }
 
 model Usuario {
@@ -260,4 +261,20 @@ model EnvioAviso {
   creadoEn     DateTime    @default(now())
 
   @@index([avisoId])
+}
+
+// Catálogo de proveedores de la administradora (mantención, aseo, servicios, etc.).
+model Proveedor {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  nombre           String
+  rut              String?
+  rubro            String?
+  contacto         String?
+  telefono         String?
+  correo           String?
+  creadoEn         DateTime @default(now())
+
+  @@unique([administradoraId, nombre])
 }

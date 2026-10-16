@@ -76,6 +76,15 @@ async function main() {
     ],
   });
 
+  await db.proveedor.createMany({
+    data: [
+      { nombre: "Enel", rubro: "Electricidad", telefono: "600 696 0000" },
+      { nombre: "Aguas Andinas", rubro: "Agua potable", telefono: "600 331 1000" },
+      { nombre: "Limpiezas Sur", rubro: "Aseo", rut: "76.123.456-7", contacto: "Rosa Pérez", correo: "contacto@limpiezassur.cl" },
+      { nombre: "Ascensores Chile", rubro: "Mantención de ascensores", rut: "77.987.654-3", telefono: "+56 2 2345 6789" },
+    ].map((p) => ({ ...p, administradoraId: adm.id })),
+  });
+
   // Septiembre 2026 cerrado, con pagos parciales para que haya morosidad.
   const septiembre = await db.periodo.create({
     data: { administradoraId: adm.id, condominioId: condominio.id, anio: 2026, mes: 9 },

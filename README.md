@@ -16,6 +16,9 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 - Estado de cuenta por unidad, listado de morosidad y portal del residente con sus avisos y pagos.
 - Aviso de cobro en PDF por unidad, con el detalle del mes, la deuda anterior y los gastos del condominio.
 - Rendición mensual en PDF por condominio: gastos por categoría, detalle con proveedores, fondo de reserva, recaudación y avisos impagos. La ven el administrador, el comité y los residentes del condominio.
+- Menú lateral con Mis propiedades, Propietarios y residentes, Permisos, Reportes globales, Panel de propiedades, Crear propiedad y Catálogo de proveedores (en el celular se despliega con el botón de menú).
+- Reportes globales: emitido, recaudado, porcentaje de cobranza, deuda vencida y morosos de todas las propiedades.
+- Catálogo de proveedores con RUT, rubro y contacto; aparecen como sugerencia al cargar un gasto y muestran cuánto se les ha pagado.
 - Cada usuario puede cambiar su contraseña.
 - Envío de los avisos de cobro por correo, con el PDF adjunto, a los propietarios y residentes que tengan correo registrado. Cada envío queda registrado.
 

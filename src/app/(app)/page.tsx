@@ -26,16 +26,16 @@ export default async function InicioPage() {
   const moneda = usuario.administradora?.moneda ?? "CLP";
 
   const tarjetas = [
-    { titulo: "Condominios", valor: condominios, href: "/condominios" },
+    { titulo: "Propiedades", valor: condominios, href: "/condominios" },
     { titulo: "Unidades", valor: unidades, href: "/condominios" },
-    { titulo: "Personas", valor: personas, href: "/personas" },
+    { titulo: "Propietarios y residentes", valor: personas, href: "/personas" },
     { titulo: "Por cobrar", valor: formatoMoneda(porCobrar._sum.saldo ?? 0, moneda), href: "/condominios" },
     { titulo: "Deuda vencida", valor: formatoMoneda(vencido._sum.saldo ?? 0, moneda), href: "/condominios" },
   ];
 
   return (
     <>
-      <PageHeader titulo={`Hola, ${usuario.nombre.split(" ")[0]}`} descripcion="Resumen de tu administración" />
+      <PageHeader titulo={`Hola, ${usuario.nombre.split(" ")[0]}`} descripcion="Panel de propiedades: resumen de tu administración" />
       <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {tarjetas.map((t) => (
           <Link key={t.titulo} href={t.href}>
