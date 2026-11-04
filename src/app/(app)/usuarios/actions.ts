@@ -6,6 +6,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdministradora } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { registrar } from "@/lib/registro";
+import { ETIQUETAS_ROL } from "@/lib/formato";
 import { ClaveSchema, CorreoSchema } from "@/lib/usuarios";
 
 const UsuarioSchema = z
@@ -27,7 +29,7 @@ const UsuarioSchema = z
   });
 
 export async function crearUsuario(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = UsuarioSchema.safeParse({
     nombre: aTexto(formData.get("nombre")),
     correo: aTexto(formData.get("correo")),
@@ -65,6 +67,7 @@ export async function crearUsuario(_: EstadoForm, formData: FormData): Promise<E
       personaId: rol === "RESIDENTE" ? personaId : null,
     },
   });
+  await registrar(usuario, "Creó una cuenta de acceso", `${resto.nombre} (${resto.correo}) como ${ETIQUETAS_ROL[rol].toLowerCase()}`);
   revalidatePath("/usuarios");
   return { ok: true, mensaje: `Cuenta creada para ${resto.nombre}.` };
 }
@@ -72,6 +75,9 @@ export async function crearUsuario(_: EstadoForm, formData: FormData): Promise<E
 export async function eliminarUsuario(id: string) {
   const { usuario, administradoraId } = await requireAdministradora();
   if (id === usuario.id) return; // no borrarse a sí mismo
+  const borrado = await db.usuario.findFirst({ where: { id, administradoraId }, select: { nombre: true, correo: true } });
+  if (!borrado) return;
   await db.usuario.deleteMany({ where: { id, administradoraId } });
+  await registrar(usuario, "Borró una cuenta de acceso", `${borrado.nombre} (${borrado.correo})`);
   revalidatePath("/usuarios");
 }

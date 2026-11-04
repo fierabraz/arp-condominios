@@ -19,6 +19,11 @@ export const ETIQUETAS_ROL = {
   RESIDENTE: "Residente",
 } as const;
 
+export const ETIQUETAS_RELACION = {
+  PROPIETARIO: "Propietario",
+  RESIDENTE: "Residente",
+} as const;
+
 export const ETIQUETAS_TIPO_UNIDAD = {
   DEPARTAMENTO: "Departamento",
   CASA: "Casa",

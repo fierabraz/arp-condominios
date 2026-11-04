@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdministradora } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { registrar } from "@/lib/registro";
 
 const ProveedorSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
@@ -16,7 +17,7 @@ const ProveedorSchema = z.object({
 });
 
 export async function crearProveedor(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = ProveedorSchema.safeParse({
     nombre: aTexto(formData.get("nombre")),
     rut: aTexto(formData.get("rut")),
@@ -31,13 +32,16 @@ export async function crearProveedor(_: EstadoForm, formData: FormData): Promise
   });
   if (existe) return { errores: { nombre: ["Ya tienes un proveedor con ese nombre."] } };
   await db.proveedor.create({ data: { ...datos.data, administradoraId } });
+  await registrar(usuario, "Agregó un proveedor", datos.data.nombre);
   revalidatePath("/proveedores");
   return { ok: true, mensaje: `${datos.data.nombre} agregado al catálogo.` };
 }
 
 export async function eliminarProveedor(id: string) {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   // Los gastos guardan el nombre del proveedor como texto, así que no se pierden.
-  await db.proveedor.deleteMany({ where: { id, administradoraId } });
+  const proveedor = await db.proveedor.findFirst({ where: { id, administradoraId }, select: { nombre: true } });
+  const { count } = await db.proveedor.deleteMany({ where: { id, administradoraId } });
+  if (count > 0) await registrar(usuario, "Borró un proveedor", proveedor?.nombre ?? "");
   revalidatePath("/proveedores");
 }

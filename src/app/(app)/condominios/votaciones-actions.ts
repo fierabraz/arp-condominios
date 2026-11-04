@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdministradora, requireUsuario } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { registrar } from "@/lib/registro";
 import { finDelDiaChile, formatoFecha, hoyChile } from "@/lib/formato";
 import { ErrorVotacion, emitirVoto, unidadesConVoto } from "@/lib/votaciones-servicio";
 
@@ -27,7 +28,7 @@ const VotacionSchema = z.object({
 const rutaVotaciones = (condominioId: string) => `/condominios/${condominioId}/votaciones`;
 
 export async function crearVotacion(condominioId: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = VotacionSchema.safeParse({
     titulo: aTexto(formData.get("titulo")),
     descripcion: aTexto(formData.get("descripcion")),
@@ -49,6 +50,7 @@ export async function crearVotacion(condominioId: string, _: EstadoForm, formDat
       opciones: { create: opciones.map((texto, orden) => ({ texto, orden })) },
     },
   });
+  await registrar(usuario, "Creó una votación", v.titulo, condominioId);
   revalidatePath(rutaVotaciones(condominioId), "layout");
   redirect(`${rutaVotaciones(condominioId)}/${v.id}`);
 }
@@ -75,21 +77,24 @@ export async function publicarVotacion(id: string) {
       },
     }),
   ]);
+  await registrar(usuario, "Publicó una votación", v.titulo, v.condominioId);
   revalidatePath(`/condominios/${v.condominioId}`, "layout");
 }
 
 export async function cerrarVotacion(id: string) {
-  const { v } = await votacionPropia(id);
+  const { usuario, v } = await votacionPropia(id);
   if (!v || v.estado !== "ABIERTA") return;
   await db.votacion.update({ where: { id }, data: { estado: "CERRADA", cerradaEn: new Date() } });
+  await registrar(usuario, "Cerró una votación", v.titulo, v.condominioId);
   revalidatePath(rutaVotaciones(v.condominioId), "layout");
 }
 
 export async function eliminarVotacion(id: string) {
-  const { v } = await votacionPropia(id);
+  const { usuario, v } = await votacionPropia(id);
   // Solo se borran las que nadie ha visto; las publicadas quedan como registro.
   if (!v || v.estado !== "BORRADOR") return;
   await db.votacion.delete({ where: { id } });
+  await registrar(usuario, "Borró una votación en borrador", v.titulo, v.condominioId);
   revalidatePath(rutaVotaciones(v.condominioId), "layout");
   redirect(rutaVotaciones(v.condominioId));
 }
@@ -104,6 +109,8 @@ export async function registrarVotoPresencial(votacionId: string, _: EstadoForm,
   if (!opcionId) return { errores: { opcionId: ["Elige una opción."] } };
   try {
     await emitirVoto({ votacionId, opcionId, unidadId, emitidoPor: usuario.nombre, presencial: true });
+    const unidad = await db.unidad.findUnique({ where: { id: unidadId }, select: { numero: true } });
+    await registrar(usuario, "Registró un voto presencial", `${v.titulo}: unidad ${unidad?.numero ?? ""}`, v.condominioId);
   } catch (e) {
     if (e instanceof ErrorVotacion) return { mensaje: e.message };
     throw e;
@@ -123,6 +130,8 @@ export async function votar(votacionId: string, unidadId: string, _: EstadoForm,
   if (!propias.some((u) => u.id === unidadId)) return { mensaje: "Solo los propietarios de la unidad pueden votar." };
   try {
     await emitirVoto({ votacionId, opcionId, unidadId, emitidoPor: usuario.nombre, presencial: false });
+    const unidad = propias.find((u) => u.id === unidadId);
+    await registrar(usuario, "Votó desde su cuenta", `${v.titulo}: unidad ${unidad?.numero ?? ""}`, v.condominioId);
   } catch (e) {
     if (e instanceof ErrorVotacion) return { mensaje: e.message };
     throw e;

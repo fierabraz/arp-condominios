@@ -7,6 +7,9 @@ import { db } from "@/lib/db";
 import { requireAdministradora } from "@/lib/auth";
 import { aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { RelacionUnidad, TipoUnidad } from "@/generated/prisma/enums";
+import { ETIQUETAS_RELACION } from "@/lib/formato";
+import { registrar } from "@/lib/registro";
+import { historialUnidad } from "@/lib/unidades";
 
 const CondominioSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
@@ -41,11 +44,12 @@ function leerCondominio(formData: FormData) {
 }
 
 export async function crearCondominio(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerCondominio(formData);
   if (!datos.success) return erroresDe(datos.error);
 
   const condominio = await db.condominio.create({ data: { ...datos.data, administradoraId } });
+  await registrar(usuario, "Creó una propiedad", condominio.nombre, condominio.id);
   redirect(`/condominios/${condominio.id}`);
 }
 
@@ -54,7 +58,7 @@ export async function editarCondominio(
   _: EstadoForm,
   formData: FormData,
 ): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerCondominio(formData);
   if (!datos.success) return erroresDe(datos.error);
 
@@ -63,6 +67,12 @@ export async function editarCondominio(
     data: datos.data,
   });
   if (count === 0) return { mensaje: "Condominio no encontrado." };
+  await registrar(
+    usuario,
+    "Cambió la configuración de una propiedad",
+    `${datos.data.nombre}: fondo de reserva ${datos.data.porcentajeReserva} %, interés por mora ${datos.data.tasaInteresMora} %, vence el día ${datos.data.diaVencimiento}`,
+    id,
+  );
   revalidatePath(`/condominios/${id}`, "layout");
   redirect(`/condominios/${id}`);
 }
@@ -89,7 +99,7 @@ export async function crearUnidad(
   _: EstadoForm,
   formData: FormData,
 ): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerUnidad(formData);
   if (!datos.success) return erroresDe(datos.error);
 
@@ -102,6 +112,7 @@ export async function crearUnidad(
   if (existe) return { errores: { numero: ["Ya existe una unidad con ese número."] } };
 
   await db.unidad.create({ data: { ...datos.data, condominioId, administradoraId } });
+  await registrar(usuario, "Agregó una unidad", `Unidad ${datos.data.numero}, alícuota ${datos.data.alicuota} %`, condominioId);
   revalidatePath(`/condominios/${condominioId}`, "layout");
   return { ok: true, mensaje: `Unidad ${datos.data.numero} agregada.` };
 }
@@ -111,7 +122,7 @@ export async function editarUnidad(
   _: EstadoForm,
   formData: FormData,
 ): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerUnidad(formData);
   if (!datos.success) return erroresDe(datos.error);
 
@@ -124,15 +135,24 @@ export async function editarUnidad(
   if (repetida) return { errores: { numero: ["Ya existe una unidad con ese número."] } };
 
   await db.unidad.update({ where: { id: unidadId }, data: datos.data });
+  await registrar(
+    usuario,
+    "Editó una unidad",
+    `Unidad ${unidad.numero}${unidad.numero !== datos.data.numero ? ` (ahora ${datos.data.numero})` : ""}: alícuota ${unidad.alicuota.toString()} % → ${datos.data.alicuota} %`,
+    unidad.condominioId,
+  );
   revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
   return { ok: true, mensaje: "Cambios guardados." };
 }
 
 export async function eliminarUnidad(unidadId: string) {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
   if (!unidad) return;
+  // Una unidad con cobros, pagos, cargos o votos no se borra: se perdería su historia.
+  if ((await historialUnidad(unidadId)).total > 0) return;
   await db.unidad.delete({ where: { id: unidadId } });
+  await registrar(usuario, "Borró una unidad", `Unidad ${unidad.numero}`, unidad.condominioId);
   revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
   redirect(`/condominios/${unidad.condominioId}/unidades`);
 }
@@ -147,7 +167,7 @@ export async function vincularPersona(
   _: EstadoForm,
   formData: FormData,
 ): Promise<EstadoForm> {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const datos = VinculoSchema.safeParse({
     personaId: aTexto(formData.get("personaId")),
     relacion: formData.get("relacion"),
@@ -165,14 +185,29 @@ export async function vincularPersona(
     create: { unidadId, ...datos.data },
     update: {},
   });
+  await registrar(
+    usuario,
+    "Vinculó una persona a una unidad",
+    `${persona.nombre} como ${ETIQUETAS_RELACION[datos.data.relacion].toLowerCase()} de la unidad ${unidad.numero}`,
+    unidad.condominioId,
+  );
   revalidatePath(`/condominios/${unidad.condominioId}/unidades/${unidadId}`);
   return { ok: true, mensaje: `${persona.nombre} vinculado.` };
 }
 
 export async function desvincularPersona(unidadId: string, personaId: string, relacion: RelacionUnidad) {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
   if (!unidad) return;
-  await db.unidadPersona.deleteMany({ where: { unidadId, personaId, relacion } });
+  const persona = await db.persona.findFirst({ where: { id: personaId, administradoraId }, select: { nombre: true } });
+  const { count } = await db.unidadPersona.deleteMany({ where: { unidadId, personaId, relacion } });
+  if (count > 0) {
+    await registrar(
+      usuario,
+      "Desvinculó una persona de una unidad",
+      `${persona?.nombre ?? "Persona"} como ${ETIQUETAS_RELACION[relacion].toLowerCase()} de la unidad ${unidad.numero}`,
+      unidad.condominioId,
+    );
+  }
   revalidatePath(`/condominios/${unidad.condominioId}/unidades/${unidadId}`);
 }

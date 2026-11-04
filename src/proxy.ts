@@ -1,20 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { decrypt, SESSION_COOKIE } from "@/lib/session";
+import { decrypt, LOGIN, SESSION_COOKIE } from "@/lib/session";
 
-// Revisión optimista: sin sesión válida se va al login. La autorización real
-// se hace en cada página y acción mediante src/lib/auth.ts.
+// Revisión optimista: sin sesión válida se va al ingreso que corresponde, y cada tipo de
+// sesión queda en su parte del sitio. La autorización real se hace en cada página y
+// acción mediante src/lib/auth.ts.
+
+const PUBLICAS = ["/login", "/recuperar", "/salir"];
+// Lo único que ve una sesión de residente: su cuenta y los documentos que se abren desde ella.
+const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones"];
+
+const empieza = (ruta: string, prefijos: string[]) => prefijos.some((p) => ruta === p || ruta.startsWith(`${p}/`));
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname.startsWith("/salir")) return NextResponse.next();
-  const esLogin = pathname.startsWith("/login");
+  if (empieza(pathname, ["/salir", "/recuperar"])) return NextResponse.next();
+  const esLogin = empieza(pathname, ["/login"]);
   const sesion = await decrypt(request.cookies.get(SESSION_COOKIE)?.value);
+  const ir = (ruta: string) => NextResponse.redirect(new URL(ruta, request.nextUrl));
 
-  if (!sesion && !esLogin) {
-    return NextResponse.redirect(new URL("/login", request.nextUrl));
+  if (!sesion) {
+    if (esLogin || empieza(pathname, PUBLICAS)) return NextResponse.next();
+    return ir(empieza(pathname, ["/mi-cuenta"]) ? LOGIN.RESIDENTE : LOGIN.ADMIN);
   }
-  if (sesion && esLogin) {
-    return NextResponse.redirect(new URL("/", request.nextUrl));
-  }
+  const inicio = sesion.tipo === "RESIDENTE" ? "/mi-cuenta" : "/";
+  if (esLogin) return ir(inicio);
+  if (sesion.tipo === "RESIDENTE" && !empieza(pathname, DE_RESIDENTE)) return ir(inicio);
+  if (sesion.tipo === "ADMIN" && empieza(pathname, ["/mi-cuenta"])) return ir(inicio);
   return NextResponse.next();
 }
 

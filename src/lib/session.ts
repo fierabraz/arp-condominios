@@ -3,15 +3,33 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { Rol } from "@/generated/prisma/enums";
 
+/** Dos tipos de sesión: la de quienes administran (administración, comité, plataforma) y la de residentes. */
+export type TipoSesion = "ADMIN" | "RESIDENTE";
+
 export type SessionPayload = {
   usuarioId: string;
   rol: Rol;
   administradoraId: string | null;
+  tipo: TipoSesion;
   expiresAt: string;
+  /** Momento de creación en milisegundos (iat del JWT solo guarda segundos). */
+  emitidaEn?: number;
+  iat?: number;
 };
 
+export function tipoDeRol(rol: Rol): TipoSesion {
+  return rol === "RESIDENTE" ? "RESIDENTE" : "ADMIN";
+}
+
+/** Página de ingreso de cada tipo de sesión. */
+export const LOGIN: Record<TipoSesion, string> = { ADMIN: "/login", RESIDENTE: "/login/residentes" };
+
 const COOKIE = "sesion";
-const DURACION_MS = 7 * 24 * 60 * 60 * 1000;
+// La sesión de administración maneja dinero y datos de todos, por eso dura menos.
+const DURACION: Record<TipoSesion, { ms: number; jwt: string }> = {
+  ADMIN: { ms: 12 * 60 * 60 * 1000, jwt: "12h" },
+  RESIDENTE: { ms: 30 * 24 * 60 * 60 * 1000, jwt: "30d" },
+};
 let clave: Uint8Array | undefined;
 
 // Se valida al usarla (no al importar) para que la compilación no exija el secreto.
@@ -30,7 +48,7 @@ export async function encrypt(payload: SessionPayload) {
   return new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(DURACION[payload.tipo].jwt)
     .sign(claveSesion());
 }
 
@@ -40,15 +58,17 @@ export async function decrypt(token: string | undefined) {
     const { payload } = await jwtVerify<SessionPayload>(token, claveSesion(), {
       algorithms: ["HS256"],
     });
-    return payload;
+    // Sesiones creadas antes de separar los tipos: el tipo sale del rol.
+    return { ...payload, tipo: payload.tipo ?? tipoDeRol(payload.rol) };
   } catch {
     return null;
   }
 }
 
-export async function createSession(data: Omit<SessionPayload, "expiresAt">) {
-  const expiresAt = new Date(Date.now() + DURACION_MS);
-  const token = await encrypt({ ...data, expiresAt: expiresAt.toISOString() });
+export async function createSession(data: Omit<SessionPayload, "expiresAt" | "tipo" | "iat" | "emitidaEn">) {
+  const tipo = tipoDeRol(data.rol);
+  const expiresAt = new Date(Date.now() + DURACION[tipo].ms);
+  const token = await encrypt({ ...data, tipo, emitidaEn: Date.now(), expiresAt: expiresAt.toISOString() });
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

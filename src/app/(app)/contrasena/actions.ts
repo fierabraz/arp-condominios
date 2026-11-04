@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { requireUsuario } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { ClaveSchema } from "@/lib/usuarios";
+import { registrar } from "@/lib/registro";
+import { createSession } from "@/lib/session";
 
 const CambioSchema = z
   .object({
@@ -29,9 +31,12 @@ export async function cambiarClave(_: EstadoForm, formData: FormData): Promise<E
   if (!(await bcrypt.compare(datos.data.actual, claveHash))) {
     return { errores: { actual: ["La contraseña actual no es correcta."] } };
   }
+  // claveActualizadaEn cierra las sesiones abiertas en otros equipos; esta se renueva.
   await db.usuario.update({
     where: { id: usuario.id },
-    data: { claveHash: await bcrypt.hash(datos.data.nueva, 10) },
+    data: { claveHash: await bcrypt.hash(datos.data.nueva, 10), claveActualizadaEn: new Date() },
   });
-  return { ok: true, mensaje: "Contraseña actualizada." };
+  await createSession({ usuarioId: usuario.id, rol: usuario.rol, administradoraId: usuario.administradoraId });
+  await registrar(usuario, "Cambió su contraseña", usuario.correo);
+  return { ok: true, mensaje: "Contraseña actualizada. Se cerró la sesión en tus otros equipos." };
 }

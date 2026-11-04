@@ -12,9 +12,11 @@ import type { Rol } from "@/generated/prisma/enums";
 export const getUsuarioActual = cache(async () => {
   const sesion = await decrypt((await cookies()).get(SESSION_COOKIE)?.value);
   if (!sesion) return null;
-  return db.usuario.findUnique({
+  const usuario = await db.usuario.findUnique({
     where: { id: sesion.usuarioId },
     select: {
+      claveActualizadaEn: true,
+      activo: true,
       id: true,
       nombre: true,
       correo: true,
@@ -25,6 +27,13 @@ export const getUsuarioActual = cache(async () => {
       administradora: { select: { nombre: true, moneda: true } },
     },
   });
+  if (!usuario) return null;
+  // Al cambiar la contraseña se cierran las sesiones abiertas antes de ese momento.
+  const { claveActualizadaEn, activo, ...datos } = usuario;
+  if (!activo) return null;
+  const emitida = sesion.emitidaEn ?? (sesion.iat ?? 0) * 1000;
+  if (claveActualizadaEn && emitida < claveActualizadaEn.getTime()) return null;
+  return datos;
 });
 
 export type UsuarioActual = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
