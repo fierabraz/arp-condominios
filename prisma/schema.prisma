@@ -83,6 +83,7 @@ model Administradora {
   proveedores  Proveedor[]
   publicaciones Publicacion[]
   votaciones   Votacion[]
+  registros    RegistroCambio[]
 }
 
 model Usuario {
@@ -99,6 +100,10 @@ model Usuario {
   personaId        String?  @unique
   persona          Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
   creadoEn         DateTime @default(now())
+  // Al cambiar la contraseña se cierran las sesiones abiertas antes de esa fecha.
+  claveActualizadaEn DateTime?
+
+  tokensRecuperacion TokenRecuperacion[]
 
   @@index([administradoraId])
 }
@@ -359,4 +364,46 @@ model Voto {
   creadoEn    DateTime       @default(now())
 
   @@unique([votacionId, unidadId])
+}
+
+// Intentos de ingreso, para bloquear temporalmente tras varios fallos.
+model IntentoIngreso {
+  id       String   @id @default(cuid())
+  correo   String
+  ip       String?
+  exitoso  Boolean
+  creadoEn DateTime @default(now())
+
+  @@index([correo, creadoEn])
+  @@index([ip, creadoEn])
+}
+
+// Enlaces de un solo uso para crear una contraseña nueva. Se guarda solo el hash del token.
+model TokenRecuperacion {
+  id        String   @id @default(cuid())
+  usuarioId String
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiraEn  DateTime
+  usadoEn   DateTime?
+  creadoEn  DateTime @default(now())
+
+  @@index([usuarioId])
+}
+
+// Registro de cambios: quién hizo qué y cuándo. Guarda nombres y textos (no relaciones)
+// para que el historial se conserve aunque después se borre lo registrado.
+model RegistroCambio {
+  id               String   @id @default(cuid())
+  administradoraId String?
+  administradora   Administradora? @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String?
+  usuarioId        String?
+  usuarioNombre    String
+  accion           String
+  detalle          String
+  creadoEn         DateTime @default(now())
+
+  @@index([administradoraId, creadoEn])
+  @@index([condominioId, creadoEn])
 }

@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { puedeEditar, requireUsuario } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { cerrarSesion } from "@/app/login/actions";
@@ -18,6 +19,7 @@ function enlaces(rol: Rol, condominioId: string | null): EnlaceMenu[] {
         { href: "/", texto: "Panel de propiedades", icono: "panel" },
         { href: "/condominios/nuevo", texto: "Crear propiedad", icono: "crear" },
         { href: "/proveedores", texto: "Catálogo de proveedores", icono: "proveedores" },
+        { href: "/registro", texto: "Registro de cambios", icono: "registro" },
       ];
     case "COMITE":
       return condominioId ? [{ href: `/condominios/${condominioId}`, texto: "Mi propiedad", icono: "edificios" }] : [];
@@ -28,6 +30,8 @@ function enlaces(rol: Rol, condominioId: string | null): EnlaceMenu[] {
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const usuario = await requireUsuario();
+  // Los residentes tienen su propio espacio, separado del de administración.
+  if (usuario.rol === "RESIDENTE") redirect("/mi-cuenta");
   // Propiedades cuyo menú de módulos puede ver: todas las de la administradora, o la del comité.
   const propiedades =
     usuario.administradoraId && (usuario.rol === "ADMINISTRADOR" || usuario.rol === "COMITE")

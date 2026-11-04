@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { CreditCard, Download, Home, UserRound, Users } from "lucide-react";
+import { Download } from "lucide-react";
 import { requireUsuario } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Insignia, Vacio } from "@/components/ui";
@@ -53,7 +52,7 @@ export default async function MiCuentaPage() {
   const nombreUnidad = (v: (typeof unidadesUnicas)[number]) => `${ETIQUETAS_TIPO_UNIDAD[v.unidad.tipo]} ${v.unidad.numero}`;
 
   return (
-    <div className="pb-24 md:pb-0">
+    <div>
       <header className="mb-6">
         {nombrePropiedad && <p className="text-sm text-texto-suave">{nombrePropiedad}</p>}
         <h1 className="text-2xl font-bold tracking-tight md:text-[1.75rem]">Hola, {usuario.nombre.split(" ")[0]}</h1>
@@ -195,36 +194,6 @@ export default async function MiCuentaPage() {
         </section>
       )}
 
-      <nav
-        aria-label="Navegación del residente"
-        className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-borde bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] md:hidden"
-      >
-        {[
-          { texto: "Inicio", href: "#", icono: Home, activo: true },
-          { texto: "Mis pagos", href: "#pagos", icono: CreditCard },
-          { texto: "Comunidad", href: "#muro", icono: Users },
-          { texto: "Mi perfil", href: "/contrasena", icono: UserRound },
-        ].map((e) => {
-          const clase = `flex min-h-12 flex-col items-center justify-center gap-1 text-xs ${
-            e.activo ? "font-bold text-marca" : "font-medium text-texto-suave"
-          }`;
-          const contenido = (
-            <>
-              <e.icono size={22} aria-hidden="true" />
-              {e.texto}
-            </>
-          );
-          return e.href.startsWith("/") ? (
-            <Link key={e.texto} href={e.href} className={clase}>
-              {contenido}
-            </Link>
-          ) : (
-            <a key={e.texto} href={e.href} className={clase} aria-current={e.activo ? "page" : undefined}>
-              {contenido}
-            </a>
-          );
-        })}
-      </nav>
     </div>
   );
 }

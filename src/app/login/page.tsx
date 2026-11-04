@@ -1,15 +1,20 @@
-import { Logo } from "@/components/logo";
+import { iniciarSesion } from "./actions";
 import { LoginForm } from "./login-form";
+import { PantallaIngreso } from "./pantalla-ingreso";
 
-export default function LoginPage() {
+export default async function LoginAdministracionPage({ searchParams }: PageProps<"/login">) {
+  const { listo } = await searchParams;
   return (
-    <main className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-sm rounded-2xl border border-borde bg-white p-8 shadow-sm">
-        <h1 className="sr-only">Iniciar sesión</h1>
-        <Logo tamano="lg" />
-        <p className="mb-6 mt-4 text-sm text-texto-suave">Ingresa con tu cuenta</p>
-        <LoginForm />
-      </div>
-    </main>
+    <PantallaIngreso
+      titulo="Ingreso de administración"
+      descripcion="Para administradores y miembros del comité."
+      aviso={listo ? "Tu contraseña quedó actualizada. Ya puedes ingresar." : undefined}
+      pie={[
+        { texto: "¿Olvidaste tu contraseña?", enlace: "Recupérala aquí", href: "/recuperar" },
+        { texto: "¿Eres residente o propietario?", enlace: "Ingreso de residentes", href: "/login/residentes" },
+      ]}
+    >
+      <LoginForm accion={iniciarSesion.bind(null, "ADMIN")} />
+    </PantallaIngreso>
   );
 }

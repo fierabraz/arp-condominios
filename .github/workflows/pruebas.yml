@@ -1,0 +1,44 @@
+# Pruebas automáticas: se ejecutan en cada cambio enviado a GitHub y en cada solicitud de cambios.
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: erp
+          POSTGRES_PASSWORD: erp
+          POSTGRES_DB: erp_condominios
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U erp"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://erp:erp@localhost:5432/erp_condominios
+      SESSION_SECRET: secreto-solo-para-las-pruebas-automaticas-0123456789
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Revisión de estilo
+        run: npm run lint
+      - name: Revisión de tipos
+        run: npx next typegen && npm run typecheck
+      - name: Pruebas de cálculo
+        run: npm test
+      - name: Migraciones y datos de demostración
+        run: npm run db:deploy && npm run db:seed
+      - name: Compilación
+        run: npm run build

@@ -26,6 +26,7 @@ import {
   X,
   Zap,
   type LucideIcon,
+  History,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { FAVORITOS_INICIALES, GRUPOS_MODULOS, TODOS_LOS_MODULOS, rutaModulo, type Modulo } from "@/lib/modulos";
@@ -39,6 +40,7 @@ export const ICONOS = {
   proveedores: Truck,
   personas: Users,
   inicio: Home,
+  registro: History,
 } satisfies Record<string, LucideIcon>;
 
 const ICONOS_GRUPO: Record<string, LucideIcon> = {

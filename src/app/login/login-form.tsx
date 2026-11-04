@@ -1,13 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { iniciarSesion } from "./actions";
 import { Boton, Campo, Input, Mensaje } from "@/components/ui";
+import type { EstadoForm } from "@/lib/forms";
 
-export function LoginForm() {
-  const [estado, accion, pendiente] = useActionState(iniciarSesion, {});
+export function LoginForm({ accion }: { accion: (estado: EstadoForm, formData: FormData) => Promise<EstadoForm> }) {
+  const [estado, enviar, pendiente] = useActionState(accion, {});
   return (
-    <form action={accion} className="space-y-4">
+    <form action={enviar} className="space-y-4">
       <Campo etiqueta="Correo" error={estado.errores?.correo}>
         <Input name="correo" type="email" autoComplete="email" required />
       </Campo>

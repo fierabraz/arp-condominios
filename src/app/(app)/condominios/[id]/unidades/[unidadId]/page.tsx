@@ -8,6 +8,7 @@ import { desvincularPersona, editarUnidad, eliminarUnidad, vincularPersona } fro
 import { VinculoForm } from "./vinculo-form";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { EstadoCuenta } from "@/components/estado-cuenta";
+import { historialUnidad } from "@/lib/unidades";
 
 export default async function UnidadPage({ params }: PageProps<"/condominios/[id]/unidades/[unidadId]">) {
   const { id, unidadId } = await params;
@@ -28,7 +29,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
     }),
   ]);
   if (!unidad) notFound();
-  const estado = (await estadoCuenta(unidad.id, administradoraId))!;
+  const [estado, historial] = await Promise.all([estadoCuenta(unidad.id, administradoraId), historialUnidad(unidad.id)]);
 
   return (
     <>
@@ -43,7 +44,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
 
       <section className="mb-8">
         <h2 className="mb-4 font-medium">Estado de cuenta</h2>
-        <EstadoCuenta estado={estado} moneda={usuario.administradora?.moneda ?? "CLP"} />
+        <EstadoCuenta estado={estado!} moneda={usuario.administradora?.moneda ?? "CLP"} />
       </section>
 
       <Card className="mb-6">
@@ -93,11 +94,26 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
         )}
       </Card>
 
-      <form action={eliminarUnidad.bind(null, unidad.id)}>
-        <Boton variante="peligro" type="submit">
-          Eliminar unidad
-        </Boton>
-      </form>
+      {historial.total > 0 ? (
+        <p className="rounded-xl bg-fondo px-4 py-3 text-sm text-texto-suave">
+          Esta unidad no se puede eliminar porque tiene historia registrada (
+          {[
+            historial.avisos && `${historial.avisos} ${historial.avisos === 1 ? "cobro" : "cobros"}`,
+            historial.pagos && `${historial.pagos} ${historial.pagos === 1 ? "pago" : "pagos"}`,
+            historial.gastos && `${historial.gastos} ${historial.gastos === 1 ? "cargo" : "cargos"}`,
+            historial.votos && `${historial.votos} ${historial.votos === 1 ? "voto" : "votos"}`,
+          ]
+            .filter(Boolean)
+            .join(", ")}
+          ). Borrarla haría desaparecer esa información de las rendiciones y del estado de cuenta.
+        </p>
+      ) : (
+        <form action={eliminarUnidad.bind(null, unidad.id)}>
+          <Boton variante="peligro" type="submit">
+            Eliminar unidad
+          </Boton>
+        </form>
+      )}
     </>
   );
 }
