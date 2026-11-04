@@ -58,6 +58,12 @@ enum PonderacionVoto {
   UNIDAD // una unidad, un voto
 }
 
+// Para qué sirve un enlace de un solo uso.
+enum TipoToken {
+  RECUPERACION // olvidó su contraseña (vence en 1 hora)
+  INVITACION // la administración lo invitó a crear su cuenta (vence en 7 días)
+}
+
 enum MedioPago {
   TRANSFERENCIA
   EFECTIVO
@@ -381,11 +387,13 @@ model IntentoIngreso {
   @@index([ip, creadoEn])
 }
 
-// Enlaces de un solo uso para crear una contraseña nueva. Se guarda solo el hash del token.
+// Enlaces de un solo uso para crear una contraseña (recuperación o invitación).
+// Se guarda solo el hash del token.
 model TokenRecuperacion {
   id        String   @id @default(cuid())
   usuarioId String
   usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  tipo      TipoToken @default(RECUPERACION)
   tokenHash String   @unique
   expiraEn  DateTime
   usadoEn   DateTime?

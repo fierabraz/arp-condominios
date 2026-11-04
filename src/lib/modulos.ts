@@ -54,6 +54,8 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
     modulos: [
       { clave: "muro", texto: "Muro de la comunidad", ruta: "/muro", descripcion: "Publicaciones y avisos para los residentes." },
       { clave: "residentes", texto: "Residentes", ruta: "/unidades", descripcion: "Unidades, alícuotas, propietarios y residentes." },
+      { clave: "invitaciones", texto: "Invitar residentes", ruta: "/invitaciones", soloAdmin: true, descripcion: "Enlace para que cada residente cree su contraseña, por correo o WhatsApp." },
+      { clave: "importar", texto: "Cargar desde Excel", ruta: "/importar", soloAdmin: true, descripcion: "Carga de una vez las unidades, alícuotas y personas desde una planilla." },
       { clave: "votaciones", texto: "Votaciones", ruta: "/votaciones", descripcion: "Consultas y votaciones en línea para asambleas, ponderadas por alícuota." },
     ],
   },

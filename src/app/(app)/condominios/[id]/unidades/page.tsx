@@ -1,8 +1,9 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAdministradora, puedeEditar } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { Plus } from "lucide-react";
-import { Card, PageHeader, Vacio } from "@/components/ui";
+import { FileSpreadsheet, Plus, Send } from "lucide-react";
+import { BotonLink, Card, PageHeader, Vacio } from "@/components/ui";
 import { morosidad } from "@/lib/cobro-servicio";
 import { ETIQUETAS_TIPO_UNIDAD, formatoPorcentaje } from "@/lib/formato";
 import { UnidadForm } from "../../unidad-form";
@@ -32,7 +33,22 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
 
   return (
     <>
-      <PageHeader titulo="Residentes y unidades" descripcion={condominio.nombre} />
+      <PageHeader
+        titulo="Residentes y unidades"
+        descripcion={condominio.nombre}
+        acciones={
+          editable && (
+            <>
+              <BotonLink href={`/condominios/${id}/importar`} variante="secundario">
+                <FileSpreadsheet size={16} aria-hidden="true" /> Cargar desde Excel
+              </BotonLink>
+              <BotonLink href={`/condominios/${id}/invitaciones`} variante="secundario">
+                <Send size={16} aria-hidden="true" /> Invitar residentes
+              </BotonLink>
+            </>
+          )
+        }
+      />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
@@ -59,7 +75,19 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
       </div>
 
       {condominio.unidades.length === 0 ? (
-        <Vacio>Esta propiedad aún no tiene unidades.</Vacio>
+        <Vacio>
+          Esta propiedad aún no tiene unidades.
+          {editable && (
+            <>
+              {" "}
+              Agrégalas una por una abajo o{" "}
+              <Link href={`/condominios/${id}/importar`} className="font-semibold text-marca hover:underline">
+                cárgalas todas desde Excel
+              </Link>
+              .
+            </>
+          )}
+        </Vacio>
       ) : (
         <ListaUnidades
           base={`/condominios/${id}/unidades`}
