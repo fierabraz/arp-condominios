@@ -37,7 +37,7 @@ export async function solicitarRecuperacion(_: EstadoForm, formData: FormData): 
 
   // La respuesta es siempre la misma, exista o no la cuenta, para no revelar qué correos están registrados.
   const usuario = await db.usuario.findUnique({ where: { correo: datos.data } });
-  if (!usuario) return { ok: true, mensaje: RESPUESTA };
+  if (!usuario || !usuario.activo) return { ok: true, mensaje: RESPUESTA };
   const recientes = await db.tokenRecuperacion.count({
     where: { usuarioId: usuario.id, creadoEn: { gte: new Date(Date.now() - 3_600_000) } },
   });

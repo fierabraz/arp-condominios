@@ -16,6 +16,7 @@ export const getUsuarioActual = cache(async () => {
     where: { id: sesion.usuarioId },
     select: {
       claveActualizadaEn: true,
+      activo: true,
       id: true,
       nombre: true,
       correo: true,
@@ -27,10 +28,11 @@ export const getUsuarioActual = cache(async () => {
     },
   });
   if (!usuario) return null;
-  // Al cambiar la contraseña se cierran las sesiones abiertas antes (con un segundo de margen,
-  // porque la hora de emisión de la sesión se guarda en segundos).
-  const { claveActualizadaEn, ...datos } = usuario;
-  if (claveActualizadaEn && (sesion.iat ?? 0) * 1000 < claveActualizadaEn.getTime() - 1000) return null;
+  // Al cambiar la contraseña se cierran las sesiones abiertas antes de ese momento.
+  const { claveActualizadaEn, activo, ...datos } = usuario;
+  if (!activo) return null;
+  const emitida = sesion.emitidaEn ?? (sesion.iat ?? 0) * 1000;
+  if (claveActualizadaEn && emitida < claveActualizadaEn.getTime()) return null;
   return datos;
 });
 

@@ -9,7 +9,10 @@ import type { Rol } from "@/generated/prisma/enums";
 function enlaces(rol: Rol, condominioId: string | null): EnlaceMenu[] {
   switch (rol) {
     case "SUPERADMIN":
-      return [{ href: "/plataforma", texto: "Administradoras", icono: "edificios" }];
+      return [
+        { href: "/plataforma", texto: "Administradoras", icono: "edificios" },
+        { href: "/plataforma/usuarios", texto: "Usuarios", icono: "personas" },
+      ];
     case "ADMINISTRADOR":
       return [
         { href: "/condominios", texto: "Mis propiedades", icono: "edificios" },

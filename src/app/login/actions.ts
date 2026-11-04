@@ -40,6 +40,7 @@ export async function iniciarSesion(tipo: TipoSesion, _: EstadoForm, formData: F
     return { mensaje: "Correo o contraseña incorrectos." };
   }
   await anotarIntento(correo, ip, true);
+  if (!usuario.activo) return { mensaje: "Esta cuenta está desactivada. Pide a la administración que la active." };
 
   // Cada tipo de cuenta entra por su propia puerta.
   const tipoCuenta = tipoDeRol(usuario.rol);
@@ -49,6 +50,7 @@ export async function iniciarSesion(tipo: TipoSesion, _: EstadoForm, formData: F
       : { mensaje: "Esta es una cuenta de administración. Usa el ingreso de administración.", ok: false };
   }
 
+  await db.usuario.update({ where: { id: usuario.id }, data: { ultimoIngresoEn: new Date() } });
   await createSession({
     usuarioId: usuario.id,
     rol: usuario.rol,

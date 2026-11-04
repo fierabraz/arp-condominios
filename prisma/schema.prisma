@@ -102,6 +102,9 @@ model Usuario {
   creadoEn         DateTime @default(now())
   // Al cambiar la contraseña se cierran las sesiones abiertas antes de esa fecha.
   claveActualizadaEn DateTime?
+  // Una cuenta desactivada no puede ingresar y sus sesiones abiertas dejan de servir.
+  activo           Boolean  @default(true)
+  ultimoIngresoEn  DateTime?
 
   tokensRecuperacion TokenRecuperacion[]
 

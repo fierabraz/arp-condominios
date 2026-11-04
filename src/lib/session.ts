@@ -12,6 +12,8 @@ export type SessionPayload = {
   administradoraId: string | null;
   tipo: TipoSesion;
   expiresAt: string;
+  /** Momento de creación en milisegundos (iat del JWT solo guarda segundos). */
+  emitidaEn?: number;
   iat?: number;
 };
 
@@ -63,10 +65,10 @@ export async function decrypt(token: string | undefined) {
   }
 }
 
-export async function createSession(data: Omit<SessionPayload, "expiresAt" | "tipo" | "iat">) {
+export async function createSession(data: Omit<SessionPayload, "expiresAt" | "tipo" | "iat" | "emitidaEn">) {
   const tipo = tipoDeRol(data.rol);
   const expiresAt = new Date(Date.now() + DURACION[tipo].ms);
-  const token = await encrypt({ ...data, tipo, expiresAt: expiresAt.toISOString() });
+  const token = await encrypt({ ...data, tipo, emitidaEn: Date.now(), expiresAt: expiresAt.toISOString() });
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
