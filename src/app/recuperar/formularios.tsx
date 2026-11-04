@@ -22,7 +22,7 @@ export function SolicitudForm({ accion }: { accion: Accion }) {
   );
 }
 
-export function ClaveNuevaForm({ accion }: { accion: Accion }) {
+export function ClaveNuevaForm({ accion, textoBoton = "Guardar contraseña" }: { accion: Accion; textoBoton?: string }) {
   const [estado, enviar, pendiente] = useActionState(accion, {});
   return (
     <form action={enviar} className="space-y-4">
@@ -34,7 +34,7 @@ export function ClaveNuevaForm({ accion }: { accion: Accion }) {
       </Campo>
       <Mensaje texto={estado.mensaje} />
       <Boton type="submit" disabled={pendiente} className="w-full">
-        {pendiente ? "Guardando…" : "Guardar contraseña"}
+        {pendiente ? "Guardando…" : textoBoton}
       </Boton>
     </form>
   );

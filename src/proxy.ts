@@ -5,7 +5,7 @@ import { decrypt, LOGIN, SESSION_COOKIE } from "@/lib/session";
 // sesión queda en su parte del sitio. La autorización real se hace en cada página y
 // acción mediante src/lib/auth.ts.
 
-const PUBLICAS = ["/login", "/recuperar", "/salir"];
+const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir"];
 // Lo único que ve una sesión de residente: su cuenta y los documentos que se abren desde ella.
 const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones"];
 
@@ -13,7 +13,7 @@ const empieza = (ruta: string, prefijos: string[]) => prefijos.some((p) => ruta 
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (empieza(pathname, ["/salir", "/recuperar"])) return NextResponse.next();
+  if (empieza(pathname, ["/salir", "/recuperar", "/invitacion"])) return NextResponse.next();
   const esLogin = empieza(pathname, ["/login"]);
   const sesion = await decrypt(request.cookies.get(SESSION_COOKIE)?.value);
   const ir = (ruta: string) => NextResponse.redirect(new URL(ruta, request.nextUrl));
