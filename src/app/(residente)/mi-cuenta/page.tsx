@@ -1,199 +1,178 @@
-import { Download } from "lucide-react";
+import { Suspense } from "react";
+import Link from "next/link";
+import { Activity, AlertTriangle, BarChart3, CalendarDays, ChevronRight, Vote, Wallet } from "lucide-react";
 import { requireUsuario } from "@/lib/auth";
-import { db } from "@/lib/db";
-import { Insignia, Vacio } from "@/components/ui";
-import { ETIQUETAS_TIPO_UNIDAD, formatoFechaLarga, formatoMoneda, formatoPorcentaje } from "@/lib/formato";
-import { estadoCuenta } from "@/lib/cobro-servicio";
-import { nombrePeriodo } from "@/lib/cobro";
-import { EstadoCuenta } from "@/components/estado-cuenta";
-import { TarjetaPublicacion } from "@/components/publicacion";
-import { VotacionesResidente } from "./votaciones-residente";
+import { Vacio } from "@/components/ui";
+import { formatoFechaHora, formatoFechaLarga, formatoMoneda } from "@/lib/formato";
+import { MARCA } from "@/lib/marca";
+import { datosInicio } from "../datos-residente";
+import { SelectorUnidad } from "../navegacion-residente";
+import { PanelImportante } from "./panel-importante";
+import { TarjetaAccesos, type Acceso } from "./tarjeta-accesos";
 
-type Estado = NonNullable<Awaited<ReturnType<typeof estadoCuenta>>>;
-
-/** Fecha en que vence lo que se debe: el aviso pendiente más antiguo. */
-function proximoVencimiento(estado: Estado) {
-  const pendientes = estado.avisos.filter((a) => Number(a.saldo) > 0).map((a) => a.vencimiento);
-  return pendientes.length ? new Date(Math.min(...pendientes.map((d) => d.getTime()))) : null;
-}
-
-export default async function MiCuentaPage() {
+export default async function InicioResidentePage({ searchParams }: PageProps<"/mi-cuenta">) {
   const usuario = await requireUsuario(["RESIDENTE"]);
-  const moneda = usuario.administradora?.moneda ?? "CLP";
-  const vinculos = usuario.personaId
-    ? await db.unidadPersona.findMany({
-        where: { personaId: usuario.personaId },
-        include: { unidad: { include: { condominio: { select: { nombre: true, direccion: true } } } } },
-      })
-    : [];
-  // Una unidad puede aparecer dos veces (propietario y residente): mostrar su cuenta una sola vez.
-  const unidadesUnicas = [...new Map(vinculos.map((v) => [v.unidadId, v])).values()];
-  const condominioIds = [...new Set(unidadesUnicas.map((v) => v.unidad.condominioId))];
-  const rendiciones = await db.periodo.findMany({
-    where: { condominioId: { in: condominioIds }, estado: "CERRADO" },
-    orderBy: [{ anio: "desc" }, { mes: "desc" }],
-    take: 12,
-    include: { condominio: { select: { nombre: true } } },
-  });
-  const publicaciones = await db.publicacion.findMany({
-    where: { condominioId: { in: condominioIds } },
-    orderBy: { creadoEn: "desc" },
-    take: 5,
-    include: { condominio: { select: { id: true, nombre: true } } },
-  });
-  const estados = (
-    await Promise.all(unidadesUnicas.map(async (v) => ({ v, estado: await estadoCuenta(v.unidadId, usuario.administradoraId!) })))
-  ).filter((e): e is { v: (typeof unidadesUnicas)[number]; estado: Estado } => e.estado !== null);
-  // Primero las unidades que deben más.
-  const porDeuda = [...estados].sort((a, b) => b.estado.deuda - a.estado.deuda);
-  const [principal, ...otras] = porDeuda;
-  const nombrePropiedad = condominioIds.length === 1 ? unidadesUnicas[0].unidad.condominio.nombre : null;
-  const $ = (n: number) => formatoMoneda(n, moneda);
-  const nombreUnidad = (v: (typeof unidadesUnicas)[number]) => `${ETIQUETAS_TIPO_UNIDAD[v.unidad.tipo]} ${v.unidad.numero}`;
+  const { unidad } = await searchParams;
+  const datos = await datosInicio(usuario, typeof unidad === "string" ? unidad : undefined);
+  const { enlace, resumen, alertas, actividad } = datos;
+  const $ = (n: number) => formatoMoneda(n, datos.moneda);
+  const urgentes = alertas.filter((a) => a.nivel === "urgente");
+
+  const informarme: Acceso[] = [
+    { texto: "Estado de cuenta y avisos de cobro", icono: "cuenta", href: enlace("/mi-cuenta/pagos") },
+    { texto: "Rendiciones financieras", icono: "rendiciones", href: enlace("/mi-cuenta/documentos") },
+    { texto: "Noticias y comunicados", icono: "noticias", href: enlace("/mi-cuenta/comunidad") },
+    { texto: "Documentos de la comunidad", icono: "avisos" },
+    { texto: "Información y actividades", icono: "reserva" },
+  ];
+  const gestion: Acceso[] = [
+    {
+      texto: "Participar en votaciones",
+      icono: "votar",
+      href: enlace("/mi-cuenta/votaciones"),
+      insignia: resumen.votacionPendiente ? "Tu voto falta" : undefined,
+    },
+    { texto: "Cambiar mi contraseña", icono: "clave", href: "/mi-cuenta/perfil" },
+    { texto: "Pagar en línea", icono: "pagar" },
+    { texto: "Solicitar certificados", icono: "certificado" },
+    { texto: "Enviar solicitudes", icono: "solicitud" },
+    { texto: "Reportar incidencias", icono: "incidencia" },
+    { texto: "Reservar espacios comunes", icono: "reserva" },
+  ];
 
   return (
-    <div>
-      <header className="mb-6">
-        {nombrePropiedad && <p className="text-sm text-texto-suave">{nombrePropiedad}</p>}
-        <h1 className="text-2xl font-bold tracking-tight md:text-[1.75rem]">Hola, {usuario.nombre.split(" ")[0]}</h1>
+    <div className="space-y-6">
+      <header>
+        <h1 className="text-3xl font-bold tracking-tight text-convive-oscuro md:text-4xl">Hola, {usuario.nombre.split(" ")[0]}</h1>
+        <p className="mt-1 text-texto-suave">Bienvenido a {MARCA.nombre}, el portal de tu comunidad.</p>
+        {/* En pantallas grandes la comunidad y el selector están en la cabecera. */}
+        {datos.todas.length > 0 && (
+          <div className="mt-2 md:hidden">
+            <Suspense>
+              <SelectorUnidad
+                compacto
+                unidades={datos.todas.map((u) => ({ id: u.id, nombre: u.nombre, condominioNombre: u.condominioNombre }))}
+              />
+            </Suspense>
+          </div>
+        )}
       </header>
 
-      {vinculos.length === 0 ? (
+      {datos.todas.length === 0 ? (
         <Vacio>Tu cuenta aún no está vinculada a ninguna unidad. Contacta a tu administración.</Vacio>
       ) : (
-        <div className="mb-8 grid gap-3 lg:grid-cols-2">
-          {principal && (
-            <section
-              aria-label={`Cuenta de ${nombreUnidad(principal.v)}`}
-              className={`flex flex-col gap-1.5 rounded-3xl p-6 lg:row-span-2 ${
-                principal.estado.deuda > 0 ? "bg-marca text-white" : "border border-borde bg-white"
-              }`}
+        <>
+          {/* En el teléfono, lo urgente se ve arriba sin tener que bajar hasta el panel. */}
+          {urgentes.length > 0 && (
+            <Link
+              href="#importante"
+              className="flex min-h-12 items-center gap-3 rounded-2xl border-l-4 border-peligro bg-peligro-suave px-4 py-3 font-semibold text-peligro lg:hidden"
             >
-              <span className={principal.estado.deuda > 0 ? "text-white/90" : "text-texto-suave"}>
-                {nombreUnidad(principal.v)}
-                {!nombrePropiedad && ` · ${principal.v.unidad.condominio.nombre}`}
-              </span>
-              {principal.estado.deuda > 0 ? (
-                <>
-                  <span className="text-4xl font-bold tracking-tight tabular-nums">{$(principal.estado.deuda)}</span>
-                  <span>
-                    {principal.estado.vencida > 0
-                      ? `Tienes ${$(principal.estado.vencida)} vencido`
-                      : `Vence el ${formatoFechaLarga(proximoVencimiento(principal.estado)!)}`}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-3xl font-bold">Estás al día</span>
-                  <span className="text-texto-suave">
-                    {principal.estado.aFavor > 0 ? `Tienes ${$(principal.estado.aFavor)} a favor.` : "No tienes cobros pendientes."}
-                  </span>
-                </>
-              )}
-              <a
-                href={`#unidad-${principal.v.unidadId}`}
-                className={`mt-3 inline-flex min-h-12 items-center justify-center rounded-2xl px-4 font-semibold ${
-                  principal.estado.deuda > 0
-                    ? "border-[1.5px] border-white/70 text-white hover:bg-white/10"
-                    : "bg-marca-suave text-marca hover:bg-marca hover:text-white"
-                }`}
-              >
-                Ver detalle
-              </a>
-            </section>
+              <AlertTriangle size={22} aria-hidden="true" className="shrink-0" />
+              <span className="flex-1">{urgentes.length === 1 ? urgentes[0].detalle : `Tienes ${urgentes.length} avisos urgentes.`}</span>
+              <ChevronRight size={20} aria-hidden="true" />
+            </Link>
           )}
-          {otras.map(({ v, estado }) => (
-            <a
-              key={v.unidadId}
-              href={`#unidad-${v.unidadId}`}
-              className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-borde bg-white px-5 py-3 hover:border-marca"
-            >
-              <span className="flex flex-col">
-                <span className="font-semibold">{nombreUnidad(v)}</span>
-                <span className="text-sm text-texto-suave">
-                  {estado.deuda === 0
-                    ? "Al día"
-                    : estado.vencida > 0
-                      ? "Tiene deuda vencida"
-                      : `Vence el ${formatoFechaLarga(proximoVencimiento(estado)!)}`}
-                </span>
-              </span>
-              <span className={`text-lg font-bold tabular-nums ${estado.vencida > 0 ? "text-peligro" : ""}`}>{$(estado.deuda)}</span>
-            </a>
-          ))}
-        </div>
-      )}
 
-      {usuario.personaId && <VotacionesResidente personaId={usuario.personaId} condominioIds={condominioIds} />}
-
-      {publicaciones.length > 0 && (
-        <section id="muro" aria-labelledby="titulo-muro" className="mb-10 scroll-mt-24">
-          <h2 id="titulo-muro" className="mb-3 text-xl font-bold">
-            Avisos de la comunidad
-          </h2>
-          <div className="space-y-3">
-            {publicaciones.map((p) => (
-              <TarjetaPublicacion key={p.id} p={p} editable={false} completa />
-            ))}
+          <div className="grid items-start gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <TarjetaAccesos
+              titulo="Quiero informarme"
+              descripcion="Revisa tu cuenta, las finanzas y las novedades de tu comunidad."
+              icono="informarme"
+              accesos={informarme}
+            />
+            <TarjetaAccesos
+              titulo="Quiero realizar una gestión"
+              descripcion="Haz tus trámites en línea de forma simple."
+              icono="gestion"
+              accesos={gestion}
+            />
+            <div className="md:col-span-2 lg:col-span-1">
+              <PanelImportante alertas={alertas} />
+            </div>
           </div>
-        </section>
-      )}
 
-      {rendiciones.length > 0 && (
-        <section aria-labelledby="titulo-documentos" className="mb-10">
-          <h2 id="titulo-documentos" className="mb-1 text-xl font-bold">
-            Documentos
-          </h2>
-          <p className="mb-3 text-sm text-texto-suave">Rendiciones: en qué se gastó el dinero de la comunidad cada mes.</p>
-          <ul className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
-            {rendiciones.map((r) => (
-              <li key={r.id}>
-                <a
-                  href={`/rendiciones/${r.id}/pdf`}
-                  target="_blank"
-                  rel="noopener"
-                  className="flex min-h-14 items-center justify-between gap-3 px-5 py-3 hover:bg-fondo"
-                >
-                  <span>
-                    <span className="font-semibold">Rendición de {nombrePeriodo(r.anio, r.mes).toLowerCase()}</span>
-                    {condominioIds.length > 1 && <span className="block text-sm text-texto-suave">{r.condominio.nombre}</span>}
-                  </span>
-                  <Download size={20} className="shrink-0 text-marca" aria-label="Descargar PDF" />
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+          <div className="grid items-start gap-4 md:grid-cols-2">
+            <section aria-labelledby="titulo-resumen" className="rounded-3xl border border-borde bg-white p-5">
+              <h2 id="titulo-resumen" className="mb-4 flex items-center gap-2 text-lg font-bold">
+                <BarChart3 size={22} aria-hidden="true" className="text-convive-oscuro" /> Resumen de mi comunidad
+              </h2>
+              <ul className="space-y-3">
+                <li>
+                  <Link
+                    href={enlace("/mi-cuenta/pagos")}
+                    className={`flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3 ${
+                      resumen.vencida > 0 ? "bg-naranja-suave" : "bg-convive-suave/70"
+                    }`}
+                  >
+                    <Wallet size={24} aria-hidden="true" className={resumen.vencida > 0 ? "text-naranja-texto" : "text-convive-oscuro"} />
+                    <span className="flex-1">
+                      <span className="block text-sm text-texto-suave">Saldo pendiente</span>
+                      <span className={`text-2xl font-bold tabular-nums ${resumen.vencida > 0 ? "text-naranja-texto" : ""}`}>
+                        {resumen.deuda > 0 ? $(resumen.deuda) : "Estás al día"}
+                      </span>
+                      {resumen.deuda === 0 && resumen.aFavor > 0 && (
+                        <span className="block text-sm text-texto-suave">Tienes {$(resumen.aFavor)} a favor.</span>
+                      )}
+                    </span>
+                    {resumen.vencida > 0 && (
+                      <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-bold text-naranja-texto">
+                        {$(resumen.vencida)} vencido
+                      </span>
+                    )}
+                  </Link>
+                </li>
+                {resumen.proximoVencimiento && (
+                  <li className="flex min-h-16 items-center gap-3 rounded-2xl bg-convive-suave/70 px-4 py-3">
+                    <CalendarDays size={24} aria-hidden="true" className="text-convive-oscuro" />
+                    <span>
+                      <span className="block text-sm text-texto-suave">Próximo vencimiento</span>
+                      <span className="text-xl font-bold">{formatoFechaLarga(resumen.proximoVencimiento)}</span>
+                      <span className="block text-sm text-texto-suave">Gastos comunes</span>
+                    </span>
+                  </li>
+                )}
+                {resumen.proximaVotacion && (
+                  <li>
+                    <Link href={enlace("/mi-cuenta/votaciones")} className="flex min-h-16 items-center gap-3 rounded-2xl bg-convive-suave/70 px-4 py-3">
+                      <Vote size={24} aria-hidden="true" className="text-convive-oscuro" />
+                      <span className="flex-1">
+                        <span className="block text-sm text-texto-suave">Votación abierta</span>
+                        <span className="font-bold">{resumen.proximaVotacion.titulo}</span>
+                        <span className="block text-sm text-texto-suave">Vota hasta el {formatoFechaHora(resumen.proximaVotacion.cierraEn)}</span>
+                      </span>
+                      <ChevronRight size={20} aria-hidden="true" />
+                    </Link>
+                  </li>
+                )}
+              </ul>
+            </section>
 
-      {estados.length > 0 && (
-        <section id="pagos" aria-labelledby="titulo-pagos" className="scroll-mt-24">
-          <h2 id="titulo-pagos" className="mb-4 text-xl font-bold">
-            Mis cobros y pagos
-          </h2>
-          <div className="space-y-10">
-            {estados.map(({ v, estado }) => (
-              <section key={v.unidadId} id={`unidad-${v.unidadId}`} className="scroll-mt-24">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <h3 className="text-lg font-bold">{nombreUnidad(v)}</h3>
-                  {estado.vencida > 0 ? (
-                    <Insignia tono="peligro">Deuda vencida</Insignia>
-                  ) : estado.deuda > 0 ? (
-                    <Insignia tono="alerta">Por pagar</Insignia>
-                  ) : (
-                    <Insignia tono="exito">Al día</Insignia>
-                  )}
-                </div>
-                <p className="mb-4 text-sm text-texto-suave">
-                  {v.unidad.condominio.nombre} · Alícuota {formatoPorcentaje(v.unidad.alicuota)}
-                </p>
-                <EstadoCuenta estado={estado} moneda={moneda} />
-              </section>
-            ))}
+            <section aria-labelledby="titulo-actividad" className="rounded-3xl border border-borde bg-white p-5">
+              <h2 id="titulo-actividad" className="mb-4 flex items-center gap-2 text-lg font-bold">
+                <Activity size={22} aria-hidden="true" className="text-convive-oscuro" /> Actividad reciente
+              </h2>
+              {actividad.length === 0 ? (
+                <p className="text-texto-suave">Aún no hay movimientos.</p>
+              ) : (
+                <ol className="relative space-y-1 border-l-2 border-convive-suave pl-5">
+                  {actividad.map((e) => (
+                    <li key={e.id} className="relative">
+                      <span aria-hidden="true" className="absolute top-4 -left-[1.6rem] h-3 w-3 rounded-full bg-convive" />
+                      <Link href={e.href} className="block rounded-xl px-2 py-2 hover:bg-fondo">
+                        <span className="block font-semibold">{e.texto}</span>
+                        <time dateTime={e.fecha.toISOString()} className="text-sm text-texto-suave">
+                          {formatoFechaHora(e.fecha)}
+                        </time>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
           </div>
-        </section>
+        </>
       )}
-
     </div>
   );
 }

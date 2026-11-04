@@ -17,6 +17,15 @@
   --color-fondo: #f4f6f5;
   --color-borde: #e1e6e4;
 
+  /* Paleta Convive (portal del residente). El turquesa no lleva texto blanco encima
+     (contraste bajo): se usa en fondos e íconos; los textos y botones van en teal oscuro. */
+  --color-convive: #14c7a4;
+  --color-convive-oscuro: #0f6b63;
+  --color-convive-suave: #e8f4f1;
+  --color-naranja: #ff9f5b;
+  --color-naranja-suave: #fff3ea;
+  --color-naranja-texto: #8a3b00;
+
   /* Texto un poco más grande que el estándar para leer bien en el teléfono. */
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.25rem;
