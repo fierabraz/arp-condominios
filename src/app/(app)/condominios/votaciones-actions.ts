@@ -136,7 +136,7 @@ export async function votar(votacionId: string, unidadId: string, _: EstadoForm,
     if (e instanceof ErrorVotacion) return { mensaje: e.message };
     throw e;
   }
-  revalidatePath("/mi-cuenta");
+  revalidatePath("/mi-cuenta", "layout");
   revalidatePath(rutaVotaciones(v.condominioId), "layout");
   return { ok: true, mensaje: "¡Gracias! Tu voto quedó registrado." };
 }
