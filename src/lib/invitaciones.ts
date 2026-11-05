@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import type { UsuarioActual } from "@/lib/auth";
-import { enviarCorreo, escaparHtml, smtpConfigurado } from "@/lib/correo";
+import { enviarCorreo, escaparHtml, correoConfigurado } from "@/lib/correo";
 import { enlaceWhatsapp, estadoAcceso, mensajeInvitacion, puedeInvitar } from "@/lib/invitacion-estado";
 import { MARCA } from "@/lib/marca";
 import { crearToken, DIAS_INVITACION } from "@/lib/recuperacion";
@@ -140,12 +140,12 @@ export async function invitarPersona(
     para: persona.correo,
     asunto: `Te invitamos a la app de ${propiedad}`,
     texto: `Hola, ${primer}:\n\nTe invitamos a ${MARCA.nombre}, la app de ${propiedad}, donde puedes ver tus gastos comunes, tus pagos, los avisos y las votaciones.\n\nCrea tu contraseña con este enlace (sirve una sola vez y durante ${DIAS_INVITACION} días):\n\n${enlace}\n\nTu usuario es este correo: ${persona.correo}`,
-    html: `<p>Hola, ${escaparHtml(primer)}:</p><p>Te invitamos a ${escaparHtml(MARCA.nombre)}, la app de <strong>${escaparHtml(propiedad)}</strong>, donde puedes ver tus gastos comunes, tus pagos, los avisos y las votaciones.</p><p><a href="${enlace}" style="display:inline-block;padding:12px 20px;background:#0e7c6b;color:#fff;border-radius:12px;text-decoration:none;font-weight:600">Crear mi contraseña</a></p><p>El enlace sirve una sola vez y durante ${DIAS_INVITACION} días. Tu usuario es este correo: ${escaparHtml(persona.correo)}</p>`,
+    html: `<p>Hola, ${escaparHtml(primer)}:</p><p>Te invitamos a ${escaparHtml(MARCA.nombre)}, la app de <strong>${escaparHtml(propiedad)}</strong>, donde puedes ver tus gastos comunes, tus pagos, los avisos y las votaciones.</p><p><a href="${enlace}" style="display:inline-block;padding:12px 20px;background:#00666A;color:#fff;border-radius:12px;text-decoration:none;font-weight:600">Crear mi contraseña</a></p><p>El enlace sirve una sola vez y durante ${DIAS_INVITACION} días. Tu usuario es este correo: ${escaparHtml(persona.correo)}</p>`,
   });
   await registrar(
     autor,
     estado === "SIN_CUENTA" ? "Invitó a una persona a la app" : "Renovó la invitación a la app",
-    `${persona.nombre} (${persona.correo})${smtpConfigurado() ? "" : ", sin servidor de correo: enlace para copiar"}`,
+    `${persona.nombre} (${persona.correo})${correoConfigurado() ? "" : ", sin servidor de correo: enlace para copiar"}`,
     condominioId,
   );
   return {

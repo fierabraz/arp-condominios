@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Home,
   KeyRound,
+  Mail,
   ListChecks,
   Lock,
   LogOut,
@@ -41,6 +42,7 @@ export const ICONOS = {
   personas: Users,
   inicio: Home,
   registro: History,
+  correo: Mail,
 } satisfies Record<string, LucideIcon>;
 
 const ICONOS_GRUPO: Record<string, LucideIcon> = {

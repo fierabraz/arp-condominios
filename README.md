@@ -27,7 +27,15 @@ Sistema web para que administradoras de edificios y condominios gestionen sus co
 
 ### Correo
 
-Para que los correos salgan de verdad, completa `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` y `SMTP_FROM` en `.env` con los datos de tu proveedor (Gmail, Brevo, Amazon SES, etc.). Mientras no estén, el sistema funciona en modo de prueba: no envía nada y guarda una copia de cada correo en la carpeta `correos-simulados/`.
+Los avisos de cobro, las invitaciones a residentes y los enlaces para recuperar la contraseña salen por el primer servicio configurado de esta lista:
+
+1. **Brevo** (recomendado para empezar, 300 correos al día gratis y no exige dominio propio): `BREVO_API_KEY`.
+2. **Resend** (100 al día gratis, exige verificar un dominio propio): `RESEND_API_KEY`.
+3. **Cualquier servidor SMTP**: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`.
+
+En todos los casos, `CORREO_REMITENTE` es el remitente (`Convive <avisos@tudominio.cl>` o solo el correo) y tiene que estar verificado en el servicio. `CORREO_RESPONDER_A` es opcional: a dónde llegan las respuestas. `SMTP_FROM` se sigue aceptando como remitente.
+
+Mientras no haya ninguno, el sistema funciona en modo de prueba: no envía nada y guarda una copia de cada correo en la carpeta `correos-simulados/`. La cuenta de plataforma ve el servicio activo y puede mandar un correo de prueba en **Correo** (`/plataforma/correo`).
 
 ## Cómo ejecutarlo en tu computador
 
@@ -82,7 +90,7 @@ Ambos servicios tienen plan gratuito suficiente para empezar. Vercel ejecuta el 
 
 Cada despliegue aplica las migraciones pendientes y, la primera vez, crea la cuenta de plataforma. Desde ahí entras con tu correo, creas tu administradora y sus usuarios. Cada vez que se fusiona un cambio en `main`, Vercel publica la nueva versión sola.
 
-Para enviar correos de verdad, agrega también las variables `SMTP_*` (ver [Correo](#correo)) y vuelve a desplegar.
+Para enviar correos de verdad, agrega también `BREVO_API_KEY` y `CORREO_REMITENTE` (ver [Correo](#correo)) y vuelve a desplegar.
 
 Si quieres datos de ejemplo en la base publicada, copia `DATABASE_URL` de Vercel a tu `.env` local y ejecuta `npm run db:seed`. Las cuentas de ejemplo usan `demo1234`, así que cámbiales la contraseña o bórralas antes de usar el sistema con clientes reales.
 
