@@ -23,7 +23,7 @@ export default async function ResidenteLayout({ children }: LayoutProps<"/">) {
   const unidades = datos.todas.map((u) => ({ id: u.id, nombre: u.nombre, condominioNombre: u.condominioNombre }));
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-convive-suave/70 to-fondo">
+    <div className="fondo-convive min-h-screen">
       <header className="sticky top-0 z-30 border-b border-borde bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-4 md:gap-5">
           <Link href="/mi-cuenta" aria-label="Inicio" className="shrink-0 rounded-xl focus-visible:ring-2 focus-visible:ring-convive">
@@ -57,7 +57,7 @@ export default async function ResidenteLayout({ children }: LayoutProps<"/">) {
                 <span className="sr-only md:hidden">Mi cuenta de usuario</span>
                 <ChevronDown size={18} aria-hidden="true" className="hidden transition group-open:rotate-180 md:block" />
               </summary>
-              <div className="absolute right-0 mt-2 w-56 rounded-2xl border border-borde bg-white p-2 shadow-lg">
+              <div className="absolute right-0 mt-2 w-56 sombra-convive rounded-2xl border border-borde bg-white p-2 shadow-lg">
                 <p className="truncate px-3 py-2 text-sm text-texto-suave">{usuario.correo}</p>
                 <Link href="/mi-cuenta/perfil" className="flex min-h-11 items-center gap-2 rounded-xl px-3 font-semibold hover:bg-fondo">
                   <UserRound size={18} aria-hidden="true" /> Mi perfil

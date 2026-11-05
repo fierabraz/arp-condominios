@@ -60,7 +60,7 @@ export default async function ImportarPage({ params }: PageProps<"/condominios/[
         />
       </Card>
 
-      <details className="rounded-2xl border border-borde bg-white p-5 text-sm">
+      <details className="sombra-convive rounded-2xl border border-borde bg-white p-5 text-sm">
         <summary className="cursor-pointer font-semibold">Qué va en cada columna</summary>
         <dl className="mt-3 grid gap-x-6 gap-y-2 md:grid-cols-[10rem_1fr]">
           {COLUMNAS.map((c) => (

@@ -13,6 +13,7 @@ export default async function InvitacionPage({ params }: PageProps<"/invitacion/
   if (!t) {
     return (
       <PantallaIngreso
+        publico="residentes"
         titulo="Esta invitación ya no sirve"
         descripcion="Las invitaciones sirven una sola vez y vencen a los 7 días. Si ya creaste tu contraseña, ingresa con tu correo. Si no, pide una invitación nueva a la administración."
       >
@@ -31,6 +32,7 @@ export default async function InvitacionPage({ params }: PageProps<"/invitacion/
   const donde = propiedades.map((p) => p.nombre).join(", ") || MARCA.nombre;
   return (
     <PantallaIngreso
+      publico="residentes"
       titulo={`¡Hola, ${nombre}! Crea tu contraseña`}
       descripcion={`Te invitaron a la app de ${donde}. Tu usuario es ${t.usuario.correo}.`}
     >

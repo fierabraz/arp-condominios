@@ -36,7 +36,7 @@ export function EnlaceInvitacion({ r }: { r: Extract<ResultadoInvitacion, { ok: 
         value={r.enlace}
         aria-label={`Enlace de invitación de ${r.nombre}`}
         onFocus={(e) => e.currentTarget.select()}
-        className="min-h-10 w-full rounded-lg border border-gray-300 bg-white px-2 font-mono text-xs"
+        className="min-h-10 w-full rounded-lg border border-borde bg-white px-2 font-mono text-xs"
       />
       <div className="flex flex-wrap gap-2">
         <a

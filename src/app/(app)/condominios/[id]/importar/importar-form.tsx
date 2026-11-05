@@ -65,7 +65,7 @@ function Pasos({
           <Link href={`${base}/invitaciones`} className="inline-flex min-h-11 items-center rounded-xl bg-marca px-4 text-sm font-semibold text-white hover:bg-marca-oscuro">
             Invitar a los residentes
           </Link>
-          <Link href={`${base}/unidades`} className="inline-flex min-h-11 items-center rounded-xl border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50">
+          <Link href={`${base}/unidades`} className="inline-flex min-h-11 items-center rounded-xl border border-borde px-4 text-sm font-semibold hover:bg-convive-suave/70">
             Ver unidades
           </Link>
           <Boton type="button" variante="secundario" onClick={otraVez}>
@@ -246,7 +246,7 @@ function Pasos({
           required
           accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
           onChange={() => setErrorArchivo(undefined)}
-          className="block w-full rounded-xl border border-dashed border-gray-300 bg-fondo p-4 text-sm file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-marca file:px-4 file:font-semibold file:text-white"
+          className="block w-full rounded-xl border border-dashed border-borde bg-fondo p-4 text-sm file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-marca file:px-4 file:font-semibold file:text-white"
         />
       </label>
       <Mensaje texto={errorArchivo} />

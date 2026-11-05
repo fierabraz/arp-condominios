@@ -91,6 +91,14 @@ function useFavoritos(): [string[], (clave: string) => void] {
   return [lista, alternar];
 }
 
+const iniciales = (nombre: string) =>
+  nombre
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]!.toUpperCase())
+    .join("");
+
 export type EnlaceMenu = { href: string; texto: string; icono: keyof typeof ICONOS };
 
 /** Enlace activo: coincidencia exacta, o la sección más específica que contiene la ruta actual. */
@@ -102,7 +110,7 @@ function activo(href: string, ruta: string, enlaces: EnlaceMenu[]) {
 
 const claseEnlace = (activo: boolean) =>
   `flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-[15px] transition ${
-    activo ? "bg-marca-suave font-semibold text-marca" : "text-texto hover:bg-gray-100"
+    activo ? "bg-marca-suave font-semibold text-marca" : "text-texto hover:bg-convive-suave/70"
   }`;
 
 function MenuPrincipal({ enlaces, ruta }: { enlaces: EnlaceMenu[]; ruta: string }) {
@@ -154,7 +162,7 @@ function MenuPropiedad({
           href={href}
           aria-current={actual ? "page" : undefined}
           className={`flex min-h-10 flex-1 items-center rounded-xl py-1.5 pr-2 text-[15px] transition ${sangria ? "pl-11" : "pl-3"} ${
-            actual ? "bg-marca-suave font-semibold text-marca" : "text-texto hover:bg-gray-100"
+            actual ? "bg-marca-suave font-semibold text-marca" : "text-texto hover:bg-convive-suave/70"
           }`}
         >
           {m.texto}
@@ -186,7 +194,7 @@ function MenuPropiedad({
         </Link>
       )}
       <p className="px-3 pb-2 text-base font-bold">{propiedad.nombre}</p>
-      <label className="mx-1 mb-2 flex min-h-11 items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 text-sm focus-within:border-marca">
+      <label className="mx-1 mb-2 flex min-h-11 items-center gap-2 rounded-xl border border-borde bg-fondo px-3 text-sm focus-within:border-convive focus-within:bg-white">
         <Search size={16} className="text-texto-suave" aria-hidden="true" />
         <input
           value={busqueda}
@@ -256,7 +264,7 @@ function MenuPropiedad({
               <ul className="mt-1 pb-1">
                 {proximos.map((m) => (
                   <li key={m.clave}>
-                    <Link href={rutaModulo(propiedad.id, m)} className="block rounded-lg px-2 py-1.5 text-texto hover:bg-gray-100">
+                    <Link href={rutaModulo(propiedad.id, m)} className="block rounded-lg px-2 py-1.5 text-texto hover:bg-convive-suave/70">
                       {m.texto}
                     </Link>
                   </li>
@@ -299,7 +307,7 @@ export function MenuLateral({
   }
 
   return (
-    <aside className="sticky top-0 z-30 border-b border-borde bg-white text-texto md:flex md:h-screen md:w-72 md:shrink-0 md:flex-col md:border-r md:border-b-0">
+    <aside className="sticky top-0 z-30 border-b border-borde bg-white/95 text-texto backdrop-blur md:flex md:h-screen md:w-72 md:shrink-0 md:flex-col md:border-r md:border-b-0">
       <div className="flex h-20 items-center justify-between gap-3 px-5">
         <div className="min-w-0">
           <Logo subtitulo={subtitulo} />
@@ -307,7 +315,7 @@ export function MenuLateral({
         <button
           type="button"
           onClick={() => setAbierto(!abierto)}
-          className="flex h-11 w-11 items-center justify-center rounded-xl border border-borde text-texto hover:bg-gray-100 md:hidden"
+          className="flex h-11 w-11 items-center justify-center rounded-xl border border-borde text-texto hover:bg-convive-suave/70 md:hidden"
           aria-label={abierto ? "Cerrar menú" : "Abrir menú"}
           aria-expanded={abierto}
         >
@@ -333,16 +341,23 @@ export function MenuLateral({
         </div>
 
         <div className="mt-auto shrink-0 border-t border-borde p-4">
-          <p className="truncate px-2 text-sm font-semibold">{usuario}</p>
-          <p className="px-2 text-xs text-texto-suave">{rol}</p>
+          <div className="flex items-center gap-3 px-2">
+            <span aria-hidden="true" className="flex size-10 shrink-0 items-center justify-center rounded-full bg-convive-suave text-sm font-bold text-convive-oscuro">
+              {iniciales(usuario)}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold">{usuario}</span>
+              <span className="block text-xs text-texto-suave">{rol}</span>
+            </span>
+          </div>
           <Link
             href="/contrasena"
-            className="mt-3 flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-gray-100"
+            className="mt-3 flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-convive-suave/70"
           >
             <KeyRound size={16} /> Cambiar contraseña
           </Link>
           <form action={cerrarSesion}>
-            <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-gray-100">
+            <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-convive-suave/70">
               <LogOut size={16} /> Cerrar sesión
             </button>
           </form>

@@ -13,7 +13,7 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight md:text-[1.75rem]">{titulo}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-convive-oscuro md:text-[2rem]">{titulo}</h1>
         {descripcion && <p className="mt-1 text-sm text-texto-suave">{descripcion}</p>}
       </div>
       {acciones && <div className="flex flex-wrap gap-2">{acciones}</div>}
@@ -23,21 +23,21 @@ export function PageHeader({
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-borde bg-white p-5 ${className}`}>
+    <div className={`sombra-convive rounded-2xl border border-borde bg-white p-5 ${className}`}>
       {children}
     </div>
   );
 }
 
 const estilosBoton = {
-  primario: "bg-marca text-white hover:bg-marca-oscuro",
-  secundario: "border border-gray-300 bg-white text-texto hover:bg-gray-50",
+  primario: "bg-marca text-white shadow-sm hover:bg-marca-oscuro",
+  secundario: "border border-borde bg-white text-convive-oscuro hover:border-convive hover:bg-convive-suave",
   peligro: "border border-peligro-suave bg-white text-peligro hover:bg-peligro-suave",
 };
 
 type Variante = keyof typeof estilosBoton;
 const baseBoton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition disabled:opacity-50";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-convive disabled:opacity-50";
 
 export function Boton({
   variante = "primario",
@@ -83,7 +83,7 @@ export function Campo({
 }
 
 const baseInput =
-  "min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-base focus:border-marca focus:outline-none focus:ring-2 focus:ring-marca-suave md:text-sm";
+  "min-h-11 w-full rounded-xl border border-borde bg-white px-3 py-2 text-base focus:border-convive focus:outline-none focus:ring-2 focus:ring-convive/25 md:text-sm";
 
 export function Input(props: ComponentProps<"input">) {
   return <input className={baseInput} {...props} />;
@@ -95,8 +95,8 @@ export function Select(props: ComponentProps<"select">) {
 
 export function Tabla({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-2xl border border-borde bg-white">
-      <table className="w-full text-left text-sm [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-texto-suave [&_thead]:bg-gray-50 [&_tbody_tr]:border-t [&_tbody_tr]:border-gray-100">
+    <div className="sombra-convive overflow-x-auto sombra-convive rounded-2xl border border-borde bg-white">
+      <table className="w-full text-left text-sm [&_td]:px-4 [&_td]:py-3 [&_th]:px-4 [&_th]:py-3 [&_th]:font-semibold [&_th]:text-texto-suave [&_thead]:bg-convive-suave/60 [&_tbody_tr]:border-t [&_tbody_tr]:border-borde">
         {children}
       </table>
     </div>
@@ -105,7 +105,7 @@ export function Tabla({ children }: { children: ReactNode }) {
 
 export function Vacio({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-texto-suave">
+    <div className="rounded-2xl border border-dashed border-convive/40 bg-white/80 p-8 text-center text-sm text-texto-suave">
       {children}
     </div>
   );
@@ -147,9 +147,9 @@ export function Indicador({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border border-borde bg-white p-5">
+    <div className="sombra-convive flex flex-col gap-2 sombra-convive rounded-2xl border border-borde bg-white p-5">
       <span className="text-sm text-texto-suave">{etiqueta}</span>
-      <span className={`text-3xl font-bold ${tono === "peligro" ? "text-peligro" : ""}`}>{valor}</span>
+      <span className={`text-3xl font-bold ${tono === "peligro" ? "text-peligro" : "text-convive-oscuro"}`}>{valor}</span>
       {children}
     </div>
   );

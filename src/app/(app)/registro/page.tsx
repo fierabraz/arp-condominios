@@ -56,7 +56,7 @@ export default async function RegistroPage({ searchParams }: PageProps<"/registr
       {visibles.length === 0 ? (
         <Vacio>{hasta ? "No hay cambios más antiguos." : "Todavía no hay cambios registrados."}</Vacio>
       ) : (
-        <ol className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
+        <ol className="sombra-convive divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
           {visibles.map((r) => (
             <li key={r.id} className="grid gap-1 p-4 md:grid-cols-[11rem_1fr] md:gap-4">
               <time dateTime={r.creadoEn.toISOString()} className="text-sm text-texto-suave">

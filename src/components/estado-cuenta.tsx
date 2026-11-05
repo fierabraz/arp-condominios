@@ -37,7 +37,7 @@ export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: strin
               const saldo = Number(a.saldo);
               const vencido = saldo > 0 && a.vencimiento < ahora;
               return (
-                <li key={a.id} className="flex flex-col gap-1 rounded-2xl border border-borde bg-white p-4">
+                <li key={a.id} className="flex flex-col gap-1 sombra-convive rounded-2xl border border-borde bg-white p-4">
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-semibold">{nombrePeriodo(a.periodo.anio, a.periodo.mes)}</span>
                     {saldo === 0 ? (

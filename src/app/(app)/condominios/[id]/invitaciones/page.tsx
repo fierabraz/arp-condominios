@@ -87,7 +87,7 @@ export default async function InvitacionesPage({ params }: PageProps<"/condomini
             )}
           </Card>
 
-          <ul className="divide-y divide-gray-100 rounded-2xl border border-borde bg-white">
+          <ul className="divide-y divide-gray-100 sombra-convive rounded-2xl border border-borde bg-white">
             {personas.map((p) => {
               const etiqueta = ETIQUETAS_ACCESO[p.estado];
               const unidades = [...new Set(p.unidades.map((v) => v.unidad.numero))].join(", ");

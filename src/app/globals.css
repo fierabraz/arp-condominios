@@ -3,9 +3,10 @@
 /* Marca: colores con nombre de uso. Las pantallas usan bg-marca, text-exito, etc.;
    ninguna escribe un color directo. Para cambiar la identidad basta con editar aquí. */
 @theme {
-  --color-marca: #0e7c6b;
-  --color-marca-oscuro: #0a5c50;
-  --color-marca-suave: #e3f2ee;
+  /* Desde el rediseño Convive, toda la app usa el teal oscuro como color de marca. */
+  --color-marca: #00666a;
+  --color-marca-oscuro: #004b4e;
+  --color-marca-suave: #e8f4f1;
   --color-exito: #1f6b35;
   --color-exito-suave: #e6f4ea;
   --color-alerta: #8a4b08;
@@ -14,13 +15,13 @@
   --color-peligro-suave: #fdecea;
   --color-texto: #1c2b2a;
   --color-texto-suave: #52605e;
-  --color-fondo: #f4f6f5;
-  --color-borde: #e1e6e4;
+  --color-fondo: #f3f8f7;
+  --color-borde: #dde9e6;
 
-  /* Paleta Convive (portal del residente). El turquesa no lleva texto blanco encima
+  /* Paleta Convive (toda la app). El turquesa no lleva texto blanco encima
      (contraste bajo): se usa en fondos e íconos; los textos y botones van en teal oscuro. */
   --color-convive: #14c7a4;
-  --color-convive-oscuro: #0f6b63;
+  --color-convive-oscuro: #00666a;
   --color-convive-suave: #e8f4f1;
   --color-naranja: #ff9f5b;
   --color-naranja-suave: #fff3ea;
@@ -43,4 +44,20 @@ body {
   background: var(--color-fondo);
   color: var(--color-texto);
   font-family: var(--font-marca), system-ui, sans-serif;
+}
+
+/* Fondo decorativo del diseño Convive: manchas suaves turquesa (arriba a la derecha) y
+   naranja (abajo a la izquierda) sobre el fondo claro. Solo decora: no lleva texto encima. */
+.fondo-convive {
+  background-color: var(--color-fondo);
+  background-image:
+    radial-gradient(42rem 26rem at 105% -8%, color-mix(in srgb, var(--color-convive) 26%, transparent), transparent 70%),
+    radial-gradient(30rem 22rem at -8% 108%, color-mix(in srgb, var(--color-naranja) 22%, transparent), transparent 70%),
+    linear-gradient(180deg, var(--color-convive-suave), var(--color-fondo) 22rem);
+  background-attachment: fixed;
+}
+
+/* Sombra de las tarjetas: suave y con un toque del color de marca. */
+@utility sombra-convive {
+  box-shadow: 0 1px 2px rgb(15 107 99 / 0.05), 0 8px 24px -12px rgb(15 107 99 / 0.18);
 }

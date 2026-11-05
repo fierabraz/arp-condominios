@@ -71,7 +71,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
                 <BotonConfirmar
                   accion={cerrarVotacion.bind(null, v.id)}
                   pregunta="¿Cerrar la votación ahora? Nadie más podrá votar."
-                  className={`${boton} border border-gray-300 bg-white hover:bg-gray-50`}
+                  className={`${boton} border border-borde bg-white hover:bg-convive-suave/70`}
                 >
                   Cerrar votación
                 </BotonConfirmar>

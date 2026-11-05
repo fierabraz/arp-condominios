@@ -15,7 +15,7 @@ const fechaLarga = (d: Date) =>
   new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "America/Santiago" }).format(d);
 
 const boton =
-  "inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-gray-300 bg-white px-3 text-sm font-semibold text-texto hover:bg-fondo";
+  "inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-borde bg-white px-3 text-sm font-semibold text-texto hover:bg-fondo";
 
 /** Tarjeta de una publicación del muro, con sus acciones. */
 export function TarjetaPublicacion({
@@ -32,7 +32,7 @@ export function TarjetaPublicacion({
   const base = `/condominios/${p.condominio.id}/muro/${p.id}`;
   const texto = `${p.titulo}\n\n${p.contenido}\n\n— ${p.condominio.nombre}`;
   return (
-    <article className="rounded-2xl border border-borde bg-white p-5">
+    <article className="sombra-convive rounded-2xl border border-borde bg-white p-5">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">
         <span className="flex items-center gap-2 text-texto">
           {p.condominio.nombre}
