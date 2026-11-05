@@ -116,7 +116,7 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
       </nav>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-[1.75rem]">{condominio.nombre}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-convive-oscuro md:text-[2rem]">{condominio.nombre}</h1>
           <p className="mt-1 text-sm text-texto-suave">
             {[condominio.rut && `RUT ${condominio.rut}`, `${resumen.unidades} unidades`, resumen.direccion].filter(Boolean).join(" · ")}
           </p>
@@ -135,20 +135,26 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
       </div>
 
       <section aria-labelledby="para-hoy" className="mb-8">
-        <h2 id="para-hoy" className="mb-3 text-xl font-bold">
-          Para hoy
-        </h2>
         {tareas.length === 0 ? (
-          <Vacio>No hay nada pendiente. Todo está al día.</Vacio>
+          <>
+            <h2 id="para-hoy" className="mb-3 text-xl font-bold text-convive-oscuro">
+              Para hoy
+            </h2>
+            <Vacio>No hay nada pendiente. Todo está al día.</Vacio>
+          </>
         ) : (
-          <ul className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
+          <div className="sombra-convive overflow-hidden rounded-2xl bg-naranja p-2">
+            <h2 id="para-hoy" className="flex items-center gap-2 px-3 pt-2 pb-3 text-xl font-bold text-texto">
+              <AlertTriangle size={22} aria-hidden="true" /> Para hoy
+            </h2>
+          <ul className="space-y-2">
             {tareas.map((t) => (
-              <li key={t.clave} className="flex flex-wrap items-center gap-4 p-4">
-                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-marca-suave text-marca">
+              <li key={t.clave} className="flex flex-wrap items-center gap-4 rounded-xl bg-white p-4">
+                <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-naranja-suave text-naranja-texto">
                   <t.icono size={20} aria-hidden="true" />
                 </span>
                 <span className="min-w-0 flex-1 basis-52">
-                  <span className="block font-semibold">{t.texto}</span>
+                  <span className="block font-bold text-naranja-texto">{t.texto}</span>
                   <span className="block text-sm text-texto-suave">{t.detalle}</span>
                 </span>
                 <BotonLink href={t.href} variante="secundario">
@@ -157,6 +163,7 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
               </li>
             ))}
           </ul>
+          </div>
         )}
       </section>
 
@@ -184,19 +191,23 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
 
       <div className="grid gap-8 lg:grid-cols-[1fr_1.4fr]">
         <section aria-labelledby="accesos" className="min-w-0">
-          <h2 id="accesos" className="mb-3 text-xl font-bold">
+          <h2 id="accesos" className="mb-3 text-xl font-bold text-convive-oscuro">
             Accesos rápidos
           </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+          <div className="sombra-convive grid gap-2 rounded-2xl border border-borde bg-convive-suave/70 p-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             {accesos
               .filter((a) => editable || !a.admin)
               .map((a) => (
                 <Link
                   key={a.texto}
                   href={a.href}
-                  className="flex min-h-14 items-center gap-3 rounded-2xl border border-borde bg-white px-4 font-semibold hover:border-marca hover:text-marca"
+                  className="group flex min-h-14 items-center gap-3 rounded-xl bg-white px-3 font-semibold text-texto transition hover:text-convive-oscuro hover:shadow-sm"
                 >
-                  <a.icono size={20} className="text-marca" aria-hidden="true" /> {a.texto}
+                  <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-convive-suave text-convive-oscuro">
+                    <a.icono size={19} />
+                  </span>
+                  <span className="min-w-0 flex-1">{a.texto}</span>
+                  <ChevronRight size={18} className="shrink-0 text-texto-suave group-hover:text-convive-oscuro" aria-hidden="true" />
                 </Link>
               ))}
           </div>
@@ -204,7 +215,7 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
 
         <section aria-labelledby="ultimos-avisos" className="min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <h2 id="ultimos-avisos" className="text-xl font-bold">
+            <h2 id="ultimos-avisos" className="text-xl font-bold text-convive-oscuro">
               Muro de la comunidad
             </h2>
             <Link href={`${base}/muro`} className="text-sm font-semibold text-marca hover:text-marca-oscuro">
@@ -216,7 +227,7 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
               Aún no hay publicaciones. {editable && "Usa “Nueva publicación” para avisar algo a los residentes."}
             </Vacio>
           ) : (
-            <ul className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
+            <ul className="sombra-convive divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
               {publicaciones.map((p) => (
                 <li key={p.id}>
                   <Link href={`${base}/muro/${p.id}`} className="flex items-center gap-3 p-4 hover:bg-fondo">

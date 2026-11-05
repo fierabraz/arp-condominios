@@ -7,6 +7,7 @@ export default async function RecuperarPage({ searchParams }: PageProps<"/recupe
   const volver = residente ? "/login/residentes" : "/login";
   return (
     <PantallaIngreso
+      publico={residente ? "residentes" : "administracion"}
       titulo="Recuperar contraseña"
       descripcion="Escribe el correo de tu cuenta y te enviaremos un enlace para crear una contraseña nueva."
       pie={[{ texto: "¿La recordaste?", enlace: "Volver a ingresar", href: volver }]}

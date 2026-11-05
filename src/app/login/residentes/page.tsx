@@ -6,6 +6,7 @@ export default async function LoginResidentesPage({ searchParams }: PageProps<"/
   const { listo } = await searchParams;
   return (
     <PantallaIngreso
+      publico="residentes"
       titulo="Ingreso de residentes"
       descripcion="Revisa tus cobros, tus pagos, los avisos y las votaciones de tu comunidad."
       aviso={listo ? "Tu contraseña quedó actualizada. Ya puedes ingresar." : undefined}

@@ -1,4 +1,4 @@
-# ERP Condominios
+# Convive (ERP de condominios)
 
 Sistema web para que administradoras de edificios y condominios gestionen sus comunidades y cobren gastos comunes. Cada administradora tiene su propio espacio con sus datos separados, así que un mismo sistema sirve a muchos clientes.
 

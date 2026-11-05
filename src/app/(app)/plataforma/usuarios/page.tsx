@@ -84,7 +84,7 @@ export default async function UsuariosPlataformaPage({ searchParams }: PageProps
           <ul className="space-y-2 md:hidden">
             {usuarios.map((u) => (
               <li key={u.id}>
-                <Link href={`/plataforma/usuarios/${u.id}`} className="flex flex-col gap-1 rounded-2xl border border-borde bg-white p-4 hover:border-marca">
+                <Link href={`/plataforma/usuarios/${u.id}`} className="flex flex-col gap-1 sombra-convive rounded-2xl border border-borde bg-white p-4 hover:border-marca">
                   <span className="flex items-center justify-between gap-2">
                     <span className="font-semibold">{u.nombre}</span>
                     {u.activo ? <Insignia tono="exito">Activa</Insignia> : <Insignia tono="peligro">Desactivada</Insignia>}

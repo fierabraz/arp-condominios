@@ -20,7 +20,7 @@ export default async function DocumentosPage({ searchParams }: PageProps<"/mi-cu
       {rendiciones.length === 0 ? (
         <Vacio>Todavía no hay rendiciones. Aparecen cuando la administración cierra cada mes.</Vacio>
       ) : (
-        <ul className="divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
+        <ul className="sombra-convive divide-y divide-borde overflow-hidden rounded-2xl border border-borde bg-white">
           {rendiciones.map((r) => (
             <li key={r.id}>
               <a

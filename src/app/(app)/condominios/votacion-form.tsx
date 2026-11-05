@@ -42,7 +42,7 @@ export function VotacionForm({
           <textarea
             name="descripcion"
             rows={4}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-marca focus:outline-none focus:ring-1 focus:ring-marca"
+            className="w-full rounded-lg border border-borde px-3 py-2 text-sm focus:border-marca focus:outline-none focus:ring-1 focus:ring-marca"
             placeholder="Explica qué se vota, costos y plazos."
           />
         </Campo>
@@ -73,7 +73,7 @@ export function VotacionForm({
                   type="button"
                   onClick={() => setOpciones(opciones.filter((x) => x.id !== o.id))}
                   aria-label={`Quitar opción ${i + 1}`}
-                  className="rounded p-1.5 text-texto-suave hover:bg-gray-100"
+                  className="rounded p-1.5 text-texto-suave hover:bg-convive-suave/70"
                 >
                   <X size={16} />
                 </button>

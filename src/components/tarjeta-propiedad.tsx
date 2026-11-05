@@ -59,7 +59,7 @@ export function TarjetaPropiedad({ p, conBoton = true }: { p: ResumenPropiedad; 
         <p className={`font-semibold ${p.morosidad > 0 ? "text-peligro" : ""}`}>{pct(p.morosidad)}</p>
         <Link
           href={`/condominios/${p.id}/morosidad`}
-          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-gray-300 px-3 text-sm font-semibold hover:bg-fondo"
+          className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-borde px-3 text-sm font-semibold hover:bg-fondo"
         >
           Ir a Morosidad
         </Link>

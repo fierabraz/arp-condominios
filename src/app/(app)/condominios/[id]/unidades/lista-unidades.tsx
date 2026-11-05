@@ -47,7 +47,7 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
   return (
     <>
       <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center">
-        <label className="flex min-h-12 flex-1 items-center gap-2 rounded-xl border border-gray-300 bg-white px-3 focus-within:border-marca focus-within:ring-2 focus-within:ring-marca-suave">
+        <label className="flex min-h-12 flex-1 items-center gap-2 rounded-xl border border-borde bg-white px-3 focus-within:border-marca focus-within:ring-2 focus-within:ring-marca-suave">
           <Search size={18} className="text-texto-suave" aria-hidden="true" />
           <span className="sr-only">Buscar unidad o persona</span>
           <input
@@ -66,7 +66,7 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
               aria-pressed={filtro === f}
               onClick={() => setFiltro(f)}
               className={`min-h-11 rounded-full px-4 text-sm font-semibold ${
-                filtro === f ? "bg-texto text-white" : "border border-gray-300 bg-white text-texto hover:bg-fondo"
+                filtro === f ? "bg-texto text-white" : "border border-borde bg-white text-texto hover:bg-fondo"
               }`}
             >
               {FILTROS[f].texto}
@@ -99,7 +99,7 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
                   </span>
                 </>
               );
-              const clase = "flex flex-col gap-1.5 rounded-2xl border border-borde bg-white p-4";
+              const clase = "flex flex-col gap-1.5 sombra-convive rounded-2xl border border-borde bg-white p-4";
               return (
                 <li key={u.id}>
                   {editable ? (
