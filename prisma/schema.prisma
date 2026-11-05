@@ -86,6 +86,69 @@ enum ModalidadIncorporacion {
   EXISTENTE // ya funcionaba con otra administración o sistema (migración mixta)
 }
 
+// COM-001 · Entrega 2: estructura física. Agrupaciones libres (no todos tienen torres o pisos).
+enum TipoAgrupacion {
+  SECTOR
+  TORRE
+  EDIFICIO
+  PISO
+  NIVEL // subterráneo o nivel de estacionamientos
+  OTRO
+}
+
+enum ClaseEspacio {
+  ESTACIONAMIENTO
+  BODEGA
+}
+
+// Condición jurídica: de quién es (distinto de para qué se usa y de quién lo usa).
+enum RegimenEspacio {
+  UNIDAD_PRIVADA // tiene rol y alícuota propios (es una unidad que se cobra)
+  ACCESORIO // pertenece a una unidad principal
+  BIEN_COMUN // de la comunidad; no se cobra ni tiene alícuota
+  POR_DEFINIR // aún no se sabe: no se presume ninguno
+}
+
+// Destino: para qué está.
+enum DestinoEspacio {
+  PRIVADO
+  VISITAS
+  USO_COMUN
+  SERVICIO
+}
+
+enum EstadoEspacio {
+  DISPONIBLE
+  ASIGNADO
+  FUERA_DE_USO
+}
+
+// Derecho o autorización de uso, con vigencia. No es propiedad.
+enum TipoAsignacion {
+  PERMANENTE // uso exclusivo autorizado (por acta, reglamento o escritura)
+  TEMPORAL // por un período
+}
+
+enum TipoInstalacion {
+  ASCENSOR
+  BOMBA
+  PORTON
+  CAMARA
+  ELECTRICO
+  SANITARIO
+  CONTRA_INCENDIOS
+  ESPACIO_COMUN // quincho, sala multiuso, piscina, plaza
+  EQUIPAMIENTO
+  OTRO
+}
+
+enum EstadoInstalacion {
+  OPERATIVA
+  CON_OBSERVACIONES
+  FUERA_DE_SERVICIO
+  SIN_INFORMACION
+}
+
 enum MedioPago {
   TRANSFERENCIA
   EFECTIVO
@@ -190,7 +253,113 @@ model Condominio {
   asignaciones  AsignacionCondominio[]
   publicaciones Publicacion[]
   votaciones    Votacion[]
+  agrupaciones  Agrupacion[]
+  espacios      Espacio[]
+  instalaciones Instalacion[]
 
+  @@index([administradoraId])
+}
+
+// COM-001 · Estructura física: sector, torre, edificio, piso... Puede anidarse (torre > piso).
+model Agrupacion {
+  id               String   @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  tipo             TipoAgrupacion
+  nombre           String
+  padreId          String?
+  padre            Agrupacion?  @relation("Subagrupaciones", fields: [padreId], references: [id], onDelete: Restrict)
+  hijas            Agrupacion[] @relation("Subagrupaciones")
+  orden            Int      @default(0)
+  creadoEn         DateTime @default(now())
+
+  unidades      Unidad[]
+  espacios      Espacio[]
+  instalaciones Instalacion[]
+
+  @@unique([condominioId, padreId, nombre])
+  @@index([administradoraId])
+}
+
+// Estacionamiento o bodega, con su condición jurídica, destino y accesibilidad por separado.
+// Si es UNIDAD_PRIVADA, se cobra a través de la unidad (Unidad) que lo representa.
+model Espacio {
+  id                 String   @id @default(cuid())
+  administradoraId   String
+  condominioId       String
+  condominio         Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  clase              ClaseEspacio
+  codigo             String
+  agrupacionId       String?
+  agrupacion         Agrupacion? @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  ubicacion          String?
+  regimen            RegimenEspacio @default(POR_DEFINIR)
+  destino            DestinoEspacio?
+  accesible          Boolean  @default(false)
+  estado             EstadoEspacio @default(DISPONIBLE)
+  // UNIDAD_PRIVADA: la unidad (con alícuota) que es este mismo espacio.
+  unidadPropiaId     String?
+  unidadPropia       Unidad?  @relation("EspacioUnidadPropia", fields: [unidadPropiaId], references: [id], onDelete: SetNull)
+  // ACCESORIO: la unidad principal a la que pertenece.
+  unidadPrincipalId  String?
+  unidadPrincipal    Unidad?  @relation("EspacioUnidadPrincipal", fields: [unidadPrincipalId], references: [id], onDelete: SetNull)
+  respaldo           String?  // documento que acredita la condición (escritura, reglamento, plano)
+  observaciones      String?
+  creadoEn           DateTime @default(now())
+  actualizadoEn      DateTime @updatedAt
+
+  asignaciones AsignacionEspacio[]
+
+  @@unique([condominioId, clase, codigo])
+  @@index([administradoraId])
+}
+
+// Autorización de uso de un espacio. No se borra: al terminar se le pone fecha "hasta".
+model AsignacionEspacio {
+  id            String   @id @default(cuid())
+  espacioId     String
+  espacio       Espacio  @relation(fields: [espacioId], references: [id], onDelete: Cascade)
+  tipo          TipoAsignacion
+  unidadId      String?
+  unidad        Unidad?  @relation(fields: [unidadId], references: [id], onDelete: SetNull)
+  personaId     String?
+  persona       Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  // Nombre de a quién se asignó, para que el historial se lea aunque después cambie la unidad o la persona.
+  beneficiario  String
+  desde         DateTime @db.Date
+  hasta         DateTime? @db.Date
+  respaldo      String?
+  observaciones String?
+  creadoPor     String
+  creadoEn      DateTime @default(now())
+  terminadaPor  String?
+  terminadaEn   DateTime?
+
+  @@index([espacioId, desde])
+}
+
+// Inventario básico de instalaciones, equipos y espacios comunes. Base para mantenciones futuras.
+model Instalacion {
+  id               String   @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  tipo             TipoInstalacion
+  codigo           String
+  nombre           String
+  agrupacionId     String?
+  agrupacion       Agrupacion? @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  ubicacion        String?
+  descripcion      String?
+  estado           EstadoInstalacion @default(SIN_INFORMACION)
+  proveedorId      String?
+  proveedor        Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  observaciones    String?
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+
+  @@unique([condominioId, codigo])
   @@index([administradoraId])
 }
 
@@ -206,6 +375,7 @@ model Persona {
 
   unidades UnidadPersona[]
   usuario  Usuario?
+  asignacionesEspacio AsignacionEspacio[]
 
   @@index([administradoraId])
 }
@@ -220,8 +390,14 @@ model Unidad {
   tipo             TipoUnidad @default(DEPARTAMENTO)
   // Porcentaje de participación en el gasto común (ej. 1.25 = 1,25 %)
   alicuota         Decimal  @db.Decimal(9, 6)
+  // COM-001: dónde está (torre, piso, sector...). Opcional.
+  agrupacionId     String?
+  agrupacion       Agrupacion? @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
   creadoEn         DateTime @default(now())
 
+  espaciosPropios    Espacio[] @relation("EspacioUnidadPropia")
+  espaciosVinculados Espacio[] @relation("EspacioUnidadPrincipal")
+  asignaciones       AsignacionEspacio[]
   personas UnidadPersona[]
   gastos   Gasto[]
   avisos   AvisoCobro[]
@@ -364,6 +540,8 @@ model Proveedor {
   telefono         String?
   correo           String?
   creadoEn         DateTime @default(now())
+
+  instalaciones Instalacion[]
 
   @@unique([administradoraId, nombre])
 }

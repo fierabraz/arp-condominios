@@ -10,6 +10,7 @@ import { VinculoForm } from "./vinculo-form";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { EstadoCuenta } from "@/components/estado-cuenta";
 import { historialUnidad } from "@/lib/unidades";
+import { asignacionVigente, CLASES, opcionesAgrupaciones } from "@/lib/estructura";
 
 export default async function UnidadPage({ params }: PageProps<"/condominios/[id]/unidades/[unidadId]">) {
   const { id, unidadId } = await params;
@@ -31,7 +32,29 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
     }),
   ]);
   if (!unidad) notFound();
-  const [estado, historial] = await Promise.all([estadoCuenta(unidad.id, administradoraId), historialUnidad(unidad.id)]);
+  const [estado, historial, agrupaciones, espacios] = await Promise.all([
+    estadoCuenta(unidad.id, administradoraId),
+    historialUnidad(unidad.id),
+    db.agrupacion.findMany({ where: { condominioId: id } }),
+    // Estacionamientos y bodegas de la unidad: los que le pertenecen y los que usa (COM-001).
+    db.espacio.findMany({
+      where: {
+        condominioId: id,
+        OR: [{ unidadPrincipalId: unidad.id }, { unidadPropiaId: unidad.id }, { asignaciones: { some: { unidadId: unidad.id } } }],
+      },
+      include: { asignaciones: { where: { unidadId: unidad.id } } },
+      orderBy: [{ clase: "asc" }, { codigo: "asc" }],
+    }),
+  ]);
+  const opcionesAgrupacion = opcionesAgrupaciones(agrupaciones);
+  const espaciosUnidad = espacios
+    .map((e) => {
+      const uso = asignacionVigente(e.asignaciones);
+      const relacion =
+        e.unidadPrincipalId === unidad.id ? "le pertenece" : e.unidadPropiaId === unidad.id ? "es esta unidad" : uso ? `la usa (${uso.tipo === "TEMPORAL" ? "temporal" : "uso exclusivo"})` : null;
+      return relacion ? { id: e.id, nombre: `${CLASES[e.clase].singular} ${e.codigo}`, relacion } : null;
+    })
+    .filter((x) => x !== null);
 
   return (
     <>
@@ -54,13 +77,31 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
         <UnidadForm
           accion={editarUnidad.bind(null, unidad.id)}
           textoBoton="Guardar"
+          agrupaciones={opcionesAgrupacion}
           valores={{
             numero: unidad.numero,
             tipo: unidad.tipo,
             alicuota: unidad.alicuota.toString(),
+            agrupacionId: unidad.agrupacionId,
           }}
         />
       </Card>
+
+      {espaciosUnidad.length > 0 && (
+        <Card className="mb-6">
+          <h2 className="mb-3 font-medium">Estacionamientos y bodegas</h2>
+          <ul className="grid gap-1 text-sm">
+            {espaciosUnidad.map((e) => (
+              <li key={e.id}>
+                <Link href={`/condominios/${id}/estructura/espacios/${e.id}`} className="font-semibold text-marca hover:underline">
+                  {e.nombre}
+                </Link>{" "}
+                <span className="text-texto-suave">{e.relacion}</span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card className="mb-6">
         <h2 className="mb-4 font-medium">Propietarios y residentes</h2>

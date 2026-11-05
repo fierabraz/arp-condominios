@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { puedeVerPropiedad, requireAdministradora, requirePrincipal } from "@/lib/auth";
 import { esPrincipal, filtroPersonas } from "@/lib/permisos";
-import { aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { aFechaDia, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { EstadoComunidad, ModalidadIncorporacion, RelacionUnidad, TipoComunidad, TipoUnidad } from "@/generated/prisma/enums";
 import { ESTADOS, revisarCambio } from "@/lib/configuracion";
 import { datosDeUna } from "@/lib/configuracion-servicio";
@@ -51,13 +51,6 @@ const CondominioSchema = z.object({
   observaciones: z.string().max(4000, { error: "Máximo 4.000 caracteres." }).optional(),
 });
 
-/** "2026-12-01" (campo de fecha) → fecha a medianoche UTC; vacío → null. */
-function aFecha(valor: FormDataEntryValue | null) {
-  const s = aTexto(valor);
-  if (!s) return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00Z`) : new Date(NaN);
-}
-
 function leerCondominio(formData: FormData) {
   return CondominioSchema.safeParse({
     nombre: aTexto(formData.get("nombre")),
@@ -71,7 +64,7 @@ function leerCondominio(formData: FormData) {
     tipo: aTexto(formData.get("tipo")) ?? null,
     modalidad: aTexto(formData.get("modalidad")) ?? null,
     region: aTexto(formData.get("region")),
-    fechaIncorporacion: aFecha(formData.get("fechaIncorporacion")),
+    fechaIncorporacion: aFechaDia(formData.get("fechaIncorporacion")),
     reglamento: aTexto(formData.get("reglamento")),
     observaciones: aTexto(formData.get("observaciones")),
   });
@@ -180,6 +173,17 @@ function leerUnidad(formData: FormData) {
   });
 }
 
+/**
+ * Torre, sector o piso elegido en el formulario (COM-001). undefined si el formulario no trae el
+ * campo (no se toca), null si se dejó vacío, false si no es de esta propiedad.
+ */
+async function leerAgrupacion(formData: FormData, condominioId: string): Promise<string | null | undefined | false> {
+  if (!formData.has("agrupacionId")) return undefined;
+  const id = aTexto(formData.get("agrupacionId"));
+  if (!id) return null;
+  return (await db.agrupacion.count({ where: { id, condominioId } })) ? id : false;
+}
+
 export async function crearUnidad(
   condominioId: string,
   _: EstadoForm,
@@ -196,8 +200,10 @@ export async function crearUnidad(
     where: { condominioId_numero: { condominioId, numero: datos.data.numero } },
   });
   if (existe) return { errores: { numero: ["Ya existe una unidad con ese número."] } };
+  const agrupacionId = await leerAgrupacion(formData, condominioId);
+  if (agrupacionId === false) return { errores: { agrupacionId: ["Elige una agrupación de esta propiedad."] } };
 
-  await db.unidad.create({ data: { ...datos.data, condominioId, administradoraId } });
+  await db.unidad.create({ data: { ...datos.data, agrupacionId, condominioId, administradoraId } });
   await registrar(usuario, "Agregó una unidad", `Unidad ${datos.data.numero}, alícuota ${datos.data.alicuota} %`, condominioId);
   revalidatePath(`/condominios/${condominioId}`, "layout");
   return { ok: true, mensaje: `Unidad ${datos.data.numero} agregada.` };
@@ -219,8 +225,10 @@ export async function editarUnidad(
     where: { condominioId: unidad.condominioId, numero: datos.data.numero, NOT: { id: unidadId } },
   });
   if (repetida) return { errores: { numero: ["Ya existe una unidad con ese número."] } };
+  const agrupacionId = await leerAgrupacion(formData, unidad.condominioId);
+  if (agrupacionId === false) return { errores: { agrupacionId: ["Elige una agrupación de esta propiedad."] } };
 
-  await db.unidad.update({ where: { id: unidadId }, data: datos.data });
+  await db.unidad.update({ where: { id: unidadId }, data: { ...datos.data, agrupacionId } });
   await registrar(
     usuario,
     "Editó una unidad",

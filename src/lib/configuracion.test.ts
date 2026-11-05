@@ -65,3 +65,12 @@ test("bajar de estado se permite, salvo dejar de cobrar si ya emitió cobros", (
   assert.equal(revisarCambio({ ...base, estado: "HABILITADA_ADMINISTRATIVA" }, "EN_CONFIGURACION").ok, true);
   assert.equal(revisarCambio(base, "EN_CONFIGURACION").ok, false);
 });
+
+test("el paso 02 resume la estructura física y lleva a ella, sin exigirla", () => {
+  const sin = pasosConfiguracion(base)[1];
+  assert.equal(sin.estado, "completo");
+  assert.equal(sin.otra?.ruta, "/estructura");
+  const con = pasosConfiguracion({ ...base, estructura: { agrupaciones: 3, espacios: 1, instalaciones: 0 } })[1];
+  assert.equal(con.estado, "completo");
+  assert.match(con.detalle, /3 torres, sectores o pisos, 1 estacionamiento o bodega\.$/);
+});
