@@ -86,6 +86,20 @@ Para enviar correos de verdad, agrega también las variables `SMTP_*` (ver [Corr
 
 Si quieres datos de ejemplo en la base publicada, copia `DATABASE_URL` de Vercel a tu `.env` local y ejecuta `npm run db:seed`. Las cuentas de ejemplo usan `demo1234`, así que cámbiales la contraseña o bórralas antes de usar el sistema con clientes reales.
 
+### Base de datos separada para las versiones de prueba
+
+Cada solicitud de cambios (PR) genera en Vercel una versión de prueba (Preview). Para que esas pruebas nunca toquen los datos reales, Neon crea para cada una su propia copia de la base (una "rama" llamada `preview/<nombre-de-la-rama>`). Se activa una sola vez:
+
+1. En Vercel abre el proyecto, ve a **Storage** y pulsa la base de Neon.
+2. En la pestaña **Projects**, en la fila del proyecto, abre el menú `…` y pulsa **Remove Project Connection**. La versión publicada sigue funcionando.
+3. Pulsa **Connect Project**, elige el proyecto, deja marcados **Development**, **Preview** y **Production**, y en **Create database branch for deployment** marca solo **Preview**. Pulsa **Connect**.
+
+Desde ahí, cada versión de prueba parte con una copia de los datos reales del momento: puedes entrar con tus cuentas de siempre, y lo que hagas ahí no cambia la base real.
+
+Como protección extra, cada publicación ejecuta `npm run db:verificar` antes de las migraciones: en producción anota cuál es la base real y en una versión de prueba se detiene si detecta que está conectada a esa misma base.
+
+El plan gratuito de Neon permite pocas ramas por proyecto. Si una versión de prueba falla por ese límite, entra a <https://console.neon.tech>, abre **Branches** y borra las ramas `preview/...` de cambios ya fusionados (nunca la rama `main` o `production`).
+
 ## Tecnología
 
 - [Next.js](https://nextjs.org) 16 con TypeScript y Tailwind CSS.
