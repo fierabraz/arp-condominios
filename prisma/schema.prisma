@@ -130,6 +130,8 @@ model Condominio {
   // Tasa de interés mensual por mora (ej. 1.5 = 1,5 % mensual)
   tasaInteresMora    Decimal  @default(0) @db.Decimal(5, 2)
   diaVencimiento     Int      @default(10)
+  // Cuántas unidades con alícuota tiene la propiedad en total (para seguir el avance de la carga)
+  totalUnidades      Int?
   creadoEn           DateTime @default(now())
 
   unidades      Unidad[]

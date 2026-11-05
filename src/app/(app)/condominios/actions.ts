@@ -29,6 +29,12 @@ const CondominioSchema = z.object({
     .int()
     .min(1, { error: "Entre 1 y 28." })
     .max(28, { error: "Entre 1 y 28." }),
+  totalUnidades: z
+    .number({ error: "Ingresa un número entero." })
+    .int({ error: "Ingresa un número entero." })
+    .min(1, { error: "Debe ser al menos 1." })
+    .max(10000, { error: "Máximo 10.000." })
+    .nullable(),
 });
 
 function leerCondominio(formData: FormData) {
@@ -40,6 +46,7 @@ function leerCondominio(formData: FormData) {
     porcentajeReserva: aNumero(formData.get("porcentajeReserva")) ?? 5,
     tasaInteresMora: aNumero(formData.get("tasaInteresMora")) ?? 0,
     diaVencimiento: aNumero(formData.get("diaVencimiento")) ?? 10,
+    totalUnidades: aNumero(formData.get("totalUnidades")) ?? null,
   });
 }
 
@@ -70,7 +77,7 @@ export async function editarCondominio(
   await registrar(
     usuario,
     "Cambió la configuración de una propiedad",
-    `${datos.data.nombre}: fondo de reserva ${datos.data.porcentajeReserva} %, interés por mora ${datos.data.tasaInteresMora} %, vence el día ${datos.data.diaVencimiento}`,
+    `${datos.data.nombre}: fondo de reserva ${datos.data.porcentajeReserva} %, interés por mora ${datos.data.tasaInteresMora} %, vence el día ${datos.data.diaVencimiento}, ${datos.data.totalUnidades ?? "sin indicar"} unidades en total`,
     id,
   );
   revalidatePath(`/condominios/${id}`, "layout");

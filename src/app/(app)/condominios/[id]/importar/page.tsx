@@ -55,6 +55,7 @@ export default async function ImportarPage({ params }: PageProps<"/condominios/[
       <Card className="mb-6">
         <ImportarForm
           condominioId={id}
+          totalUnidades={condominio.totalUnidades}
           revisar={revisarPlanilla.bind(null, id)}
           confirmar={confirmarImportacion.bind(null, id)}
         />

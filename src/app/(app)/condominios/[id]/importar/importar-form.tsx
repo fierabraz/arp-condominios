@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
-import { Boton, Insignia, Mensaje, Tabla } from "@/components/ui";
+import { Boton, Input, Insignia, Mensaje, Tabla } from "@/components/ui";
 import type { EstadoImportacion } from "../../importar-actions";
+import { COLOR_ALICUOTAS, estadoAlicuotas } from "@/lib/alicuotas";
 
 type Accion = (estado: EstadoImportacion, formData: FormData) => Promise<EstadoImportacion>;
 
@@ -19,19 +20,41 @@ const TIPOS: Record<string, string> = {
 const pct = (n: number) => `${n.toLocaleString("es-CL", { maximumFractionDigits: 6 })} %`;
 const TAMANO_MAXIMO = 900 * 1024;
 
-export function ImportarForm({ condominioId, revisar, confirmar }: { condominioId: string; revisar: Accion; confirmar: Accion }) {
+export function ImportarForm({
+  condominioId,
+  totalUnidades,
+  revisar,
+  confirmar,
+}: {
+  condominioId: string;
+  /** Total de unidades guardado en la propiedad (null si no se ha indicado). */
+  totalUnidades: number | null;
+  revisar: Accion;
+  confirmar: Accion;
+}) {
   // Cada vez que se vuelve a empezar, el formulario se monta de nuevo y queda limpio.
   const [vuelta, setVuelta] = useState(0);
-  return <Pasos key={vuelta} condominioId={condominioId} revisar={revisar} confirmar={confirmar} otraVez={() => setVuelta((v) => v + 1)} />;
+  return (
+    <Pasos
+      key={vuelta}
+      condominioId={condominioId}
+      totalUnidades={totalUnidades}
+      revisar={revisar}
+      confirmar={confirmar}
+      otraVez={() => setVuelta((v) => v + 1)}
+    />
+  );
 }
 
 function Pasos({
   condominioId,
+  totalUnidades,
   revisar,
   confirmar,
   otraVez,
 }: {
   condominioId: string;
+  totalUnidades: number | null;
   revisar: Accion;
   confirmar: Accion;
   otraVez: () => void;
@@ -43,7 +66,7 @@ function Pasos({
 
   if (final.etapa === "listo") {
     const r = final.resumen;
-    const cuadra = Math.abs(final.sumaAlicuotas - 100) < 0.0001;
+    const estado = estadoAlicuotas({ cargadas: final.totalUnidades, suma: final.sumaAlicuotas, total: final.totalPropiedad });
     return (
       <div className="space-y-4">
         <p className="flex items-center gap-2 text-lg font-bold text-exito">
@@ -56,11 +79,7 @@ function Pasos({
           </li>
           <li>{r.vinculosNuevos} propietarios o residentes vinculados a sus unidades</li>
         </ul>
-        {!cuadra && (
-          <Mensaje
-            texto={`Las alícuotas de las ${final.totalUnidades} unidades suman ${pct(final.sumaAlicuotas)}. Deben sumar 100 % para cobrar bien: corrígelas antes de emitir el próximo cobro.`}
-          />
-        )}
+        <AvisoAlicuotas estado={estado} condominioId={condominioId} />
         <div className="flex flex-wrap gap-2">
           <Link href={`${base}/invitaciones`} className="inline-flex min-h-11 items-center rounded-xl bg-marca px-4 text-sm font-semibold text-white hover:bg-marca-oscuro">
             Invitar a los residentes
@@ -84,7 +103,7 @@ function Pasos({
     const completadas = plan.personas.filter((p) => p.accion === "completar");
     const vinculosNuevos = plan.vinculos.filter((v) => v.nuevo);
     const nombrePersona = new Map(plan.personas.map((p) => [p.clave, p.nombre]));
-    const cuadra = Math.abs(plan.sumaAlicuotas - 100) < 0.0001;
+    const estado = estadoAlicuotas({ cargadas: plan.totalUnidades, suma: plan.sumaAlicuotas, total: revision.totalPropiedad });
     const bloqueado = errores.length > 0 || !revision.hayCambios;
     const errorFinal = final.etapa === "inicio" ? final.errores : undefined;
 
@@ -121,10 +140,17 @@ function Pasos({
             {a}
           </p>
         ))}
-        <p className={`rounded-xl px-3 py-2 text-sm ${cuadra ? "bg-exito-suave text-exito" : "bg-alerta-suave text-alerta"}`}>
-          Después de cargar, las alícuotas de las {plan.totalUnidades} unidades sumarán {pct(plan.sumaAlicuotas)}
-          {cuadra ? ". Cuadra." : ". Deberían sumar 100 % para cobrar bien; puedes cargar igual y corregirlas después."}
-        </p>
+        <AvisoAlicuotas
+          estado={estado}
+          condominioId={condominioId}
+          prefijo="Después de cargar: "
+          sufijo={estado.tipo === "error" ? " Puedes cargar igual y corregirlas después." : undefined}
+        />
+        {revision.totalNuevo && (
+          <p className="text-sm text-texto-suave">
+            Al confirmar se guardará que la propiedad tiene {revision.totalPropiedad} unidades en total.
+          </p>
+        )}
 
         {(nuevas.length > 0 || cambiadas.length > 0) && (
           <section>
@@ -215,6 +241,7 @@ function Pasos({
 
         <form action={enviarConfirmacion} className="flex flex-wrap gap-2">
           <input type="hidden" name="filas" value={revision.filas} />
+          {revision.totalNuevo && <input type="hidden" name="totalUnidades" value={revision.totalPropiedad ?? ""} />}
           <Boton type="submit" disabled={bloqueado || guardando}>
             {guardando ? "Cargando…" : "Confirmar y cargar"}
           </Boton>
@@ -249,6 +276,24 @@ function Pasos({
           className="block w-full rounded-xl border border-dashed border-borde bg-fondo p-4 text-sm file:mr-3 file:min-h-11 file:rounded-xl file:border-0 file:bg-marca file:px-4 file:font-semibold file:text-white"
         />
       </label>
+      {totalUnidades ? (
+        <p className="text-sm text-texto-suave">
+          La propiedad tiene {totalUnidades} unidades en total. Si no es así, cámbialo en{" "}
+          <Link href={`${base}/editar`} className="font-semibold text-marca hover:underline">
+            Configurar propiedad
+          </Link>
+          .
+        </p>
+      ) : (
+        <label className="block max-w-sm">
+          <span className="mb-1 block text-sm font-semibold">¿Cuántas unidades tiene la propiedad en total?</span>
+          <Input type="number" name="totalUnidades" min={1} max={10000} placeholder="Ej. 100" />
+          <span className="mt-1 block text-xs text-texto-suave">
+            Cuenta todas las que tienen alícuota (departamentos, estacionamientos, bodegas…). Así, si cargas por partes, te
+            mostramos el avance en vez de un aviso de alícuotas que no suman 100 %.
+          </span>
+        </label>
+      )}
       <Mensaje texto={errorArchivo} />
       {(revision.etapa === "inicio" ? revision.errores : undefined)?.map((e, i) => <Mensaje key={i} texto={e.fila > 1 ? `Fila ${e.fila}: ${e.mensaje}` : e.mensaje} />)}
       <Boton type="submit" disabled={leyendo}>
@@ -264,5 +309,33 @@ function Cifra({ etiqueta, valor }: { etiqueta: string; valor: number }) {
       <p className="text-xs text-texto-suave">{etiqueta}</p>
       <p className="text-xl font-bold">{valor}</p>
     </div>
+  );
+}
+
+function AvisoAlicuotas({
+  estado,
+  condominioId,
+  prefijo = "",
+  sufijo = "",
+}: {
+  estado: ReturnType<typeof estadoAlicuotas>;
+  condominioId: string;
+  prefijo?: string;
+  sufijo?: string;
+}) {
+  return (
+    <p className={`rounded-xl px-3 py-2 text-sm ${COLOR_ALICUOTAS[estado.tipo]}`}>
+      {prefijo}
+      {prefijo ? estado.texto.charAt(0).toLowerCase() + estado.texto.slice(1) : estado.texto}
+      {sufijo}
+      {estado.tipo === "revisar" && (
+        <>
+          {" "}
+          <Link href={`/condominios/${condominioId}/editar`} className="font-semibold underline">
+            Indicar el total
+          </Link>
+        </>
+      )}
+    </p>
   );
 }
