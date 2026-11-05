@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireAdministradora } from "@/lib/auth";
+import { filtroPersonas } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { Boton, Card, Insignia, PageHeader } from "@/components/ui";
 import { BotonInvitar } from "@/components/invitacion";
@@ -12,8 +13,8 @@ import { editarPersona, eliminarPersona } from "../actions";
 
 export default async function PersonaPage({ params }: PageProps<"/personas/[id]">) {
   const { id } = await params;
-  const { administradoraId } = await requireAdministradora();
-  const p = await db.persona.findFirst({ where: { id, administradoraId }, include: { _count: { select: { unidades: true } } } });
+  const { usuario, administradoraId } = await requireAdministradora();
+  const p = await db.persona.findFirst({ where: { id, administradoraId, ...filtroPersonas(usuario) }, include: { _count: { select: { unidades: true } } } });
   if (!p) notFound();
   const estado = (await estadoDePersona(p.id, administradoraId))!;
   const sinUnidad = p._count.unidades === 0;

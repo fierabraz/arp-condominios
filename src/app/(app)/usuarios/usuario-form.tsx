@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Boton, Campo, Input, Mensaje, Select } from "@/components/ui";
 import type { EstadoForm } from "@/lib/forms";
+import { SelectorAcceso } from "./selector-acceso";
 
 type Opcion = { id: string; nombre: string };
 
@@ -55,6 +56,7 @@ export function UsuarioForm({
           </Select>
         </Campo>
       )}
+      {rol === "ADMINISTRADOR" && <SelectorAcceso condominios={condominios} error={e.asignados} />}
       {rol === "RESIDENTE" && (
         <Campo etiqueta="Persona" error={e.personaId}>
           <Select name="personaId" defaultValue="">

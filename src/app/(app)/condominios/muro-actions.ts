@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
 
@@ -24,7 +24,7 @@ export async function crearPublicacion(condominioId: string, _: EstadoForm, form
   const { usuario, administradoraId } = await requireAdministradora();
   const datos = leer(formData);
   if (!datos.success) return erroresDe(datos.error);
-  if (!(await db.condominio.findFirst({ where: { id: condominioId, administradoraId } }))) {
+  if (!puedeVerPropiedad(usuario, condominioId) || !(await db.condominio.findFirst({ where: { id: condominioId, administradoraId } }))) {
     return { mensaje: "Propiedad no encontrada." };
   }
   await db.publicacion.create({ data: { ...datos.data, condominioId, administradoraId, autor: usuario.nombre } });
@@ -38,7 +38,7 @@ export async function editarPublicacion(id: string, _: EstadoForm, formData: For
   const datos = leer(formData);
   if (!datos.success) return erroresDe(datos.error);
   const pub = await db.publicacion.findFirst({ where: { id, administradoraId } });
-  if (!pub) return { mensaje: "Publicación no encontrada." };
+  if (!pub || !puedeVerPropiedad(usuario, pub.condominioId)) return { mensaje: "Publicación no encontrada." };
   await db.publicacion.update({ where: { id }, data: datos.data });
   await registrar(usuario, "Editó una publicación", datos.data.titulo, pub.condominioId);
   revalidatePath(`/condominios/${pub.condominioId}`, "layout");
@@ -48,7 +48,7 @@ export async function editarPublicacion(id: string, _: EstadoForm, formData: For
 export async function eliminarPublicacion(id: string, volverAlMuro = false) {
   const { usuario, administradoraId } = await requireAdministradora();
   const pub = await db.publicacion.findFirst({ where: { id, administradoraId } });
-  if (!pub) return;
+  if (!pub || !puedeVerPropiedad(usuario, pub.condominioId)) return;
   await db.publicacion.delete({ where: { id } });
   await registrar(usuario, "Borró una publicación", pub.titulo, pub.condominioId);
   revalidatePath(`/condominios/${pub.condominioId}`, "layout");

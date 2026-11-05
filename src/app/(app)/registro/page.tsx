@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdministradora } from "@/lib/auth";
+import { filtroCondominios, filtroRegistro } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { BotonLink, Boton, PageHeader, Select, Vacio } from "@/components/ui";
 import { formatoFechaHora } from "@/lib/formato";
@@ -7,15 +8,20 @@ import { formatoFechaHora } from "@/lib/formato";
 const POR_PAGINA = 50;
 
 export default async function RegistroPage({ searchParams }: PageProps<"/registro">) {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const { propiedad, antes } = await searchParams;
   const condominioId = typeof propiedad === "string" && propiedad ? propiedad : undefined;
   const hasta = typeof antes === "string" && !Number.isNaN(Date.parse(antes)) ? new Date(antes) : undefined;
 
   const [propiedades, filas] = await Promise.all([
-    db.condominio.findMany({ where: { administradoraId }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
+    db.condominio.findMany({ where: { administradoraId, ...filtroCondominios(usuario) }, orderBy: { nombre: "asc" }, select: { id: true, nombre: true } }),
     db.registroCambio.findMany({
-      where: { administradoraId, ...(condominioId ? { condominioId } : {}), ...(hasta ? { creadoEn: { lt: hasta } } : {}) },
+      where: {
+        administradoraId,
+        // Sin acceso total se ve solo lo de sus propiedades, aunque se pida otra en la dirección.
+        AND: [filtroRegistro(usuario), condominioId ? { condominioId } : {}],
+        ...(hasta ? { creadoEn: { lt: hasta } } : {}),
+      },
       orderBy: { creadoEn: "desc" },
       take: POR_PAGINA + 1,
     }),

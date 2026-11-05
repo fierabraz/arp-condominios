@@ -20,10 +20,10 @@ async function monedaDe(tx: Pick<Tx, "administradora">, administradoraId: string
   return decimalesMoneda(adm.moneda);
 }
 
-/** Pagos de la unidad que aún tienen monto sin aplicar (saldo a favor), del más antiguo al más nuevo. */
+/** Pagos vigentes de la unidad que aún tienen monto sin aplicar (saldo a favor), del más antiguo al más nuevo. */
 async function pagosConSobrante(tx: Tx, unidadId: string, dec: number) {
   const pagos = await tx.pago.findMany({
-    where: { unidadId },
+    where: { unidadId, anuladoEn: null },
     orderBy: [{ fecha: "asc" }, { creadoEn: "asc" }],
     include: { aplicaciones: { select: { monto: true } } },
   });
@@ -60,6 +60,18 @@ async function aplicarMonto(tx: Tx, pagoId: string, unidadId: string, monto: num
 }
 
 export class ErrorCobro extends Error {}
+
+/**
+ * Bloquea las unidades hasta que termine la transacción: si dos personas registran o anulan
+ * pagos de la misma unidad a la vez, la segunda operación espera a la primera y lee los saldos
+ * ya actualizados. Se bloquean en orden de id para que dos operaciones nunca se esperen entre sí.
+ * No cambia ningún cálculo.
+ */
+async function bloquearUnidades(tx: Tx, unidadIds: string[]) {
+  if (unidadIds.length === 0) return;
+  const ids = [...new Set(unidadIds)].sort();
+  await tx.$queryRaw`SELECT id FROM "Unidad" WHERE id = ANY(${ids}::text[]) ORDER BY id FOR UPDATE`;
+}
 
 async function cargarPeriodo(tx: Tx, periodoId: string, administradoraId: string) {
   const periodo = await tx.periodo.findFirst({
@@ -138,8 +150,14 @@ export async function previsualizarPeriodo(periodoId: string, administradoraId: 
 /** Cierra el período y emite un aviso de cobro por unidad. */
 export async function emitirPeriodo(periodoId: string, administradoraId: string) {
   return db.$transaction(async (tx) => {
+    // Bloquear el período: dos cierres a la vez esperan uno al otro y el segundo ve que ya se cerró.
+    await tx.$queryRaw`SELECT id FROM "Periodo" WHERE id = ${periodoId} FOR UPDATE`;
     const periodo = await cargarPeriodo(tx, periodoId, administradoraId);
     if (periodo.estado === "CERRADO") throw new ErrorCobro("El período ya fue cerrado.");
+    await bloquearUnidades(
+      tx,
+      periodo.condominio.unidades.map((u) => u.id),
+    );
     const { condominio } = periodo;
     const ahora = new Date();
     const { lineas, dec } = await calcularPeriodo(tx, periodo, administradoraId, ahora);
@@ -180,6 +198,7 @@ export async function registrarPago(
   return db.$transaction(async (tx) => {
     const unidad = await tx.unidad.findFirst({ where: { id: datos.unidadId, administradoraId } });
     if (!unidad) throw new ErrorCobro("Unidad no encontrada.");
+    await bloquearUnidades(tx, [unidad.id]);
     const dec = await monedaDe(tx, administradoraId);
     const monto = aMinimo(datos.monto, dec);
     const pago = await tx.pago.create({
@@ -190,18 +209,34 @@ export async function registrarPago(
   });
 }
 
-/** Anula un pago: devuelve los montos aplicados a los avisos y lo elimina. */
-export async function anularPago(pagoId: string, administradoraId: string) {
+/**
+ * Anula un pago: devuelve a los avisos los montos que tenía aplicados y lo marca como anulado.
+ * El pago no se borra: queda en la lista con quién lo anuló, cuándo y por qué, y deja de contar
+ * para la deuda y el saldo a favor (igual que antes, cuando se eliminaba).
+ */
+export async function anularPago(
+  pagoId: string,
+  administradoraId: string,
+  anulacion: { por: string; motivo: string },
+) {
   return db.$transaction(async (tx) => {
     const pago = await tx.pago.findFirst({
       where: { id: pagoId, administradoraId },
-      include: { aplicaciones: true },
     });
     if (!pago) throw new ErrorCobro("Pago no encontrado.");
-    for (const ap of pago.aplicaciones) {
+    await bloquearUnidades(tx, [pago.unidadId]);
+    // Marcar primero y solo si sigue vigente: dos anulaciones a la vez no devuelven el monto dos veces.
+    const { count } = await tx.pago.updateMany({
+      where: { id: pago.id, anuladoEn: null },
+      data: { anuladoEn: new Date(), anuladoPor: anulacion.por, motivoAnulacion: anulacion.motivo },
+    });
+    if (count === 0) throw new ErrorCobro("Ese pago ya estaba anulado.");
+    // Releer lo aplicado ya con la unidad bloqueada: otra operación pudo usar su saldo a favor.
+    const aplicaciones = await tx.aplicacionPago.findMany({ where: { pagoId: pago.id } });
+    for (const ap of aplicaciones) {
       await tx.avisoCobro.update({ where: { id: ap.avisoId }, data: { saldo: { increment: ap.monto } } });
     }
-    await tx.pago.delete({ where: { id: pago.id } });
+    await tx.aplicacionPago.deleteMany({ where: { pagoId: pago.id } });
     // Si la unidad tenía otros saldos a favor, ahora pueden cubrir lo que quedó pendiente.
     await aplicarSaldosAFavor(tx, pago.unidadId, await monedaDe(tx, administradoraId));
     return pago;
@@ -230,7 +265,7 @@ export async function estadoCuenta(unidadId: string, administradoraId: string) {
   const vencida = avisos
     .filter((a) => a.vencimiento < ahora)
     .reduce((s, a) => s + aMinimo(a.saldo.toString(), dec), 0);
-  const aFavor = pagos.reduce(
+  const aFavor = pagos.filter((p) => !p.anuladoEn).reduce(
     (s, p) =>
       s + aMinimo(p.monto.toString(), dec) - p.aplicaciones.reduce((t, a) => t + aMinimo(a.monto.toString(), dec), 0),
     0,

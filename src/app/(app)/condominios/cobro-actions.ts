@@ -4,13 +4,13 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { aMonto, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { anularPago, emitirPeriodo, ErrorCobro, registrarPago } from "@/lib/cobro-servicio";
 import { enviarAvisosPeriodo } from "@/lib/envio-avisos";
 import { MedioPago, TipoGasto } from "@/generated/prisma/enums";
 import { nombrePeriodo } from "@/lib/cobro";
-import { formatoMoneda } from "@/lib/formato";
+import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { registrar } from "@/lib/registro";
 
 const PeriodoSchema = z.object({
@@ -24,7 +24,7 @@ export async function abrirPeriodo(condominioId: string, _: EstadoForm, formData
   if (!datos.success) return erroresDe(datos.error);
 
   const condominio = await db.condominio.findFirst({ where: { id: condominioId, administradoraId } });
-  if (!condominio) return { mensaje: "Condominio no encontrado." };
+  if (!condominio || !puedeVerPropiedad(usuario, condominioId)) return { mensaje: "Condominio no encontrado." };
   const existe = await db.periodo.findUnique({
     where: { condominioId_anio_mes: { condominioId, ...datos.data } },
   });
@@ -66,7 +66,7 @@ export async function agregarGasto(periodoId: string, _: EstadoForm, formData: F
   if (!datos.success) return erroresDe(datos.error);
 
   const periodo = await db.periodo.findFirst({ where: { id: periodoId, administradoraId } });
-  if (!periodo) return { mensaje: "Período no encontrado." };
+  if (!periodo || !puedeVerPropiedad(usuario, periodo.condominioId)) return { mensaje: "Período no encontrado." };
   if (periodo.estado === "CERRADO") return { mensaje: "El período está cerrado." };
   const { unidadId, ...resto } = datos.data;
   if (resto.tipo === "INDIVIDUAL") {
@@ -93,7 +93,7 @@ export async function eliminarGasto(gastoId: string) {
     where: { id: gastoId, administradoraId },
     include: { periodo: true },
   });
-  if (!gasto || gasto.periodo.estado === "CERRADO") return;
+  if (!gasto || gasto.periodo.estado === "CERRADO" || !puedeVerPropiedad(usuario, gasto.periodo.condominioId)) return;
   await db.gasto.delete({ where: { id: gastoId } });
   await registrar(
     usuario,
@@ -106,6 +106,8 @@ export async function eliminarGasto(gastoId: string) {
 
 export async function cerrarPeriodo(periodoId: string): Promise<EstadoForm> {
   const { usuario, administradoraId } = await requireAdministradora();
+  const elegido = await db.periodo.findFirst({ where: { id: periodoId, administradoraId }, select: { condominioId: true } });
+  if (!elegido || !puedeVerPropiedad(usuario, elegido.condominioId)) return { mensaje: "Período no encontrado." };
   try {
     const n = await emitirPeriodo(periodoId, administradoraId);
     const periodo = await db.periodo.findUniqueOrThrow({ where: { id: periodoId } });
@@ -137,7 +139,7 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
   });
   if (!datos.success) return erroresDe(datos.error);
   const unidad = await db.unidad.findFirst({ where: { id: datos.data.unidadId, condominioId, administradoraId } });
-  if (!unidad) return { errores: { unidadId: ["Unidad no encontrada."] } };
+  if (!unidad || !puedeVerPropiedad(usuario, condominioId)) return { errores: { unidadId: ["Unidad no encontrada."] } };
 
   try {
     await registrarPago(administradoraId, datos.data);
@@ -155,27 +157,43 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
   return { ok: true, mensaje: `Pago de la unidad ${unidad.numero} registrado.` };
 }
 
-export async function eliminarPago(pagoId: string) {
+const AnulacionSchema = z.object({
+  motivo: z
+    .string({ error: "Escribe por qué se anula." })
+    .min(5, { error: "Escribe por qué se anula (al menos 5 letras)." })
+    .max(300, { error: "Máximo 300 caracteres." }),
+});
+
+/** Anula un pago con un motivo. El pago queda a la vista como anulado; no se borra. */
+export async function anularPagoConMotivo(pagoId: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const { usuario, administradoraId } = await requireAdministradora();
-  const pago = await anularPago(pagoId, administradoraId).catch((e) => {
-    if (e instanceof ErrorCobro) return null;
-    throw e;
+  const datos = AnulacionSchema.safeParse({ motivo: aTexto(formData.get("motivo")) });
+  if (!datos.success) return erroresDe(datos.error);
+  const encontrado = await db.pago.findFirst({
+    where: { id: pagoId, administradoraId },
+    include: { unidad: { select: { numero: true, condominioId: true } } },
   });
-  if (!pago) return;
-  const unidad = await db.unidad.findUniqueOrThrow({ where: { id: pago.unidadId } });
+  if (!encontrado || !puedeVerPropiedad(usuario, encontrado.unidad.condominioId)) return { mensaje: "Pago no encontrado." };
+  try {
+    await anularPago(pagoId, administradoraId, { por: usuario.nombre, motivo: datos.data.motivo });
+  } catch (e) {
+    if (e instanceof ErrorCobro) return { mensaje: e.message };
+    throw e;
+  }
   await registrar(
     usuario,
     "Anuló un pago",
-    `Unidad ${unidad.numero}: ${formatoMoneda(pago.monto, usuario.administradora?.moneda)}`,
-    unidad.condominioId,
+    `Unidad ${encontrado.unidad.numero}: ${formatoMoneda(encontrado.monto, usuario.administradora?.moneda)} del ${formatoFecha(encontrado.fecha)}${encontrado.referencia ? ` (ref. ${encontrado.referencia})` : ""}. Motivo: ${datos.data.motivo}`,
+    encontrado.unidad.condominioId,
   );
-  revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
+  revalidatePath(`/condominios/${encontrado.unidad.condominioId}`, "layout");
+  return { ok: true, mensaje: "Pago anulado." };
 }
 
 export async function enviarAvisos(periodoId: string): Promise<EstadoForm> {
   const { usuario, administradoraId } = await requireAdministradora();
   const periodo = await db.periodo.findFirst({ where: { id: periodoId, administradoraId } });
-  if (!periodo) return { mensaje: "Período no encontrado." };
+  if (!periodo || !puedeVerPropiedad(usuario, periodo.condominioId)) return { mensaje: "Período no encontrado." };
   if (periodo.estado !== "CERRADO") return { mensaje: "Primero cierra el período para emitir los avisos." };
 
   const r = await enviarAvisosPeriodo(periodoId, administradoraId);

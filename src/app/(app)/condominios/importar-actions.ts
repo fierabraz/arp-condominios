@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { registrar } from "@/lib/registro";
 import { hayCambios, resumenPlan, type ErrorFila, type FilaImportada, type Plan } from "@/lib/importacion";
@@ -38,7 +38,7 @@ async function propiedad(condominioId: string) {
     where: { id: condominioId, administradoraId },
     select: { id: true, totalUnidades: true },
   });
-  return condominio ? { usuario, administradoraId, totalUnidades: condominio.totalUnidades } : null;
+  return condominio && puedeVerPropiedad(usuario, condominioId) ? { usuario, administradoraId, totalUnidades: condominio.totalUnidades } : null;
 }
 
 const TotalSchema = z.coerce

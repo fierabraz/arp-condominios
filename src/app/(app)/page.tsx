@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUsuario } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { filtroCondominios, filtroPersonas, filtroPorCondominio } from "@/lib/permisos";
 import { Card, PageHeader } from "@/components/ui";
 import { formatoMoneda } from "@/lib/formato";
 
@@ -14,12 +15,12 @@ export default async function InicioPage() {
   const administradoraId = usuario.administradoraId!;
   const ahora = new Date();
   const [condominios, unidades, personas, porCobrar, vencido] = await Promise.all([
-    db.condominio.count({ where: { administradoraId } }),
-    db.unidad.count({ where: { administradoraId } }),
-    db.persona.count({ where: { administradoraId } }),
-    db.avisoCobro.aggregate({ where: { administradoraId, saldo: { gt: 0 } }, _sum: { saldo: true } }),
+    db.condominio.count({ where: { administradoraId, ...filtroCondominios(usuario) } }),
+    db.unidad.count({ where: { administradoraId, ...filtroPorCondominio(usuario) } }),
+    db.persona.count({ where: { administradoraId, ...filtroPersonas(usuario) } }),
+    db.avisoCobro.aggregate({ where: { administradoraId, saldo: { gt: 0 }, unidad: filtroPorCondominio(usuario) }, _sum: { saldo: true } }),
     db.avisoCobro.aggregate({
-      where: { administradoraId, saldo: { gt: 0 }, vencimiento: { lt: ahora } },
+      where: { administradoraId, saldo: { gt: 0 }, vencimiento: { lt: ahora }, unidad: filtroPorCondominio(usuario) },
       _sum: { saldo: true },
     }),
   ]);

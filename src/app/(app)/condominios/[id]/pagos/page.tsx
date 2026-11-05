@@ -1,9 +1,10 @@
 import { db } from "@/lib/db";
-import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
+import { Card, Insignia, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { ETIQUETAS_MEDIO_PAGO, formatoFecha, formatoMoneda, hoyISO } from "@/lib/formato";
-import { eliminarPago, nuevoPago } from "../../cobro-actions";
+import { anularPagoConMotivo, nuevoPago } from "../../cobro-actions";
 import { condominioVisible } from "../condominio-actual";
 import { PagoForm } from "./pago-form";
+import { AnularPagoForm } from "./anular-form";
 
 export default async function PagosPage({ params }: PageProps<"/condominios/[id]/pagos">) {
   const { id } = await params;
@@ -26,7 +27,7 @@ export default async function PagosPage({ params }: PageProps<"/condominios/[id]
 
   return (
     <>
-      <PageHeader titulo="Recaudación" descripcion={`${condominio.nombre} · Cada pago se aplica primero a la deuda más antigua de la unidad.`} />
+      <PageHeader titulo="Recaudación" descripcion={`${condominio.nombre} · Cada pago se aplica primero a la deuda más antigua de la unidad. Un pago anulado no se borra: queda tachado con su motivo.`} />
       {editable && (
         <Card className="mb-6">
           <h2 className="mb-4 font-medium">Registrar pago</h2>
@@ -60,20 +61,26 @@ export default async function PagosPage({ params }: PageProps<"/condominios/[id]
           </thead>
           <tbody>
             {pagos.map((p) => {
-              const aFavor = Number(p.monto) - p.aplicaciones.reduce((s, a) => s + Number(a.monto), 0);
+              const anulado = !!p.anuladoEn;
+              const aFavor = anulado ? 0 : Number(p.monto) - p.aplicaciones.reduce((s, a) => s + Number(a.monto), 0);
               return (
-                <tr key={p.id}>
+                <tr key={p.id} className={anulado ? "bg-fondo/60 text-texto-suave" : undefined}>
                   <td className="whitespace-nowrap">{formatoFecha(p.fecha)}</td>
                   <td className="font-medium">{p.unidad.numero}</td>
                   <td>{ETIQUETAS_MEDIO_PAGO[p.medio]}</td>
-                  <td className="text-texto-suave">{p.referencia ?? "—"}</td>
-                  <td className="text-right tabular-nums">{$(p.monto)}</td>
+                  <td className="text-texto-suave">
+                    {p.referencia ?? "—"}
+                    {anulado && (
+                      <span className="mt-1 block text-xs">
+                        Anulado el {formatoFecha(p.anuladoEn!)} por {p.anuladoPor}: {p.motivoAnulacion}
+                      </span>
+                    )}
+                  </td>
+                  <td className={`text-right tabular-nums ${anulado ? "line-through" : ""}`}>{$(p.monto)}</td>
                   <td className="text-right tabular-nums">{aFavor > 0.004 ? $(aFavor) : "—"}</td>
                   {editable && (
-                    <td className="text-right">
-                      <form action={eliminarPago.bind(null, p.id)}>
-                        <button className="text-sm text-peligro hover:underline">Anular</button>
-                      </form>
+                    <td className="text-right align-top">
+                      {anulado ? <Insignia tono="peligro">Anulado</Insignia> : <AnularPagoForm accion={anularPagoConMotivo.bind(null, p.id)} />}
                     </td>
                   )}
                 </tr>
