@@ -28,7 +28,7 @@ export async function datosAviso(avisoId: string, administradoraId: string) {
       select: { saldo: true },
     }),
     db.pago.findMany({
-      where: { unidadId: aviso.unidadId },
+      where: { unidadId: aviso.unidadId, anuladoEn: null },
       select: { monto: true, aplicaciones: { select: { monto: true } } },
     }),
   ]);

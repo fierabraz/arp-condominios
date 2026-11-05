@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
+import { filtroPersonas } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { Boton, Card, PageHeader, Vacio } from "@/components/ui";
 import { UnidadForm } from "../../../unidad-form";
@@ -13,6 +14,7 @@ import { historialUnidad } from "@/lib/unidades";
 export default async function UnidadPage({ params }: PageProps<"/condominios/[id]/unidades/[unidadId]">) {
   const { id, unidadId } = await params;
   const { usuario, administradoraId } = await requireAdministradora();
+  if (!puedeVerPropiedad(usuario, id)) notFound();
 
   const [unidad, personas] = await Promise.all([
     db.unidad.findFirst({
@@ -23,7 +25,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
       },
     }),
     db.persona.findMany({
-      where: { administradoraId },
+      where: { administradoraId, ...filtroPersonas(usuario) },
       orderBy: { nombre: "asc" },
       select: { id: true, nombre: true },
     }),

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdministradora } from "@/lib/auth";
+import { filtroPersonas } from "@/lib/permisos";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
 
@@ -38,7 +39,7 @@ export async function editarPersona(id: string, _: EstadoForm, formData: FormDat
   const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerPersona(formData);
   if (!datos.success) return erroresDe(datos.error);
-  const { count } = await db.persona.updateMany({ where: { id, administradoraId }, data: datos.data });
+  const { count } = await db.persona.updateMany({ where: { id, administradoraId, ...filtroPersonas(usuario) }, data: datos.data });
   if (count === 0) return { mensaje: "Persona no encontrada." };
   await registrar(usuario, "Editó los datos de una persona", datos.data.nombre);
   revalidatePath("/personas");
@@ -47,8 +48,8 @@ export async function editarPersona(id: string, _: EstadoForm, formData: FormDat
 
 export async function eliminarPersona(id: string) {
   const { usuario, administradoraId } = await requireAdministradora();
-  const persona = await db.persona.findFirst({ where: { id, administradoraId }, select: { nombre: true } });
-  const { count } = await db.persona.deleteMany({ where: { id, administradoraId } });
+  const persona = await db.persona.findFirst({ where: { id, administradoraId, ...filtroPersonas(usuario) }, select: { nombre: true } });
+  const { count } = persona ? await db.persona.deleteMany({ where: { id, administradoraId } }) : { count: 0 };
   if (count > 0) await registrar(usuario, "Borró una persona", persona?.nombre ?? "");
   revalidatePath("/personas");
   redirect("/personas");

@@ -133,11 +133,14 @@ export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: strin
           </thead>
           <tbody>
             {estado.pagos.map((p) => (
-              <tr key={p.id}>
+              <tr key={p.id} className={p.anuladoEn ? "text-texto-suave" : undefined}>
                 <td className="whitespace-nowrap">{formatoFecha(p.fecha)}</td>
                 <td>{ETIQUETAS_MEDIO_PAGO[p.medio]}</td>
-                <td className="text-texto-suave">{p.referencia ?? "—"}</td>
-                <td className="text-right tabular-nums">{$(p.monto)}</td>
+                <td className="text-texto-suave">
+                  {p.referencia ?? "—"}
+                  {p.anuladoEn && <span className="ml-2"><Insignia tono="peligro">Anulado</Insignia></span>}
+                </td>
+                <td className={`text-right tabular-nums ${p.anuladoEn ? "line-through" : ""}`}>{$(p.monto)}</td>
               </tr>
             ))}
           </tbody>

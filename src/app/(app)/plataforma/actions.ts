@@ -45,6 +45,8 @@ export async function crearAdministradora(_: EstadoForm, formData: FormData): Pr
           correo: d.adminCorreo,
           claveHash: await bcrypt.hash(d.adminClave, 10),
           rol: "ADMINISTRADOR",
+          // El primer administrador es el principal: ve todas las propiedades y asigna a los demás.
+          accesoTodas: true,
         },
       },
     },

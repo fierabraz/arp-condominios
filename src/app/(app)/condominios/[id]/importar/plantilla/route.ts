@@ -1,5 +1,5 @@
 import writeXlsxFile from "write-excel-file/node";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ETIQUETAS_TIPO_UNIDAD } from "@/lib/formato";
 import { COLUMNAS } from "@/lib/importacion";
@@ -10,7 +10,8 @@ import { COLUMNAS } from "@/lib/importacion";
  */
 export async function GET(_: Request, { params }: RouteContext<"/condominios/[id]/importar/plantilla">) {
   const { id } = await params;
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
+  if (!puedeVerPropiedad(usuario, id)) return new Response("Propiedad no encontrada", { status: 404 });
   const condominio = await db.condominio.findFirst({
     where: { id, administradoraId },
     include: {

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { estadoAcceso, puedeInvitar } from "@/lib/invitacion-estado";
 import { invitarPersona, personasDePropiedad, type ResultadoInvitacion } from "@/lib/invitaciones";
 
@@ -19,6 +19,7 @@ export async function invitar(personaId: string, condominioId?: string): Promise
 /** Invita a todas las personas de la propiedad que tienen correo y todavía no tienen acceso. */
 export async function invitarPendientes(condominioId: string): Promise<ResultadoInvitacion[]> {
   const { usuario, administradoraId } = await requireAdministradora();
+  if (!puedeVerPropiedad(usuario, condominioId)) return [];
   const personas = await personasDePropiedad(condominioId, administradoraId);
   const pendientes = personas.filter((p) => {
     const estado = estadoAcceso(p.correo, p.usuario && { ...p.usuario, invitaciones: p.usuario.tokensRecuperacion });

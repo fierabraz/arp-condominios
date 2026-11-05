@@ -157,7 +157,7 @@ export const datosInicio = cache(async (usuario: UsuarioActual, unidadParam?: st
         fecha: a.emitidoEn,
         href: sel.enlace("/mi-cuenta/pagos"),
       })),
-      ...estado.pagos.slice(0, 3).map((p) => ({
+      ...estado.pagos.filter((p) => !p.anuladoEn).slice(0, 3).map((p) => ({
         id: `pago-${p.id}`,
         tipo: "pago" as const,
         texto: `Pago registrado por ${$(Number(p.monto))}${varias ? ` · ${unidad.nombre}` : ""}`,

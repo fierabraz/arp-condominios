@@ -1,6 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { UsuarioActual } from "@/lib/auth";
+import { alcanzaCondominio } from "@/lib/permisos";
 
 // Reglas de quién puede ver qué, para documentos que comparten administradores,
 // comité y residentes (avisos de cobro y rendiciones).
@@ -14,9 +15,8 @@ export async function puedeVerCondominio(usuario: UsuarioActual, condominioId: s
   if (!condominio) return false;
   switch (usuario.rol) {
     case "ADMINISTRADOR":
-      return true;
     case "COMITE":
-      return usuario.condominioId === condominioId;
+      return alcanzaCondominio(usuario, condominioId);
     case "RESIDENTE":
       return (
         !!usuario.personaId &&
@@ -38,9 +38,8 @@ export async function puedeVerUnidad(usuario: UsuarioActual, unidadId: string) {
   if (!unidad) return false;
   switch (usuario.rol) {
     case "ADMINISTRADOR":
-      return true;
     case "COMITE":
-      return usuario.condominioId === unidad.condominioId;
+      return alcanzaCondominio(usuario, unidad.condominioId);
     case "RESIDENTE":
       return (
         !!usuario.personaId &&

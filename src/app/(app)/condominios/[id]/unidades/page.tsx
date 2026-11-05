@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireAdministradora, puedeEditar } from "@/lib/auth";
+import { requireAdministradora, puedeEditar, puedeVerPropiedad } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { FileSpreadsheet, Plus, Send } from "lucide-react";
 import { BotonLink, Card, PageHeader, Vacio } from "@/components/ui";
@@ -14,7 +14,7 @@ import { COLOR_ALICUOTAS, estadoAlicuotas } from "@/lib/alicuotas";
 export default async function UnidadesPage({ params }: PageProps<"/condominios/[id]/unidades">) {
   const { id } = await params;
   const { usuario, administradoraId } = await requireAdministradora(["ADMINISTRADOR", "COMITE"]);
-  if (usuario.rol === "COMITE" && usuario.condominioId !== id) notFound();
+  if (!puedeVerPropiedad(usuario, id)) notFound();
 
   const condominio = await db.condominio.findFirst({
     where: { id, administradoraId },

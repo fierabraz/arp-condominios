@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { alcanzaCondominio } from "@/lib/permisos";
 import type { UsuarioActual } from "@/lib/auth";
 import { enviarCorreo, escaparHtml, correoConfigurado } from "@/lib/correo";
 import { enlaceWhatsapp, estadoAcceso, mensajeInvitacion, puedeInvitar } from "@/lib/invitacion-estado";
@@ -92,7 +93,12 @@ export async function invitarPersona(
       },
     },
   });
-  if (!persona) return { ok: false, personaId, nombre: "", error: "Persona no encontrada." };
+  // Un administrador sin acceso total solo invita a personas de sus propiedades (o sin unidad aún).
+  const visible =
+    persona &&
+    (persona.unidades.length === 0 || persona.unidades.some((v) => alcanzaCondominio(autor, v.unidad.condominioId))) &&
+    (!condominioId || alcanzaCondominio(autor, condominioId));
+  if (!persona || !visible) return { ok: false, personaId, nombre: "", error: "Persona no encontrada." };
   const falla = (error: string): ResultadoInvitacion => ({ ok: false, personaId, nombre: persona.nombre, error });
   if (!persona.correo) return falla("Le falta el correo. Agrégalo en sus datos para poder invitarla.");
   if (persona.unidades.length === 0) return falla("No está vinculada a ninguna unidad, así que no vería nada en la app.");

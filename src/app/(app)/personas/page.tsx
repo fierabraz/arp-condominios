@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { requireAdministradora } from "@/lib/auth";
+import { filtroPersonas, filtroPorCondominio } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { PersonaForm } from "./persona-form";
 import { crearPersona } from "./actions";
 
 export default async function PersonasPage() {
-  const { administradoraId } = await requireAdministradora();
+  const { usuario, administradoraId } = await requireAdministradora();
   const personas = await db.persona.findMany({
-    where: { administradoraId },
+    where: { administradoraId, ...filtroPersonas(usuario) },
     orderBy: { nombre: "asc" },
     include: {
-      unidades: { include: { unidad: { include: { condominio: { select: { nombre: true } } } } } },
+      unidades: { where: { unidad: filtroPorCondominio(usuario) }, include: { unidad: { include: { condominio: { select: { nombre: true } } } } } },
     },
   });
 

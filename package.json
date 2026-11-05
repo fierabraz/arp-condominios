@@ -15,7 +15,8 @@
     "db:init": "tsx scripts/inicializar.ts",
     "db:verificar": "tsx scripts/verificar-base.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "test:bd": "node --conditions=react-server --import tsx --test \"pruebas/**/*.test.ts\""
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

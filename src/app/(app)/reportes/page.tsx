@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireAdministradora } from "@/lib/auth";
+import { filtroCondominios, filtroPorCondominio } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { BotonDocumento, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { formatoMoneda, formatoPorcentaje } from "@/lib/formato";
@@ -15,7 +16,7 @@ export default async function ReportesPage() {
   const ahora = new Date();
 
   const condominios = await db.condominio.findMany({
-    where: { administradoraId },
+    where: { administradoraId, ...filtroCondominios(usuario) },
     orderBy: { nombre: "asc" },
     include: {
       _count: { select: { unidades: true } },
@@ -28,7 +29,7 @@ export default async function ReportesPage() {
     },
   });
   const vencidos = await db.avisoCobro.findMany({
-    where: { administradoraId, saldo: { gt: 0 }, vencimiento: { lt: ahora } },
+    where: { administradoraId, saldo: { gt: 0 }, vencimiento: { lt: ahora }, unidad: filtroPorCondominio(usuario) },
     select: { saldo: true, unidadId: true, unidad: { select: { condominioId: true } } },
   });
 

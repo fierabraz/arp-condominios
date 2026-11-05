@@ -40,5 +40,7 @@ jobs:
         run: npm test
       - name: Migraciones y datos de demostración
         run: npm run db:deploy && npm run db:seed
+      - name: Pruebas de pagos, anulaciones y aislamiento (base temporal)
+        run: npm run test:bd
       - name: Compilación
         run: npm run build

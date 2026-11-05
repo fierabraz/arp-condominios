@@ -1,21 +1,27 @@
 import { requireAdministradora } from "@/lib/auth";
+import { condominiosPermitidos, esPrincipal } from "@/lib/permisos";
 import { BotonLink, PageHeader, Vacio } from "@/components/ui";
 import { TarjetaPropiedad } from "@/components/tarjeta-propiedad";
 import { resumenPropiedades } from "@/lib/resumen-propiedades";
 
 export default async function CondominiosPage() {
-  const { administradoraId } = await requireAdministradora();
-  const propiedades = await resumenPropiedades(administradoraId);
+  const { usuario, administradoraId } = await requireAdministradora();
+  const propiedades = await resumenPropiedades(administradoraId, condominiosPermitidos(usuario) ?? undefined);
+  const principal = esPrincipal(usuario);
 
   return (
     <>
       <PageHeader
         titulo="Mis propiedades"
-        descripcion="Edificios y condominios que administras"
-        acciones={<BotonLink href="/condominios/nuevo">Crear propiedad</BotonLink>}
+        descripcion={principal ? "Edificios y condominios que administras" : "Edificios y condominios que tienes asignados"}
+        acciones={principal ? <BotonLink href="/condominios/nuevo">Crear propiedad</BotonLink> : undefined}
       />
       {propiedades.length === 0 ? (
-        <Vacio>Aún no tienes propiedades. Crea la primera para empezar.</Vacio>
+        <Vacio>
+          {principal
+            ? "Aún no tienes propiedades. Crea la primera para empezar."
+            : "Aún no tienes propiedades asignadas. Pide al administrador principal que te asigne en Permisos."}
+        </Vacio>
       ) : (
         <div className="overflow-hidden rounded-xl border border-borde shadow-sm">
           {propiedades.map((p) => (

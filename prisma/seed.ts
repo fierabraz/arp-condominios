@@ -71,7 +71,7 @@ async function main() {
 
   await db.usuario.createMany({
     data: [
-      { nombre: "Ana Administradora", correo: "admin@demo.cl", claveHash, rol: "ADMINISTRADOR", administradoraId: adm.id },
+      { nombre: "Ana Administradora", correo: "admin@demo.cl", claveHash, rol: "ADMINISTRADOR", accesoTodas: true, administradoraId: adm.id },
       { nombre: "Pedro Tesorero", correo: "comite@demo.cl", claveHash, rol: "COMITE", administradoraId: adm.id, condominioId: condominio.id },
       { nombre: "María González", correo: "maria@demo.cl", claveHash, rol: "RESIDENTE", administradoraId: adm.id, personaId: maria.id },
     ],

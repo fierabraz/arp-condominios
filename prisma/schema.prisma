@@ -12,7 +12,7 @@ datasource db {
 
 enum Rol {
   SUPERADMIN // dueño de la plataforma
-  ADMINISTRADOR // administra todo dentro de su administradora
+  ADMINISTRADOR // administra las propiedades asignadas (o todas, si es principal)
   COMITE // solo lectura de su condominio
   RESIDENTE // ve sus avisos de cobro, pagos y saldo
 }
@@ -102,6 +102,9 @@ model Usuario {
   rol              Rol
   // Para COMITE: condominio que puede ver. Para RESIDENTE: persona vinculada.
   condominioId     String?
+  // Para ADMINISTRADOR: el principal ve todas las propiedades de la administradora (también las
+  // nuevas) y maneja las cuentas; los demás ven solo las asignadas en AsignacionCondominio.
+  accesoTodas      Boolean  @default(false)
   condominio       Condominio? @relation(fields: [condominioId], references: [id], onDelete: SetNull)
   personaId        String?  @unique
   persona          Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
@@ -113,8 +116,21 @@ model Usuario {
   ultimoIngresoEn  DateTime?
 
   tokensRecuperacion TokenRecuperacion[]
+  asignaciones       AsignacionCondominio[]
 
   @@index([administradoraId])
+}
+
+// Propiedades que puede administrar un administrador que no es principal.
+model AsignacionCondominio {
+  usuarioId    String
+  usuario      Usuario    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  condominioId String
+  condominio   Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  creadoEn     DateTime   @default(now())
+
+  @@id([usuarioId, condominioId])
+  @@index([condominioId])
 }
 
 model Condominio {
@@ -137,6 +153,7 @@ model Condominio {
   unidades      Unidad[]
   periodos      Periodo[]
   usuarios      Usuario[]
+  asignaciones  AsignacionCondominio[]
   publicaciones Publicacion[]
   votaciones    Votacion[]
 
@@ -268,6 +285,11 @@ model Pago {
   medio            MedioPago
   referencia       String?
   creadoEn         DateTime @default(now())
+  // Un pago anulado no se borra: deja de contar para la deuda y el saldo a favor,
+  // pero queda a la vista con quién lo anuló, cuándo y por qué.
+  anuladoEn        DateTime?
+  anuladoPor       String?
+  motivoAnulacion  String?
 
   aplicaciones AplicacionPago[]
 

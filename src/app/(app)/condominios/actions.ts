@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAdministradora } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora, requirePrincipal } from "@/lib/auth";
+import { filtroPersonas } from "@/lib/permisos";
 import { aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { RelacionUnidad, TipoUnidad } from "@/generated/prisma/enums";
 import { ETIQUETAS_RELACION } from "@/lib/formato";
@@ -51,7 +52,8 @@ function leerCondominio(formData: FormData) {
 }
 
 export async function crearCondominio(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const { usuario, administradoraId } = await requireAdministradora();
+  // Solo el administrador principal crea propiedades (los demás solo ven las que les asignan).
+  const { usuario, administradoraId } = await requirePrincipal();
   const datos = leerCondominio(formData);
   if (!datos.success) return erroresDe(datos.error);
 
@@ -68,6 +70,7 @@ export async function editarCondominio(
   const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerCondominio(formData);
   if (!datos.success) return erroresDe(datos.error);
+  if (!puedeVerPropiedad(usuario, id)) return { mensaje: "Condominio no encontrado." };
 
   const { count } = await db.condominio.updateMany({
     where: { id, administradoraId },
@@ -111,7 +114,7 @@ export async function crearUnidad(
   if (!datos.success) return erroresDe(datos.error);
 
   const condominio = await db.condominio.findFirst({ where: { id: condominioId, administradoraId } });
-  if (!condominio) return { mensaje: "Condominio no encontrado." };
+  if (!condominio || !puedeVerPropiedad(usuario, condominioId)) return { mensaje: "Condominio no encontrado." };
 
   const existe = await db.unidad.findUnique({
     where: { condominioId_numero: { condominioId, numero: datos.data.numero } },
@@ -134,7 +137,7 @@ export async function editarUnidad(
   if (!datos.success) return erroresDe(datos.error);
 
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
-  if (!unidad) return { mensaje: "Unidad no encontrada." };
+  if (!unidad || !puedeVerPropiedad(usuario, unidad.condominioId)) return { mensaje: "Unidad no encontrada." };
 
   const repetida = await db.unidad.findFirst({
     where: { condominioId: unidad.condominioId, numero: datos.data.numero, NOT: { id: unidadId } },
@@ -155,7 +158,7 @@ export async function editarUnidad(
 export async function eliminarUnidad(unidadId: string) {
   const { usuario, administradoraId } = await requireAdministradora();
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
-  if (!unidad) return;
+  if (!unidad || !puedeVerPropiedad(usuario, unidad.condominioId)) return;
   // Una unidad con cobros, pagos, cargos o votos no se borra: se perdería su historia.
   if ((await historialUnidad(unidadId)).total > 0) return;
   await db.unidad.delete({ where: { id: unidadId } });
@@ -183,9 +186,9 @@ export async function vincularPersona(
 
   const [unidad, persona] = await Promise.all([
     db.unidad.findFirst({ where: { id: unidadId, administradoraId } }),
-    db.persona.findFirst({ where: { id: datos.data.personaId, administradoraId } }),
+    db.persona.findFirst({ where: { id: datos.data.personaId, administradoraId, ...filtroPersonas(usuario) } }),
   ]);
-  if (!unidad || !persona) return { mensaje: "Unidad o persona no encontrada." };
+  if (!unidad || !persona || !puedeVerPropiedad(usuario, unidad.condominioId)) return { mensaje: "Unidad o persona no encontrada." };
 
   await db.unidadPersona.upsert({
     where: { unidadId_personaId_relacion: { unidadId, ...datos.data } },
@@ -205,7 +208,7 @@ export async function vincularPersona(
 export async function desvincularPersona(unidadId: string, personaId: string, relacion: RelacionUnidad) {
   const { usuario, administradoraId } = await requireAdministradora();
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
-  if (!unidad) return;
+  if (!unidad || !puedeVerPropiedad(usuario, unidad.condominioId)) return;
   const persona = await db.persona.findFirst({ where: { id: personaId, administradoraId }, select: { nombre: true } });
   const { count } = await db.unidadPersona.deleteMany({ where: { unidadId, personaId, relacion } });
   if (count > 0) {

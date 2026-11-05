@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAdministradora, requireUsuario } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora, requireUsuario } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
 import { finDelDiaChile, formatoFecha, hoyChile } from "@/lib/formato";
@@ -37,7 +37,7 @@ export async function crearVotacion(condominioId: string, _: EstadoForm, formDat
     opciones: formData.getAll("opcion").map(String),
   });
   if (!datos.success) return erroresDe(datos.error);
-  if (!(await db.condominio.findFirst({ where: { id: condominioId, administradoraId } }))) {
+  if (!puedeVerPropiedad(usuario, condominioId) || !(await db.condominio.findFirst({ where: { id: condominioId, administradoraId } }))) {
     return { mensaje: "Propiedad no encontrada." };
   }
   const { opciones, cierra, ...resto } = datos.data;
@@ -57,7 +57,9 @@ export async function crearVotacion(condominioId: string, _: EstadoForm, formDat
 
 async function votacionPropia(id: string) {
   const { usuario, administradoraId } = await requireAdministradora();
-  const v = await db.votacion.findFirst({ where: { id, administradoraId } });
+  const encontrada = await db.votacion.findFirst({ where: { id, administradoraId } });
+  // Una votación de una propiedad que no le corresponde se trata como inexistente.
+  const v = encontrada && puedeVerPropiedad(usuario, encontrada.condominioId) ? encontrada : null;
   return { usuario, v };
 }
 
