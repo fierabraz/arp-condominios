@@ -1,0 +1,219 @@
+// COM-001 · Configurador de comunidades: avance de la configuración y reglas para cambiar de estado.
+// Todo es puro (sin base de datos) para poder probarlo; los datos los junta configuracion-servicio.ts.
+
+import { estadoAlicuotas, type EstadoAlicuotas } from "./alicuotas";
+
+export type Estado = "EN_CONFIGURACION" | "HABILITADA_ADMINISTRATIVA" | "HABILITADA_FINANCIERA";
+export type Tipo = "EDIFICIO" | "CONDOMINIO_CASAS" | "MIXTO" | "OFICINAS" | "OTRO";
+export type Modalidad = "NUEVA" | "EXISTENTE";
+
+export const ESTADOS: Record<Estado, { texto: string; corto: string; descripcion: string }> = {
+  EN_CONFIGURACION: {
+    texto: "En configuración",
+    corto: "En configuración",
+    descripcion: "Se están cargando sus datos. Los residentes aún no la ven y no se emiten cobros.",
+  },
+  HABILITADA_ADMINISTRATIVA: {
+    texto: "Habilitada administrativamente",
+    corto: "Habilitada (administrativa)",
+    descripcion: "Muro, votaciones e invitaciones a residentes disponibles. Todavía no emite cobros ni registra pagos.",
+  },
+  HABILITADA_FINANCIERA: {
+    texto: "Habilitada financieramente",
+    corto: "Habilitada",
+    descripcion: "Opera completa: emite cobros, registra pagos y lleva fondos y rendiciones.",
+  },
+};
+
+/** Color de la insignia de cada estado (tonos de Insignia). */
+export const TONO_ESTADO = {
+  EN_CONFIGURACION: "alerta",
+  HABILITADA_ADMINISTRATIVA: "marca",
+  HABILITADA_FINANCIERA: "exito",
+} as const;
+
+export const ORDEN_ESTADOS: Estado[] = ["EN_CONFIGURACION", "HABILITADA_ADMINISTRATIVA", "HABILITADA_FINANCIERA"];
+
+export const TIPOS: Record<Tipo, string> = {
+  EDIFICIO: "Edificio",
+  CONDOMINIO_CASAS: "Condominio de casas",
+  MIXTO: "Mixto (edificios y casas)",
+  OFICINAS: "Oficinas o comercial",
+  OTRO: "Otro",
+};
+
+export const MODALIDADES: Record<Modalidad, { texto: string; ayuda: string }> = {
+  NUEVA: { texto: "Comunidad nueva", ayuda: "Parte de cero en Convive, sin deudas ni saldos anteriores." },
+  EXISTENTE: {
+    texto: "Comunidad existente",
+    ayuda: "Ya funcionaba con otra administración o sistema: tiene deudas, fondos o saldos que traer (migración mixta).",
+  },
+};
+
+/** Emitir cobros y registrar pagos solo en una comunidad habilitada financieramente. */
+export const operaFinanzas = (estado: Estado) => estado === "HABILITADA_FINANCIERA";
+/** Invitar residentes y que la vean: desde la habilitación administrativa. */
+export const operaAdministracion = (estado: Estado) => estado !== "EN_CONFIGURACION";
+
+export const MENSAJE_SIN_FINANZAS =
+  "Esta propiedad aún no está habilitada financieramente. Complétala en Configuración para emitir cobros y registrar pagos.";
+
+/** Lo que el configurador necesita saber de una comunidad. */
+export type DatosConfiguracion = {
+  estado: Estado;
+  nombre: string;
+  direccion: string;
+  tipo: Tipo | null;
+  modalidad: Modalidad | null;
+  fechaIncorporacion: Date | null;
+  totalUnidades: number | null;
+  unidades: number;
+  sumaAlicuotas: number;
+  unidadesSinPropietario: number;
+  /** Avisos de cobro ya emitidos en Convive. */
+  cobrosEmitidos: number;
+};
+
+export type EstadoPaso = "completo" | "observacion" | "pendiente" | "disponible" | "proximamente";
+
+export type Paso = {
+  numero: string;
+  titulo: string;
+  estado: EstadoPaso;
+  detalle: string;
+  /** Ruta dentro de la propiedad (se le antepone /condominios/[id]). */
+  ruta?: string;
+  accion?: string;
+};
+
+const unidadesTxt = (n: number) => `${n} ${n === 1 ? "unidad" : "unidades"}`;
+
+/** Datos de identificación que faltan (paso 01). */
+export function faltanIdentificacion(d: DatosConfiguracion): string[] {
+  const faltan: string[] = [];
+  if (!d.nombre.trim()) faltan.push("nombre");
+  if (!d.direccion.trim()) faltan.push("dirección");
+  if (!d.tipo) faltan.push("tipo de comunidad");
+  if (!d.modalidad) faltan.push("si es nueva o existente");
+  if (!d.fechaIncorporacion) faltan.push("fecha de incorporación");
+  return faltan;
+}
+
+export function alicuotasDe(d: DatosConfiguracion): EstadoAlicuotas {
+  return estadoAlicuotas({ cargadas: d.unidades, suma: d.sumaAlicuotas, total: d.totalUnidades });
+}
+
+/** Las 8 etapas del configurador con su avance. Las que aún no se construyen quedan "próximamente". */
+export function pasosConfiguracion(d: DatosConfiguracion): Paso[] {
+  const faltan = faltanIdentificacion(d);
+  const alic = alicuotasDe(d);
+
+  const estructura: Paso =
+    d.unidades === 0
+      ? { numero: "02", titulo: "Estructura y unidades", estado: "pendiente", detalle: "Aún no hay unidades.", ruta: "/unidades", accion: "Agregar unidades" }
+      : alic.tipo === "ok"
+        ? { numero: "02", titulo: "Estructura y unidades", estado: "completo", detalle: alic.texto, ruta: "/unidades", accion: "Ver unidades" }
+        : { numero: "02", titulo: "Estructura y unidades", estado: "observacion", detalle: alic.texto, ruta: "/unidades", accion: "Seguir con las unidades" };
+
+  const personas: Paso =
+    d.unidades === 0
+      ? { numero: "03", titulo: "Personas", estado: "pendiente", detalle: "Primero agrega las unidades.", ruta: "/unidades" }
+      : d.unidadesSinPropietario === 0
+        ? { numero: "03", titulo: "Personas", estado: "completo", detalle: "Todas las unidades tienen propietario.", ruta: "/unidades", accion: "Ver unidades" }
+        : {
+            numero: "03",
+            titulo: "Personas",
+            estado: "observacion",
+            detalle: `${unidadesTxt(d.unidadesSinPropietario)} sin propietario registrado.`,
+            ruta: "/unidades",
+            accion: "Completar propietarios",
+          };
+
+  const finanzas: Paso =
+    d.modalidad === "EXISTENTE"
+      ? {
+          numero: "04",
+          titulo: "Finanzas y apertura",
+          estado: "proximamente",
+          detalle: "Las reglas de cobro ya se pueden revisar. La apertura con deudas, fondos y bancos anteriores llega en una próxima entrega.",
+          ruta: "/editar",
+          accion: "Revisar reglas de cobro",
+        }
+      : {
+          numero: "04",
+          titulo: "Reglas de cobro",
+          estado: "disponible",
+          detalle: "Fondo de reserva, interés por mora y día de vencimiento. Tienen valores por defecto; revísalos antes de habilitar.",
+          ruta: "/editar",
+          accion: "Revisar reglas de cobro",
+        };
+
+  return [
+    {
+      numero: "01",
+      titulo: "Identificación",
+      estado: faltan.length ? "pendiente" : "completo",
+      detalle: faltan.length ? `Falta: ${faltan.join(", ")}.` : "Datos de la comunidad completos.",
+      ruta: "/editar",
+      accion: faltan.length ? "Completar" : "Editar",
+    },
+    estructura,
+    personas,
+    finanzas,
+    {
+      numero: "05",
+      titulo: "Administración y personal",
+      estado: "disponible",
+      detalle: "Los administradores asignados se manejan en Permisos. Comité y personal llegan en una próxima entrega.",
+    },
+    { numero: "06", titulo: "Servicios", estado: "proximamente", detalle: "Elegir qué módulos usa la comunidad." },
+    { numero: "07", titulo: "Documentos", estado: "proximamente", detalle: "Reglamento, planos, actas y contratos." },
+    { numero: "08", titulo: "Validación y activación", estado: d.estado === "HABILITADA_FINANCIERA" ? "completo" : "pendiente", detalle: ESTADOS[d.estado].texto + "." },
+  ];
+}
+
+/** Porcentaje de avance: pasos completos sobre los pasos que ya se pueden completar (01 a 03). */
+export function avanceConfiguracion(d: DatosConfiguracion) {
+  const medibles = pasosConfiguracion(d).filter((p) => ["01", "02", "03"].includes(p.numero));
+  const completos = medibles.filter((p) => p.estado === "completo").length;
+  return { completos, total: medibles.length, porcentaje: Math.round((completos / medibles.length) * 100) };
+}
+
+export type Revision = { ok: boolean; bloqueos: string[]; advertencias: string[] };
+
+/**
+ * ¿Se puede pasar la comunidad a `destino`? Bajar de estado se permite (no borra nada), salvo
+ * dejar de operar finanzas si ya hay cobros emitidos; subir exige los requisitos de cada estado. Lo financiero de una comunidad EXISTENTE queda
+ * restringido hasta que exista la apertura con fecha de corte (próxima entrega).
+ */
+export function revisarCambio(d: DatosConfiguracion, destino: Estado): Revision {
+  const bloqueos: string[] = [];
+  const advertencias: string[] = [];
+  if (destino === d.estado) return { ok: false, bloqueos: ["La propiedad ya está en ese estado."], advertencias };
+  if (ORDEN_ESTADOS.indexOf(destino) < ORDEN_ESTADOS.indexOf(d.estado)) {
+    // Una comunidad que ya cobró no puede dejar de registrar pagos: sus residentes tienen deudas vivas.
+    if (d.estado === "HABILITADA_FINANCIERA" && d.cobrosEmitidos > 0) {
+      bloqueos.push("Ya emitió cobros en Convive: no puede dejar de estar habilitada financieramente.");
+    }
+    return { ok: bloqueos.length === 0, bloqueos, advertencias };
+  }
+
+  // Habilitación administrativa (también se exige para la financiera).
+  const faltan = faltanIdentificacion(d);
+  if (faltan.length) bloqueos.push(`Completa la identificación: ${faltan.join(", ")}.`);
+  if (d.unidades === 0) bloqueos.push("Agrega al menos una unidad.");
+  if (d.unidades > 0 && d.unidadesSinPropietario > 0) {
+    advertencias.push(`${unidadesTxt(d.unidadesSinPropietario)} sin propietario registrado.`);
+  }
+
+  if (destino === "HABILITADA_FINANCIERA") {
+    const alic = alicuotasDe(d);
+    if (d.unidades > 0 && alic.tipo !== "ok") bloqueos.push(alic.texto);
+    if (d.modalidad === "EXISTENTE") {
+      bloqueos.push(
+        "Es una comunidad existente: antes de cobrar hay que registrar su apertura (fecha de corte, deudas, fondos y bancos), que llega en una próxima entrega.",
+      );
+    }
+  }
+  return { ok: bloqueos.length === 0, bloqueos, advertencias };
+}

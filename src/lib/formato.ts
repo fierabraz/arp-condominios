@@ -109,3 +109,8 @@ export function formatoFechaLarga(fecha: Date) {
   const conAnio = anio(fecha) !== anio(new Date());
   return fecha.toLocaleDateString("es-CL", { timeZone: ZONA_HORARIA, day: "numeric", month: "long", ...(conAnio ? { year: "numeric" } : {}) });
 }
+
+/** Fecha sin hora (guardada como día, a medianoche UTC): "1 de diciembre de 2026", sin correrse por la zona horaria. */
+export function formatoDia(fecha: Date) {
+  return fecha.toLocaleDateString("es-CL", { timeZone: "UTC", day: "numeric", month: "long", year: "numeric" });
+}

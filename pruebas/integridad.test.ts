@@ -21,7 +21,7 @@ async function escenario(nombre: string, unidades: number, gastoComun: number) {
   const adm = await db.administradora.create({ data: { nombre: `Prueba ${nombre} ${sufijo}` } });
   creadas.push(adm.id);
   const condominio = await db.condominio.create({
-    data: { administradoraId: adm.id, nombre: `Edificio ${nombre}`, direccion: "Calle 1", porcentajeReserva: 0 },
+    data: { administradoraId: adm.id, nombre: `Edificio ${nombre}`, direccion: "Calle 1", porcentajeReserva: 0, estado: "HABILITADA_FINANCIERA" },
   });
   const u = [];
   for (let i = 1; i <= unidades; i++) {

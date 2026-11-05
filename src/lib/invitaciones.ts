@@ -1,4 +1,5 @@
 import "server-only";
+import { operaAdministracion } from "./configuracion";
 import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
@@ -79,7 +80,7 @@ export async function invitarPersona(
   const persona = await db.persona.findFirst({
     where: { id: personaId, administradoraId },
     include: {
-      unidades: { include: { unidad: { select: { condominioId: true, condominio: { select: { nombre: true } } } } } },
+      unidades: { include: { unidad: { select: { condominioId: true, condominio: { select: { nombre: true, estado: true } } } } } },
       usuario: {
         select: {
           id: true,
@@ -102,6 +103,10 @@ export async function invitarPersona(
   const falla = (error: string): ResultadoInvitacion => ({ ok: false, personaId, nombre: persona.nombre, error });
   if (!persona.correo) return falla("Le falta el correo. Agrégalo en sus datos para poder invitarla.");
   if (persona.unidades.length === 0) return falla("No está vinculada a ninguna unidad, así que no vería nada en la app.");
+  // COM-001: mientras la propiedad está en configuración, los residentes todavía no entran.
+  if (persona.unidades.every((v) => !operaAdministracion(v.unidad.condominio.estado))) {
+    return falla("Su propiedad sigue en configuración. Habilítala en Configuración antes de invitar a los residentes.");
+  }
 
   const estado = estadoAcceso(
     persona.correo,

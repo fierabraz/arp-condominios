@@ -7,9 +7,12 @@ export default async function NuevoCondominioPage() {
   await requirePrincipal();
   return (
     <>
-      <PageHeader titulo="Crear propiedad" descripcion="Un edificio o condominio con sus reglas de cobro" />
+      <PageHeader
+        titulo="Crear propiedad"
+        descripcion="Queda “En configuración” hasta que completes sus datos. Puedes guardar a medias y continuar después."
+      />
       <Card>
-        <CondominioForm accion={crearCondominio} textoBoton="Crear condominio" />
+        <CondominioForm accion={crearCondominio} textoBoton="Guardar y continuar" />
       </Card>
     </>
   );

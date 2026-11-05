@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireUsuario } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { filtroCondominios, filtroPersonas, filtroPorCondominio } from "@/lib/permisos";
-import { Card, PageHeader } from "@/components/ui";
+import { condominiosPermitidos, esPrincipal, filtroCondominios, filtroPersonas, filtroPorCondominio } from "@/lib/permisos";
+import { BotonLink, Card, PageHeader, Vacio } from "@/components/ui";
+import { TarjetaPropiedad } from "@/components/tarjeta-propiedad";
+import { resumenPropiedades } from "@/lib/resumen-propiedades";
 import { formatoMoneda } from "@/lib/formato";
 
 export default async function InicioPage() {
@@ -14,7 +16,9 @@ export default async function InicioPage() {
 
   const administradoraId = usuario.administradoraId!;
   const ahora = new Date();
-  const [condominios, unidades, personas, porCobrar, vencido] = await Promise.all([
+  const principal = esPrincipal(usuario);
+  const [propiedades, condominios, unidades, personas, porCobrar, vencido] = await Promise.all([
+    resumenPropiedades(administradoraId, condominiosPermitidos(usuario) ?? undefined),
     db.condominio.count({ where: { administradoraId, ...filtroCondominios(usuario) } }),
     db.unidad.count({ where: { administradoraId, ...filtroPorCondominio(usuario) } }),
     db.persona.count({ where: { administradoraId, ...filtroPersonas(usuario) } }),
@@ -47,6 +51,28 @@ export default async function InicioPage() {
           </Link>
         ))}
       </div>
+
+      <section aria-labelledby="mis-propiedades" className="mt-8">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+          <h2 id="mis-propiedades" className="text-xl font-bold text-convive-oscuro">
+            {principal ? "Mis propiedades" : "Propiedades asignadas"}
+          </h2>
+          {principal && <BotonLink href="/condominios/nuevo">Crear propiedad</BotonLink>}
+        </div>
+        {propiedades.length === 0 ? (
+          <Vacio>
+            {principal
+              ? "Aún no tienes propiedades. Crea la primera para empezar."
+              : "Aún no tienes propiedades asignadas. Pide al administrador principal que te asigne en Permisos."}
+          </Vacio>
+        ) : (
+          <div className="overflow-hidden rounded-xl border border-borde shadow-sm">
+            {propiedades.map((p) => (
+              <TarjetaPropiedad key={p.id} p={p} />
+            ))}
+          </div>
+        )}
+      </section>
     </>
   );
 }
