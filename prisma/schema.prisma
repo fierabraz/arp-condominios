@@ -64,6 +64,28 @@ enum TipoToken {
   INVITACION // la administración lo invitó a crear su cuenta (vence en 7 días)
 }
 
+// COM-001: en qué etapa está la comunidad. Las operaciones de dinero (emitir cobros,
+// registrar pagos) solo se permiten en HABILITADA_FINANCIERA.
+enum EstadoComunidad {
+  EN_CONFIGURACION // se están cargando sus datos; nada visible para residentes
+  HABILITADA_ADMINISTRATIVA // muro, votaciones e invitaciones; sin cobros
+  HABILITADA_FINANCIERA // además emite cobros y registra pagos
+}
+
+// Supuesto provisional (D-COM-04): lista simple hasta verificar si la ley define tipos.
+enum TipoComunidad {
+  EDIFICIO
+  CONDOMINIO_CASAS
+  MIXTO
+  OFICINAS
+  OTRO
+}
+
+enum ModalidadIncorporacion {
+  NUEVA // comunidad que parte de cero en Convive
+  EXISTENTE // ya funcionaba con otra administración o sistema (migración mixta)
+}
+
 enum MedioPago {
   TRANSFERENCIA
   EFECTIVO
@@ -148,6 +170,18 @@ model Condominio {
   diaVencimiento     Int      @default(10)
   // Cuántas unidades con alícuota tiene la propiedad en total (para seguir el avance de la carga)
   totalUnidades      Int?
+  // COM-001 · configurador. Las comunidades que ya existían quedan HABILITADA_FINANCIERA
+  // (ver la migración); las nuevas nacen EN_CONFIGURACION.
+  estado             EstadoComunidad @default(EN_CONFIGURACION)
+  estadoCambiadoEn   DateTime?
+  tipo               TipoComunidad?
+  modalidad          ModalidadIncorporacion?
+  region             String?
+  fechaIncorporacion DateTime? @db.Date
+  // Antecedentes legales: inscripción del reglamento de copropiedad, notaría, fecha, etc.
+  reglamento         String?
+  // Información complementaria disponible (texto libre).
+  observaciones      String?
   creadoEn           DateTime @default(now())
 
   unidades      Unidad[]

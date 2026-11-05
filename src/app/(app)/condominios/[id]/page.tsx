@@ -19,6 +19,7 @@ import { morosidad } from "@/lib/cobro-servicio";
 import { nombrePeriodo } from "@/lib/cobro";
 import { formatoFechaLarga } from "@/lib/formato";
 import { condominioVisible } from "./condominio-actual";
+import { ESTADOS, operaFinanzas } from "@/lib/configuracion";
 
 type Tarea = { clave: string; texto: string; detalle: string; accion: string; href: string; icono: LucideIcon };
 
@@ -65,7 +66,7 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
       href: `${base}/periodos/${abierto.id}`,
       icono: ClipboardList,
     });
-  } else if (editable) {
+  } else if (editable && operaFinanzas(condominio.estado)) {
     tareas.push({
       clave: "abrir",
       texto: "No hay un mes abierto",
@@ -123,16 +124,30 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
         </div>
         {editable && (
           <div className="flex flex-wrap gap-2">
-            <BotonLink href={`${base}/editar`} variante="secundario" aria-label="Configurar propiedad" title="Configurar propiedad">
-              <Pencil size={16} aria-hidden="true" />
+            <BotonLink href={`${base}/configuracion`} variante="secundario">
+              <Pencil size={16} aria-hidden="true" /> Configuración
             </BotonLink>
             <BotonLink href={`${base}/muro/nueva`} variante="secundario">
               Nueva publicación
             </BotonLink>
-            <BotonLink href={`${base}/pagos`}>Registrar pago</BotonLink>
+            {operaFinanzas(condominio.estado) && <BotonLink href={`${base}/pagos`}>Registrar pago</BotonLink>}
           </div>
         )}
       </div>
+
+      {!operaFinanzas(condominio.estado) && (
+        <section aria-label="Estado de la propiedad" className="mb-8 flex flex-wrap items-center gap-4 rounded-2xl border border-alerta/30 bg-alerta-suave p-4">
+          <span className="min-w-0 flex-1 basis-60">
+            <span className="block font-bold text-alerta">{ESTADOS[condominio.estado].texto}</span>
+            <span className="block text-sm text-texto">{ESTADOS[condominio.estado].descripcion}</span>
+          </span>
+          {editable && (
+            <BotonLink href={`${base}/configuracion`} variante="secundario">
+              Continuar configuración
+            </BotonLink>
+          )}
+        </section>
+      )}
 
       <section aria-labelledby="para-hoy" className="mb-8">
         {tareas.length === 0 ? (

@@ -227,8 +227,11 @@ function MenuPropiedad({
             <Home size={18} strokeWidth={2.2} /> Panel
           </Link>
           {editable && (
-            <Link href={`${base}/editar`} className={claseEnlace(ruta === `${base}/editar`)}>
-              <Settings size={18} strokeWidth={2.2} /> Configurar propiedad
+            <Link
+              href={`${base}/configuracion`}
+              className={claseEnlace(ruta === `${base}/configuracion` || ruta === `${base}/editar`)}
+            >
+              <Settings size={18} strokeWidth={2.2} /> Configuración
             </Link>
           )}
           {GRUPOS_MODULOS.map((g) => {

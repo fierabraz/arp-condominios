@@ -1,4 +1,5 @@
 import "server-only";
+import { MENSAJE_SIN_FINANZAS, operaFinanzas } from "./configuracion";
 import { db } from "@/lib/db";
 import type { MedioPago } from "@/generated/prisma/enums";
 import {
@@ -154,6 +155,7 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string)
     await tx.$queryRaw`SELECT id FROM "Periodo" WHERE id = ${periodoId} FOR UPDATE`;
     const periodo = await cargarPeriodo(tx, periodoId, administradoraId);
     if (periodo.estado === "CERRADO") throw new ErrorCobro("El período ya fue cerrado.");
+    if (!operaFinanzas(periodo.condominio.estado)) throw new ErrorCobro(MENSAJE_SIN_FINANZAS);
     await bloquearUnidades(
       tx,
       periodo.condominio.unidades.map((u) => u.id),
@@ -196,8 +198,12 @@ export async function registrarPago(
   datos: { unidadId: string; monto: number; fecha: Date; medio: MedioPago; referencia?: string },
 ) {
   return db.$transaction(async (tx) => {
-    const unidad = await tx.unidad.findFirst({ where: { id: datos.unidadId, administradoraId } });
+    const unidad = await tx.unidad.findFirst({
+      where: { id: datos.unidadId, administradoraId },
+      include: { condominio: { select: { estado: true } } },
+    });
     if (!unidad) throw new ErrorCobro("Unidad no encontrada.");
+    if (!operaFinanzas(unidad.condominio.estado)) throw new ErrorCobro(MENSAJE_SIN_FINANZAS);
     await bloquearUnidades(tx, [unidad.id]);
     const dec = await monedaDe(tx, administradoraId);
     const monto = aMinimo(datos.monto, dec);

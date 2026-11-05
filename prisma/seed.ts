@@ -27,6 +27,9 @@ async function main() {
     data: {
       administradoraId: adm.id,
       nombre: "Edificio Los Aromos",
+      estado: "HABILITADA_FINANCIERA",
+      tipo: "EDIFICIO",
+      modalidad: "NUEVA",
       rut: "65.123.456-7",
       direccion: "Av. Providencia 1234",
       comuna: "Providencia",

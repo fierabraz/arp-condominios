@@ -5,9 +5,11 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { puedeVerPropiedad, requireAdministradora, requirePrincipal } from "@/lib/auth";
-import { filtroPersonas } from "@/lib/permisos";
+import { esPrincipal, filtroPersonas } from "@/lib/permisos";
 import { aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
-import { RelacionUnidad, TipoUnidad } from "@/generated/prisma/enums";
+import { EstadoComunidad, ModalidadIncorporacion, RelacionUnidad, TipoComunidad, TipoUnidad } from "@/generated/prisma/enums";
+import { ESTADOS, revisarCambio } from "@/lib/configuracion";
+import { datosDeUna } from "@/lib/configuracion-servicio";
 import { ETIQUETAS_RELACION } from "@/lib/formato";
 import { registrar } from "@/lib/registro";
 import { historialUnidad } from "@/lib/unidades";
@@ -36,7 +38,25 @@ const CondominioSchema = z.object({
     .min(1, { error: "Debe ser al menos 1." })
     .max(10000, { error: "Máximo 10.000." })
     .nullable(),
+  // COM-001: identificación. Todo opcional para poder guardar a medias y seguir después.
+  tipo: z.enum(TipoComunidad, { error: "Elige un tipo." }).nullable(),
+  modalidad: z.enum(ModalidadIncorporacion, { error: "Elige una opción." }).nullable(),
+  region: z.string().max(80).optional(),
+  fechaIncorporacion: z
+    .date({ error: "Fecha no válida." })
+    .min(new Date("1900-01-01"), { error: "Fecha no válida." })
+    .max(new Date("2100-01-01"), { error: "Fecha no válida." })
+    .nullable(),
+  reglamento: z.string().max(2000, { error: "Máximo 2.000 caracteres." }).optional(),
+  observaciones: z.string().max(4000, { error: "Máximo 4.000 caracteres." }).optional(),
 });
+
+/** "2026-12-01" (campo de fecha) → fecha a medianoche UTC; vacío → null. */
+function aFecha(valor: FormDataEntryValue | null) {
+  const s = aTexto(valor);
+  if (!s) return null;
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(`${s}T00:00:00Z`) : new Date(NaN);
+}
 
 function leerCondominio(formData: FormData) {
   return CondominioSchema.safeParse({
@@ -48,7 +68,25 @@ function leerCondominio(formData: FormData) {
     tasaInteresMora: aNumero(formData.get("tasaInteresMora")) ?? 0,
     diaVencimiento: aNumero(formData.get("diaVencimiento")) ?? 10,
     totalUnidades: aNumero(formData.get("totalUnidades")) ?? null,
+    tipo: aTexto(formData.get("tipo")) ?? null,
+    modalidad: aTexto(formData.get("modalidad")) ?? null,
+    region: aTexto(formData.get("region")),
+    fechaIncorporacion: aFecha(formData.get("fechaIncorporacion")),
+    reglamento: aTexto(formData.get("reglamento")),
+    observaciones: aTexto(formData.get("observaciones")),
   });
+}
+
+/** Los campos de texto vacíos se guardan como null (para poder borrar un dato). */
+function paraGuardar(d: z.infer<typeof CondominioSchema>) {
+  return {
+    ...d,
+    comuna: d.comuna ?? null,
+    rut: d.rut ?? null,
+    region: d.region ?? null,
+    reglamento: d.reglamento ?? null,
+    observaciones: d.observaciones ?? null,
+  };
 }
 
 export async function crearCondominio(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
@@ -57,9 +95,10 @@ export async function crearCondominio(_: EstadoForm, formData: FormData): Promis
   const datos = leerCondominio(formData);
   if (!datos.success) return erroresDe(datos.error);
 
-  const condominio = await db.condominio.create({ data: { ...datos.data, administradoraId } });
-  await registrar(usuario, "Creó una propiedad", condominio.nombre, condominio.id);
-  redirect(`/condominios/${condominio.id}`);
+  // Nace "En configuración" (valor por defecto de la tabla): se completa en el configurador.
+  const condominio = await db.condominio.create({ data: { ...paraGuardar(datos.data), administradoraId } });
+  await registrar(usuario, "Creó una propiedad", `${condominio.nombre} (en configuración)`, condominio.id);
+  redirect(`/condominios/${condominio.id}/configuracion?creada=1`);
 }
 
 export async function editarCondominio(
@@ -74,7 +113,7 @@ export async function editarCondominio(
 
   const { count } = await db.condominio.updateMany({
     where: { id, administradoraId },
-    data: datos.data,
+    data: paraGuardar(datos.data),
   });
   if (count === 0) return { mensaje: "Condominio no encontrado." };
   await registrar(
@@ -84,7 +123,44 @@ export async function editarCondominio(
     id,
   );
   revalidatePath(`/condominios/${id}`, "layout");
-  redirect(`/condominios/${id}`);
+  redirect(formData.get("volver") === "configuracion" ? `/condominios/${id}/configuracion?guardado=1` : `/condominios/${id}`);
+}
+
+/**
+ * COM-001: cambia el estado de la comunidad (en configuración / habilitada administrativa /
+ * habilitada financieramente). Revisa los requisitos con los datos de este momento.
+ * Lo financiero (habilitar o deshabilitar cobros) lo decide solo el administrador principal.
+ */
+export async function cambiarEstadoComunidad(id: string, destino: EstadoComunidad): Promise<EstadoForm> {
+  const { usuario, administradoraId } = await requireAdministradora();
+  if (!puedeVerPropiedad(usuario, id)) return { mensaje: "Propiedad no encontrada." };
+  if (!Object.keys(ESTADOS).includes(destino)) return { mensaje: "Estado no válido." };
+  const datos = await datosDeUna(administradoraId, id);
+  if (!datos) return { mensaje: "Propiedad no encontrada." };
+  const tocaFinanzas = destino === "HABILITADA_FINANCIERA" || datos.estado === "HABILITADA_FINANCIERA";
+  if (tocaFinanzas && !esPrincipal(usuario)) {
+    return { mensaje: "Solo el administrador principal puede habilitar o deshabilitar los cobros de una propiedad." };
+  }
+  const revision = revisarCambio(datos, destino);
+  if (!revision.ok) return { mensaje: revision.bloqueos.join(" ") };
+
+  // Solo cambia si sigue en el estado que se revisó (evita dos cambios cruzados).
+  const { count } = await db.condominio.updateMany({
+    where: { id, administradoraId, estado: datos.estado },
+    data: { estado: destino, estadoCambiadoEn: new Date() },
+  });
+  if (count === 0) return { mensaje: "La propiedad cambió mientras tanto. Recarga la página." };
+  await registrar(
+    usuario,
+    "Cambió el estado de una propiedad",
+    `${datos.nombre}: de "${ESTADOS[datos.estado].texto}" a "${ESTADOS[destino].texto}".${
+      revision.advertencias.length ? ` Advertencias aceptadas: ${revision.advertencias.join(" ")}` : ""
+    }`,
+    id,
+  );
+  revalidatePath(`/condominios/${id}`, "layout");
+  revalidatePath("/condominios");
+  return { ok: true, mensaje: `Ahora está ${ESTADOS[destino].texto.toLowerCase()}.` };
 }
 
 const UnidadSchema = z.object({
