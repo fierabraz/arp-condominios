@@ -9,6 +9,7 @@ import { ETIQUETAS_TIPO_UNIDAD, formatoPorcentaje } from "@/lib/formato";
 import { UnidadForm } from "../../unidad-form";
 import { crearUnidad } from "../../actions";
 import { ListaUnidades } from "./lista-unidades";
+import { COLOR_ALICUOTAS, estadoAlicuotas } from "@/lib/alicuotas";
 
 export default async function UnidadesPage({ params }: PageProps<"/condominios/[id]/unidades">) {
   const { id } = await params;
@@ -29,7 +30,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
 
   const editable = puedeEditar(usuario.rol);
   const sumaAlicuotas = condominio.unidades.reduce((s, u) => s + Number(u.alicuota), 0);
-  const cuadra = Math.abs(sumaAlicuotas - 100) < 0.0001;
+  const estado = estadoAlicuotas({ cargadas: condominio.unidades.length, suma: sumaAlicuotas, total: condominio.totalUnidades });
 
   return (
     <>
@@ -53,16 +54,28 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
           <p className="text-sm text-texto-suave">Unidades</p>
-          <p className="mt-1 text-2xl font-bold">{condominio.unidades.length}</p>
+          <p className="mt-1 text-2xl font-bold">
+            {condominio.unidades.length}
+            {condominio.totalUnidades && <span className="text-base font-semibold text-texto-suave"> de {condominio.totalUnidades}</span>}
+          </p>
+          {condominio.totalUnidades && condominio.unidades.length < condominio.totalUnidades && (
+            <div
+              className="mt-2 h-1.5 overflow-hidden rounded-full bg-gray-100"
+              role="progressbar"
+              aria-label="Unidades cargadas"
+              aria-valuenow={condominio.unidades.length}
+              aria-valuemax={condominio.totalUnidades}
+            >
+              <div className="h-full bg-marca" style={{ width: `${(condominio.unidades.length / condominio.totalUnidades) * 100}%` }} />
+            </div>
+          )}
         </Card>
         <Card>
           <p className="text-sm text-texto-suave">Suma de alícuotas</p>
-          <p className={`mt-1 text-2xl font-bold ${cuadra ? "" : "text-alerta"}`}>
+          <p className={`mt-1 text-2xl font-bold ${estado.tipo === "error" ? "text-peligro" : ""}`}>
             {formatoPorcentaje(sumaAlicuotas)}
           </p>
-          {!cuadra && condominio.unidades.length > 0 && (
-            <p className="mt-1 text-xs text-alerta">Debería sumar 100 % para cobrar correctamente.</p>
-          )}
+          {estado.tipo === "progreso" && <p className="mt-1 text-xs text-texto-suave">Llegará a 100 % con todas las unidades.</p>}
         </Card>
         <Card>
           <p className="text-sm text-texto-suave">Fondo de reserva</p>
@@ -73,6 +86,20 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
           <p className="mt-1 text-2xl font-bold">{condominio.diaVencimiento}</p>
         </Card>
       </div>
+
+      {condominio.unidades.length > 0 && estado.tipo !== "ok" && (
+        <p className={`mb-6 rounded-xl px-3 py-2 text-sm ${COLOR_ALICUOTAS[estado.tipo]}`}>
+          {estado.texto}
+          {editable && (estado.tipo === "revisar" || estado.tipo === "error") && (
+            <>
+              {" "}
+              <Link href={`/condominios/${id}/editar`} className="font-semibold underline">
+                Configurar propiedad
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
       {condominio.unidades.length === 0 ? (
         <Vacio>

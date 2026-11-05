@@ -12,6 +12,7 @@ type Valores = {
   porcentajeReserva?: string;
   tasaInteresMora?: string;
   diaVencimiento?: number;
+  totalUnidades?: number | null;
 };
 
 export function CondominioForm({
@@ -47,6 +48,21 @@ export function CondominioForm({
       </Campo>
       <Campo etiqueta="Día de vencimiento del cobro" error={e.diaVencimiento}>
         <Input name="diaVencimiento" type="number" min={1} max={28} defaultValue={valores.diaVencimiento ?? 10} />
+      </Campo>
+      <Campo etiqueta="Cantidad total de unidades" error={e.totalUnidades}>
+        <Input
+          name="totalUnidades"
+          type="number"
+          min={1}
+          max={10000}
+          defaultValue={valores.totalUnidades ?? ""}
+          placeholder="Ej. 100"
+          aria-describedby="ayuda-total-unidades"
+        />
+        <span id="ayuda-total-unidades" className="mt-1 block text-xs text-texto-suave">
+          Departamentos, casas, locales, estacionamientos y bodegas con alícuota propia. Sirve para seguir el avance mientras las
+          cargas.
+        </span>
       </Campo>
       <div className="flex items-end gap-3 sm:col-span-2">
         <Boton type="submit" disabled={pendiente}>

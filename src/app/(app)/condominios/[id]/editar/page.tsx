@@ -26,6 +26,7 @@ export default async function EditarCondominioPage({ params }: PageProps<"/condo
             porcentajeReserva: c.porcentajeReserva.toString(),
             tasaInteresMora: c.tasaInteresMora.toString(),
             diaVencimiento: c.diaVencimiento,
+            totalUnidades: c.totalUnidades,
           }}
         />
       </Card>
