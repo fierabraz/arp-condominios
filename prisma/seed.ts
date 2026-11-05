@@ -62,14 +62,17 @@ async function main() {
   const [maria, juan, carla] = personas;
   const unidad = (numero: string) => creadas.find((u) => u.numero === numero)!.id;
 
-  await db.unidadPersona.createMany({
-    data: [
-      { unidadId: unidad("101"), personaId: maria.id, relacion: "PROPIETARIO" },
-      { unidadId: unidad("101"), personaId: maria.id, relacion: "RESIDENTE" },
-      { unidadId: unidad("E1"), personaId: maria.id, relacion: "PROPIETARIO" },
-      { unidadId: unidad("102"), personaId: juan.id, relacion: "PROPIETARIO" },
-      { unidadId: unidad("102"), personaId: carla.id, relacion: "RESIDENTE" },
-    ],
+  const vinculos = [
+    { unidadId: unidad("101"), personaId: maria.id, relacion: "PROPIETARIO" },
+    { unidadId: unidad("101"), personaId: maria.id, relacion: "RESIDENTE" },
+    { unidadId: unidad("E1"), personaId: maria.id, relacion: "PROPIETARIO" },
+    { unidadId: unidad("102"), personaId: juan.id, relacion: "PROPIETARIO" },
+    { unidadId: unidad("102"), personaId: carla.id, relacion: "RESIDENTE" },
+  ] as const;
+  await db.unidadPersona.createMany({ data: [...vinculos] });
+  // Historial de vínculos (COM-001 · Entrega 3), igual que deja la migración para los datos reales.
+  await db.vinculoUnidad.createMany({
+    data: vinculos.map((v) => ({ administradoraId: adm.id, unidadId: v.unidadId, personaId: v.personaId, tipo: v.relacion, creadoPor: "Datos de prueba" })),
   });
 
   await db.usuario.createMany({

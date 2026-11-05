@@ -44,9 +44,13 @@ test("un administrador sin asignaciones no ve ninguna propiedad", () => {
   assert.deepEqual(filtroCondominios(sinAsignar), { id: { in: [] } });
 });
 
-test("las personas de otras propiedades quedan fuera; las sin unidad se ven", () => {
+test("las personas de otras propiedades quedan fuera; las sin unidad ni vínculos se ven", () => {
   assert.deepEqual(filtroPersonas(asignado), {
-    OR: [{ unidades: { none: {} } }, { unidades: { some: { unidad: { condominioId: { in: ["A"] } } } } }],
+    OR: [
+      { unidades: { none: {} }, vinculos: { none: {} } },
+      { unidades: { some: { unidad: { condominioId: { in: ["A"] } } } } },
+      { vinculos: { some: { unidad: { condominioId: { in: ["A"] } } } } },
+    ],
   });
 });
 

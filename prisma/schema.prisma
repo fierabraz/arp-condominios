@@ -31,6 +31,16 @@ enum RelacionUnidad {
   RESIDENTE
 }
 
+// COM-001 · Entrega 3: vínculo de una persona con una unidad, con fechas e historial.
+// UnidadPersona sigue siendo la foto de hoy que usan cobros, votaciones y la app de residentes.
+enum TipoVinculo {
+  PROPIETARIO
+  COPROPIETARIO
+  ARRENDATARIO
+  RESIDENTE
+  OCUPANTE
+}
+
 enum EstadoPeriodo {
   ABIERTO
   CERRADO
@@ -374,6 +384,7 @@ model Persona {
   creadoEn         DateTime @default(now())
 
   unidades UnidadPersona[]
+  vinculos VinculoUnidad[]
   usuario  Usuario?
   asignacionesEspacio AsignacionEspacio[]
 
@@ -399,12 +410,36 @@ model Unidad {
   espaciosVinculados Espacio[] @relation("EspacioUnidadPrincipal")
   asignaciones       AsignacionEspacio[]
   personas UnidadPersona[]
+  vinculos VinculoUnidad[]
   gastos   Gasto[]
   avisos   AvisoCobro[]
   pagos    Pago[]
   votos    Voto[]
 
   @@unique([condominioId, numero])
+  @@index([administradoraId])
+}
+
+model VinculoUnidad {
+  id               String      @id @default(cuid())
+  administradoraId String
+  unidadId         String
+  unidad           Unidad      @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  personaId        String
+  persona          Persona     @relation(fields: [personaId], references: [id], onDelete: Restrict)
+  tipo             TipoVinculo
+  desde            DateTime?   @db.Date // null: vínculo anterior a COM-001, sin fecha registrada
+  hasta            DateTime?   @db.Date // null: vigente
+  terminoPrevisto  DateTime?   @db.Date // fin del contrato de arriendo, solo informativo
+  respaldo         String?
+  observaciones    String?
+  creadoPor        String
+  creadoEn         DateTime    @default(now())
+  terminadoPor     String?
+  terminadoEn      DateTime?
+
+  @@index([unidadId])
+  @@index([personaId])
   @@index([administradoraId])
 }
 

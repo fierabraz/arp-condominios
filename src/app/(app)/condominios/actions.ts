@@ -7,12 +7,13 @@ import { db } from "@/lib/db";
 import { puedeVerPropiedad, requireAdministradora, requirePrincipal } from "@/lib/auth";
 import { esPrincipal, filtroPersonas } from "@/lib/permisos";
 import { aFechaDia, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
-import { EstadoComunidad, ModalidadIncorporacion, RelacionUnidad, TipoComunidad, TipoUnidad } from "@/generated/prisma/enums";
+import { EstadoComunidad, ModalidadIncorporacion, TipoComunidad, TipoUnidad, TipoVinculo } from "@/generated/prisma/enums";
 import { ESTADOS, revisarCambio } from "@/lib/configuracion";
 import { datosDeUna } from "@/lib/configuracion-servicio";
-import { ETIQUETAS_RELACION } from "@/lib/formato";
 import { registrar } from "@/lib/registro";
 import { historialUnidad } from "@/lib/unidades";
+import { TIPOS_VINCULO } from "@/lib/vinculos";
+import { crearVinculo, terminarVinculo } from "@/lib/vinculos-servicio";
 
 const CondominioSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
@@ -253,55 +254,83 @@ export async function eliminarUnidad(unidadId: string) {
 
 const VinculoSchema = z.object({
   personaId: z.string({ error: "Elige una persona." }).min(1, { error: "Elige una persona." }),
-  relacion: z.enum(RelacionUnidad, { error: "Elige la relación." }),
+  tipo: z.enum(TipoVinculo, { error: "Elige el vínculo." }),
+  desde: z.date({ error: "Ingresa la fecha de inicio." }),
+  terminoPrevisto: z.date().nullable(),
+  respaldo: z.string().max(500).optional(),
+  observaciones: z.string().max(1000).optional(),
 });
 
+const diaTxt = (f: Date) => f.toISOString().slice(0, 10);
+
+/** COM-001 · Entrega 3: vincula una persona a una unidad con fecha de inicio. Queda en el historial. */
 export async function vincularPersona(
   unidadId: string,
   _: EstadoForm,
   formData: FormData,
 ): Promise<EstadoForm> {
   const { usuario, administradoraId } = await requireAdministradora();
+  const desde = aFechaDia(formData.get("desde"));
+  const terminoPrevisto = aFechaDia(formData.get("terminoPrevisto"));
+  if ((desde && Number.isNaN(desde.getTime())) || (terminoPrevisto && Number.isNaN(terminoPrevisto.getTime()))) {
+    return { mensaje: "Revisa las fechas." };
+  }
   const datos = VinculoSchema.safeParse({
     personaId: aTexto(formData.get("personaId")),
-    relacion: formData.get("relacion"),
+    tipo: formData.get("tipo"),
+    desde: desde ?? undefined,
+    terminoPrevisto,
+    respaldo: aTexto(formData.get("respaldo")),
+    observaciones: aTexto(formData.get("observaciones")),
   });
   if (!datos.success) return erroresDe(datos.error);
+  const d = datos.data;
 
   const [unidad, persona] = await Promise.all([
     db.unidad.findFirst({ where: { id: unidadId, administradoraId } }),
-    db.persona.findFirst({ where: { id: datos.data.personaId, administradoraId, ...filtroPersonas(usuario) } }),
+    db.persona.findFirst({ where: { id: d.personaId, administradoraId, ...filtroPersonas(usuario) } }),
   ]);
   if (!unidad || !persona || !puedeVerPropiedad(usuario, unidad.condominioId)) return { mensaje: "Unidad o persona no encontrada." };
 
-  await db.unidadPersona.upsert({
-    where: { unidadId_personaId_relacion: { unidadId, ...datos.data } },
-    create: { unidadId, ...datos.data },
-    update: {},
-  });
+  const error = await db.$transaction((tx) =>
+    crearVinculo(tx, { administradoraId, unidadId, ...d, personaId: persona.id, creadoPor: usuario.nombre }),
+  );
+  if (error) return { mensaje: error };
   await registrar(
     usuario,
     "Vinculó una persona a una unidad",
-    `${persona.nombre} como ${ETIQUETAS_RELACION[datos.data.relacion].toLowerCase()} de la unidad ${unidad.numero}`,
+    `Unidad ${unidad.numero}: ${persona.nombre} como ${TIPOS_VINCULO[d.tipo].texto.toLowerCase()} desde ${diaTxt(d.desde)}${
+      d.terminoPrevisto ? `, término previsto ${diaTxt(d.terminoPrevisto)}` : ""
+    }${d.respaldo ? ` (respaldo: ${d.respaldo})` : ""}`,
     unidad.condominioId,
   );
-  revalidatePath(`/condominios/${unidad.condominioId}/unidades/${unidadId}`);
-  return { ok: true, mensaje: `${persona.nombre} vinculado.` };
+  revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
+  return { ok: true, mensaje: `${persona.nombre} vinculado como ${TIPOS_VINCULO[d.tipo].texto.toLowerCase()}.` };
 }
 
-export async function desvincularPersona(unidadId: string, personaId: string, relacion: RelacionUnidad) {
+/** Termina un vínculo (venta, fin del arriendo, mudanza). No se borra: queda en el historial. */
+export async function terminarVinculoPersona(
+  unidadId: string,
+  vinculoId: string,
+  _: EstadoForm,
+  formData: FormData,
+): Promise<EstadoForm> {
   const { usuario, administradoraId } = await requireAdministradora();
-  const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
-  if (!unidad || !puedeVerPropiedad(usuario, unidad.condominioId)) return;
-  const persona = await db.persona.findFirst({ where: { id: personaId, administradoraId }, select: { nombre: true } });
-  const { count } = await db.unidadPersona.deleteMany({ where: { unidadId, personaId, relacion } });
-  if (count > 0) {
-    await registrar(
-      usuario,
-      "Desvinculó una persona de una unidad",
-      `${persona?.nombre ?? "Persona"} como ${ETIQUETAS_RELACION[relacion].toLowerCase()} de la unidad ${unidad.numero}`,
-      unidad.condominioId,
-    );
-  }
-  revalidatePath(`/condominios/${unidad.condominioId}/unidades/${unidadId}`);
+  const hasta = aFechaDia(formData.get("hasta"));
+  if (!hasta || Number.isNaN(hasta.getTime())) return { mensaje: "Ingresa la fecha de término." };
+  const v = await db.vinculoUnidad.findFirst({
+    where: { id: vinculoId, unidadId, administradoraId },
+    include: { unidad: true, persona: { select: { nombre: true } } },
+  });
+  if (!v || !puedeVerPropiedad(usuario, v.unidad.condominioId)) return { mensaje: "No encontrado." };
+  const error = await db.$transaction((tx) => terminarVinculo(tx, v.id, hasta, usuario.nombre));
+  if (error) return { mensaje: error };
+  await registrar(
+    usuario,
+    "Terminó el vínculo de una persona con una unidad",
+    `Unidad ${v.unidad.numero}: ${v.persona.nombre} como ${TIPOS_VINCULO[v.tipo].texto.toLowerCase()} hasta ${diaTxt(hasta)}`,
+    v.unidad.condominioId,
+  );
+  revalidatePath(`/condominios/${v.unidad.condominioId}`, "layout");
+  return { ok: true, mensaje: "Vínculo terminado. Queda en el historial." };
 }

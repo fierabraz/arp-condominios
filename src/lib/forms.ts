@@ -4,6 +4,8 @@ export type EstadoForm = {
   errores?: Record<string, string[] | undefined>;
   mensaje?: string;
   ok?: boolean;
+  /** Lo que se envió, para no borrar el formulario cuando hay que corregir algo. */
+  valores?: Record<string, string>;
 };
 
 export function erroresDe(error: z.ZodError): EstadoForm {

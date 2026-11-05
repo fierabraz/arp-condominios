@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { PersonaForm } from "./persona-form";
 import { crearPersona } from "./actions";
+import { TIPOS_VINCULO } from "@/lib/vinculos";
 
 export default async function PersonasPage() {
   const { usuario, administradoraId } = await requireAdministradora();
@@ -12,7 +13,10 @@ export default async function PersonasPage() {
     where: { administradoraId, ...filtroPersonas(usuario) },
     orderBy: { nombre: "asc" },
     include: {
-      unidades: { where: { unidad: filtroPorCondominio(usuario) }, include: { unidad: { include: { condominio: { select: { nombre: true } } } } } },
+      vinculos: {
+        where: { hasta: null, unidad: filtroPorCondominio(usuario) },
+        include: { unidad: { include: { condominio: { select: { nombre: true } } } } },
+      },
     },
   });
 
@@ -46,11 +50,8 @@ export default async function PersonasPage() {
                 <td>{p.documento ?? "—"}</td>
                 <td>{p.correo ?? "—"}</td>
                 <td className="text-texto-suave">
-                  {p.unidades
-                    .map(
-                      (v) =>
-                        `${v.unidad.condominio.nombre} ${v.unidad.numero} (${v.relacion === "PROPIETARIO" ? "propietario" : "residente"})`,
-                    )
+                  {p.vinculos
+                    .map((v) => `${v.unidad.condominio.nombre} ${v.unidad.numero} (${TIPOS_VINCULO[v.tipo].texto.toLowerCase()})`)
                     .join(", ") || "—"}
                 </td>
               </tr>
