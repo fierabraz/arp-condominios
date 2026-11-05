@@ -4,8 +4,10 @@ export const MARCA = {
   nombre: "Convive",
   descripcion: "Administración de edificios y condominios",
   remitente: "Convive <no-responder@localhost>",
-  // Logo entregado por Oscar (2026-11-05): símbolo "C" con punto naranja y nombre en teal.
-  simbolo: { src: "/marca/convive-simbolo.png", ancho: 256, alto: 241 },
-  nombreImagen: { src: "/marca/convive-nombre.png", ancho: 480, alto: 105 },
-  logoCompleto: { src: "/marca/convive-logo.png", ancho: 600, alto: 510 },
+  // Logo original (CorelDRAW) entregado por Oscar el 2026-11-05, convertido a SVG vectorial:
+  // se ve nítido en cualquier tamaño. El PDF de origen está en docs/marca/.
+  // El favicon (src/app/icon.svg) es una copia del símbolo; apple-icon.png se genera desde él.
+  simbolo: { src: "/marca/convive-simbolo.svg", ancho: 577, alto: 577 },
+  nombreImagen: { src: "/marca/convive-nombre.svg", ancho: 956, alto: 211 },
+  logoCompleto: { src: "/marca/convive-logo.svg", ancho: 992, alto: 849 },
 };
