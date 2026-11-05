@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Info } from "lucide-react";
 import { BotonInvitar, InvitarTodos } from "@/components/invitacion";
 import { BotonLink, Card, Insignia, PageHeader, Vacio } from "@/components/ui";
-import { smtpConfigurado } from "@/lib/correo";
+import { correoConfigurado } from "@/lib/correo";
 import { ETIQUETAS_ACCESO, estadoAcceso, puedeInvitar } from "@/lib/invitacion-estado";
 import { personasDePropiedad } from "@/lib/invitaciones";
 import { DIAS_INVITACION } from "@/lib/recuperacion";
@@ -21,7 +21,7 @@ export default async function InvitacionesPage({ params }: PageProps<"/condomini
   }));
   const pendientes = personas.filter((p) => puedeInvitar(p.estado) && p.estado !== "INVITADA").length;
   const cuenta = (e: string) => personas.filter((p) => p.estado === e).length;
-  const conCorreo = smtpConfigurado();
+  const conCorreo = correoConfigurado();
 
   return (
     <>

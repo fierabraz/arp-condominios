@@ -10,7 +10,7 @@ import { condominioVisible } from "../../condominio-actual";
 import { GastoForm } from "./gasto-form";
 import { CerrarForm } from "./cerrar-form";
 import { EnviarForm } from "./enviar-form";
-import { smtpConfigurado } from "@/lib/correo";
+import { correoConfigurado } from "@/lib/correo";
 
 const ETIQUETAS_ENVIO = { ENVIADO: "Enviado", SIMULADO: "Prueba", ERROR: "Error" } as const;
 
@@ -174,7 +174,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
           <EnviarForm accion={enviarAvisos.bind(null, periodoId)} yaEnviados={lineas.filter((l) => l.envio).length} />
         )}
       </div>
-      {!abierto && editable && !smtpConfigurado() && (
+      {!abierto && editable && !correoConfigurado() && (
         <p className="mb-3 rounded-lg bg-alerta-suave px-3 py-2 text-sm text-alerta">
           Modo de prueba: aún no hay un servidor de correo configurado, así que los correos no salen. Se guarda una
           copia de cada uno en la carpeta correos-simulados para revisarlos.

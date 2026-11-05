@@ -34,7 +34,7 @@ export async function solicitarRecuperacion(_: EstadoForm, formData: FormData): 
     para: usuario.correo,
     asunto: `Crea una contraseña nueva en ${MARCA.nombre}`,
     texto: `Hola, ${nombre}:\n\nPediste crear una contraseña nueva. Abre este enlace (sirve una sola vez y durante ${MINUTOS_VALIDEZ} minutos):\n\n${enlace}\n\nSi no lo pediste, ignora este correo: tu contraseña actual sigue funcionando.`,
-    html: `<p>Hola, ${escaparHtml(nombre)}:</p><p>Pediste crear una contraseña nueva. Usa este botón (sirve una sola vez y durante ${MINUTOS_VALIDEZ} minutos):</p><p><a href="${enlace}" style="display:inline-block;padding:12px 20px;background:#0e7c6b;color:#fff;border-radius:12px;text-decoration:none;font-weight:600">Crear contraseña nueva</a></p><p>Si no lo pediste, ignora este correo: tu contraseña actual sigue funcionando.</p>`,
+    html: `<p>Hola, ${escaparHtml(nombre)}:</p><p>Pediste crear una contraseña nueva. Usa este botón (sirve una sola vez y durante ${MINUTOS_VALIDEZ} minutos):</p><p><a href="${enlace}" style="display:inline-block;padding:12px 20px;background:#00666A;color:#fff;border-radius:12px;text-decoration:none;font-weight:600">Crear contraseña nueva</a></p><p>Si no lo pediste, ignora este correo: tu contraseña actual sigue funcionando.</p>`,
   });
   return { ok: true, mensaje: RESPUESTA };
 }

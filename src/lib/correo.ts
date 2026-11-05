@@ -4,6 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import nodemailer from "nodemailer";
 import { MARCA } from "@/lib/marca";
+import {
+  enviarPorApi,
+  formatoDireccion,
+  leerDireccion,
+  proveedorActivo,
+  type Direccion,
+  type ProveedorCorreo,
+} from "@/lib/correo-proveedores";
 
 export type Correo = {
   para: string;
@@ -20,14 +28,33 @@ const CARPETA_SIMULADOS = process.env.VERCEL
   ? path.join(os.tmpdir(), "correos-simulados")
   : path.join(process.cwd(), "correos-simulados");
 
-export function smtpConfigurado() {
-  return !!process.env.SMTP_HOST;
+export { proveedorActivo };
+
+/** true si hay un servicio de correo real configurado (Brevo, Resend o SMTP). */
+export function correoConfigurado() {
+  return proveedorActivo() !== "PRUEBA";
 }
 
-function transporte() {
-  if (!smtpConfigurado()) {
-    return nodemailer.createTransport({ streamTransport: true, buffer: true, newline: "unix" });
-  }
+/** Remitente: CORREO_REMITENTE (o SMTP_FROM, el nombre antiguo). Sin nombre, se usa el de la marca. */
+export function remitente(): Direccion {
+  return (
+    leerDireccion(process.env.CORREO_REMITENTE, MARCA.nombre) ??
+    leerDireccion(process.env.SMTP_FROM, MARCA.nombre) ??
+    leerDireccion(MARCA.remitente)!
+  );
+}
+
+function responderA() {
+  return leerDireccion(process.env.CORREO_RESPONDER_A);
+}
+
+/** Resumen de la configuración, sin claves, para la pantalla de prueba de correo. */
+export function configuracionCorreo(): { proveedor: ProveedorCorreo; remitente: string; responderA: string | null } {
+  const r = responderA();
+  return { proveedor: proveedorActivo(), remitente: formatoDireccion(remitente()), responderA: r && formatoDireccion(r) };
+}
+
+function transporteSmtp() {
   const port = Number(process.env.SMTP_PORT || 587);
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -38,25 +65,41 @@ function transporte() {
 }
 
 /**
- * Envía un correo. Sin servidor SMTP configurado, guarda el mensaje como .eml en
- * correos-simulados/ para poder revisarlo, y lo informa como SIMULADO.
+ * Envía un correo con el servicio configurado (ver proveedorActivo). Sin ninguno, guarda el
+ * mensaje como .eml en correos-simulados/ para poder revisarlo, y lo informa como SIMULADO.
  */
 export async function enviarCorreo(correo: Correo): Promise<ResultadoEnvio> {
+  const proveedor = proveedorActivo();
+  const de = remitente();
   try {
-    const info = await transporte().sendMail({
-      from: process.env.SMTP_FROM || MARCA.remitente,
+    if (proveedor === "BREVO" || proveedor === "RESEND") {
+      const clave = (proveedor === "BREVO" ? process.env.BREVO_API_KEY : process.env.RESEND_API_KEY)!.trim();
+      const r = await enviarPorApi(proveedor, { ...correo, de, responderA: responderA() }, clave);
+      if (r.ok) return { estado: "ENVIADO" };
+      console.error(`No se pudo enviar el correo a ${correo.para}: ${r.error}`);
+      return { estado: "ERROR", error: r.error.slice(0, 500) };
+    }
+
+    const mensaje = {
+      from: formatoDireccion(de),
+      replyTo: responderA() ? formatoDireccion(responderA()!) : undefined,
       to: correo.para,
       subject: correo.asunto,
       text: correo.texto,
       html: correo.html,
       attachments: correo.adjuntos?.map((a) => ({ filename: a.nombre, content: a.contenido })),
-    });
-    if (!smtpConfigurado()) {
-      await guardarCopia(correo.para, info.message as Buffer);
-      return { estado: "SIMULADO" };
+    };
+    if (proveedor === "SMTP") {
+      await transporteSmtp().sendMail(mensaje);
+      return { estado: "ENVIADO" };
     }
-    return { estado: "ENVIADO" };
+    const info = await nodemailer
+      .createTransport({ streamTransport: true, buffer: true, newline: "unix" })
+      .sendMail(mensaje);
+    await guardarCopia(correo.para, info.message as Buffer);
+    return { estado: "SIMULADO" };
   } catch (e) {
+    console.error(`No se pudo enviar el correo a ${correo.para}: ${(e as Error).message}`);
     return { estado: "ERROR", error: (e as Error).message.slice(0, 500) };
   }
 }

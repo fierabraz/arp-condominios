@@ -12,6 +12,7 @@ function enlaces(rol: Rol, condominioId: string | null): EnlaceMenu[] {
       return [
         { href: "/plataforma", texto: "Administradoras", icono: "edificios" },
         { href: "/plataforma/usuarios", texto: "Usuarios", icono: "personas" },
+        { href: "/plataforma/correo", texto: "Correo", icono: "correo" },
       ];
     case "ADMINISTRADOR":
       return [
