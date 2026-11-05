@@ -130,12 +130,19 @@ export default async function ConfiguracionPage({ params, searchParams }: PagePr
                   <span className="block text-sm text-texto-suave">{p.detalle}</span>
                 </span>
                 {p.ruta && p.accion && editable && (
-                  <BotonLink
-                    href={`${base}${p.ruta}${p.ruta === "/editar" ? "?volver=configuracion" : ""}`}
-                    variante={p.estado === "completo" ? "secundario" : "primario"}
-                  >
-                    {p.accion}
-                  </BotonLink>
+                  <span className="flex flex-wrap gap-2">
+                    {p.otra && (
+                      <BotonLink href={`${base}${p.otra.ruta}`} variante="secundario">
+                        {p.otra.accion}
+                      </BotonLink>
+                    )}
+                    <BotonLink
+                      href={`${base}${p.ruta}${p.ruta === "/editar" ? "?volver=configuracion" : ""}`}
+                      variante={p.estado === "completo" ? "secundario" : "primario"}
+                    >
+                      {p.accion}
+                    </BotonLink>
+                  </span>
                 )}
               </li>
             );

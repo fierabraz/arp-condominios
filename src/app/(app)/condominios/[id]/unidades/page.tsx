@@ -10,6 +10,7 @@ import { UnidadForm } from "../../unidad-form";
 import { crearUnidad } from "../../actions";
 import { ListaUnidades } from "./lista-unidades";
 import { COLOR_ALICUOTAS, estadoAlicuotas } from "@/lib/alicuotas";
+import { opcionesAgrupaciones } from "@/lib/estructura";
 
 export default async function UnidadesPage({ params }: PageProps<"/condominios/[id]/unidades">) {
   const { id } = await params;
@@ -26,6 +27,8 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
     },
   });
   if (!condominio) notFound();
+  const agrupaciones = await db.agrupacion.findMany({ where: { condominioId: id } });
+  const opcionesAgrupacion = opcionesAgrupaciones(agrupaciones);
   const conDeuda = new Set((await morosidad(id, administradoraId)).map((m) => m.unidadId));
 
   const editable = puedeEditar(usuario.rol);
@@ -144,7 +147,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
             <h2 id="agregar-unidad" className="mb-4 scroll-mt-24 text-lg font-bold">
               Agregar unidad
             </h2>
-            <UnidadForm accion={crearUnidad.bind(null, id)} textoBoton="Agregar" limpiarAlGuardar />
+            <UnidadForm accion={crearUnidad.bind(null, id)} textoBoton="Agregar" limpiarAlGuardar agrupaciones={opcionesAgrupacion} />
           </Card>
           <a
             href="#agregar-unidad"

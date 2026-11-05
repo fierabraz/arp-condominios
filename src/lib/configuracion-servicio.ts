@@ -18,6 +18,7 @@ export async function datosConfiguracion(administradoraId: string, ids: string[]
         fechaIncorporacion: true,
         totalUnidades: true,
         unidades: { select: { alicuota: true } },
+        _count: { select: { agrupaciones: true, espacios: true, instalaciones: true } },
       },
     }),
     db.unidad.groupBy({
@@ -48,6 +49,7 @@ export async function datosConfiguracion(administradoraId: string, ids: string[]
         sumaAlicuotas: Math.round(c.unidades.reduce((s, u) => s + Number(u.alicuota), 0) * 1e6) / 1e6,
         unidadesSinPropietario: sin.get(c.id) ?? 0,
         cobrosEmitidos: cerr.get(c.id) ?? 0,
+        estructura: c._count,
       },
     ]),
   );

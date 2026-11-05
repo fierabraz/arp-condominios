@@ -72,6 +72,8 @@ export type DatosConfiguracion = {
   unidadesSinPropietario: number;
   /** Avisos de cobro ya emitidos en Convive. */
   cobrosEmitidos: number;
+  /** Estructura física registrada (COM-001 · Entrega 2). Es opcional: no todas las propiedades la necesitan. */
+  estructura?: { agrupaciones: number; espacios: number; instalaciones: number };
 };
 
 export type EstadoPaso = "completo" | "observacion" | "pendiente" | "disponible" | "proximamente";
@@ -84,6 +86,8 @@ export type Paso = {
   /** Ruta dentro de la propiedad (se le antepone /condominios/[id]). */
   ruta?: string;
   accion?: string;
+  /** Un segundo acceso del mismo paso. */
+  otra?: { ruta: string; accion: string };
 };
 
 const unidadesTxt = (n: number) => `${n} ${n === 1 ? "unidad" : "unidades"}`;
@@ -108,12 +112,24 @@ export function pasosConfiguracion(d: DatosConfiguracion): Paso[] {
   const faltan = faltanIdentificacion(d);
   const alic = alicuotasDe(d);
 
+  const e = d.estructura;
+  const fisica = e && e.agrupaciones + e.espacios + e.instalaciones > 0
+    ? ` Estructura física: ${[
+        e.agrupaciones && `${e.agrupaciones} ${e.agrupaciones === 1 ? "torre, sector o piso" : "torres, sectores o pisos"}`,
+        e.espacios && `${e.espacios} ${e.espacios === 1 ? "estacionamiento o bodega" : "estacionamientos o bodegas"}`,
+        e.instalaciones && `${e.instalaciones} ${e.instalaciones === 1 ? "instalación" : "instalaciones"}`,
+      ]
+        .filter(Boolean)
+        .join(", ")}.`
+    : "";
+  const otra = { ruta: "/estructura", accion: "Estructura física" };
+  const base = { numero: "02", titulo: "Estructura y unidades", ruta: "/unidades", otra } as const;
   const estructura: Paso =
     d.unidades === 0
-      ? { numero: "02", titulo: "Estructura y unidades", estado: "pendiente", detalle: "Aún no hay unidades.", ruta: "/unidades", accion: "Agregar unidades" }
+      ? { ...base, estado: "pendiente", detalle: `Aún no hay unidades.${fisica}`, accion: "Agregar unidades" }
       : alic.tipo === "ok"
-        ? { numero: "02", titulo: "Estructura y unidades", estado: "completo", detalle: alic.texto, ruta: "/unidades", accion: "Ver unidades" }
-        : { numero: "02", titulo: "Estructura y unidades", estado: "observacion", detalle: alic.texto, ruta: "/unidades", accion: "Seguir con las unidades" };
+        ? { ...base, estado: "completo", detalle: alic.texto + fisica, accion: "Ver unidades" }
+        : { ...base, estado: "observacion", detalle: alic.texto + fisica, accion: "Seguir con las unidades" };
 
   const personas: Paso =
     d.unidades === 0

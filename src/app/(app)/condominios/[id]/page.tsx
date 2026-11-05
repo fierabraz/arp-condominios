@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   AlertTriangle,
   Banknote,
+  Building2,
   ChevronRight,
   ClipboardList,
   FileText,
@@ -102,6 +103,7 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
     { texto: "Gasto común", href: `${base}/periodos`, icono: ClipboardList },
     { texto: "Egresos", href: `${base}/egresos`, icono: Receipt },
     { texto: "Unidades y residentes", href: `${base}/unidades`, icono: Users },
+    { texto: "Estructura física", href: `${base}/estructura`, icono: Building2 },
     { texto: "Morosidad", href: `${base}/morosidad`, icono: AlertTriangle },
     { texto: "Rendiciones", href: `${base}/rendiciones`, icono: FileText },
   ];
