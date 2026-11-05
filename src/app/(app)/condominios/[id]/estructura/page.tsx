@@ -21,8 +21,19 @@ import { AgrupacionForm, BotonAccion } from "./formularios";
 
 const TONO_INSTALACION = { OPERATIVA: "exito", CON_OBSERVACIONES: "alerta", FUERA_DE_SERVICIO: "peligro", SIN_INFORMACION: "neutro" } as const;
 
-export default async function EstructuraPage({ params }: PageProps<"/condominios/[id]/estructura">) {
+type Filtrable = { clase: string; accesible: boolean; destino: string | null };
+const FILTROS: Record<string, { texto: string; cumple: (e: Filtrable) => boolean }> = {
+  todos: { texto: "Todos", cumple: () => true },
+  estacionamientos: { texto: "Estacionamientos", cumple: (e) => e.clase === "ESTACIONAMIENTO" },
+  bodegas: { texto: "Bodegas", cumple: (e) => e.clase === "BODEGA" },
+  accesibles: { texto: "Accesibles", cumple: (e) => e.accesible },
+  visitas: { texto: "Visitas", cumple: (e) => e.destino === "VISITAS" },
+};
+
+export default async function EstructuraPage({ params, searchParams }: PageProps<"/condominios/[id]/estructura">) {
   const { id } = await params;
+  const f = (await searchParams).filtro;
+  const filtro = typeof f === "string" && f in FILTROS ? f : "todos";
   const { condominio, administradoraId, editable } = await condominioVisible(id);
   const base = `/condominios/${id}/estructura`;
 
@@ -41,6 +52,7 @@ export default async function EstructuraPage({ params }: PageProps<"/condominios
   ]);
   espacios.sort((a, b) => a.clase.localeCompare(b.clase) || a.codigo.localeCompare(b.codigo, "es", { numeric: true }));
   const nUnidades = new Map(unidadesPorAgrupacion.map((u) => [u.agrupacionId, u._count]));
+  const visibles = espacios.filter((e) => FILTROS[filtro].cumple(e));
   const contar = (clase: "ESTACIONAMIENTO" | "BODEGA") => espacios.filter((e) => e.clase === clase).length;
 
   return (
@@ -127,8 +139,26 @@ export default async function EstructuraPage({ params }: PageProps<"/condominios
             </BotonLink>
           )}
         </div>
+        {espacios.length > 0 && (
+          <nav aria-label="Filtrar" className="mb-3 flex flex-wrap gap-2">
+            {Object.entries(FILTROS).map(([k, v]) => (
+              <Link
+                key={k}
+                href={k === "todos" ? `${base}#espacios` : `${base}?filtro=${k}#espacios`}
+                aria-current={filtro === k ? "page" : undefined}
+                className={`rounded-full border px-3 py-1.5 text-sm font-semibold ${
+                  filtro === k ? "border-marca bg-marca text-white" : "border-borde bg-white text-convive-oscuro hover:border-convive"
+                }`}
+              >
+                {v.texto} ({espacios.filter((e) => v.cumple(e)).length})
+              </Link>
+            ))}
+          </nav>
+        )}
         {espacios.length === 0 ? (
           <Vacio>Aún no hay estacionamientos ni bodegas registrados.</Vacio>
+        ) : visibles.length === 0 ? (
+          <Vacio>Ninguno cumple este filtro.</Vacio>
         ) : (
           <Tabla>
             <thead>
@@ -143,7 +173,7 @@ export default async function EstructuraPage({ params }: PageProps<"/condominios
               </tr>
             </thead>
             <tbody>
-              {espacios.map((e) => {
+              {visibles.map((e) => {
                 const actual = asignacionVigente(e.asignaciones);
                 // Se calcula hoy: una asignación temporal vencida deja el espacio disponible.
                 const sit = situacionEspacio(e, actual);
