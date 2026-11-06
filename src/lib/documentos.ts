@@ -3,6 +3,7 @@ import { ANCHO, cifras, COLOR, encabezado, generarPdf, MARGEN, subtitulo, tabla 
 import { formatoFecha, formatoMoneda, formatoPorcentaje } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
 import type { datosAviso, datosRendicion } from "@/lib/reportes";
+import type { Informe } from "@/lib/informe-apertura";
 
 type DatosAviso = NonNullable<Awaited<ReturnType<typeof datosAviso>>>;
 type DatosRendicion = NonNullable<Awaited<ReturnType<typeof datosRendicion>>>;
@@ -155,5 +156,39 @@ export function pdfRendicion(d: DatosRendicion) {
     }
 
     pie(doc, `Generado el ${formatoFecha(new Date())}. Cifras de cobranza al momento de generar este documento.`);
+  });
+}
+
+/** Informe de apertura (COM-001 · Entrega 6). El contenido lo arma informeApertura, sin datos personales. */
+export function pdfInformeApertura(i: Informe) {
+  return generarPdf(`${i.titulo} - ${i.arriba}`, (doc) => {
+    encabezado(doc, { arriba: i.arriba, titulo: i.titulo, abajo: i.abajo });
+    if (i.aviso) {
+      const y = doc.y;
+      const alto = doc.font("Helvetica-Bold").fontSize(9.5).heightOfString(i.aviso, { width: ANCHO - 24 }) + 18;
+      doc.roundedRect(MARGEN, y, ANCHO, alto, 6).fillAndStroke("#fff4e5", "#f0b46b");
+      doc.fillColor("#8a4b00").text(i.aviso, MARGEN + 12, y + 9, { width: ANCHO - 24 });
+      doc.x = MARGEN;
+      doc.y = y + alto + 14;
+    }
+    for (const s of i.secciones) {
+      if (doc.y > doc.page.height - MARGEN - 120) doc.addPage();
+      subtitulo(doc, s.titulo);
+      if (s.cifras?.length) cifras(doc, s.cifras);
+      for (const t of s.tablas ?? []) {
+        if (t.filas.length === 0) continue;
+        tabla(
+          doc,
+          t.columnas.map((c) => ({ titulo: c.titulo, ancho: c.ancho * ANCHO, alinear: c.derecha ? "right" : "left" })),
+          t.filas,
+        );
+      }
+      for (const p of s.parrafos ?? []) {
+        doc.font("Helvetica").fontSize(9.5).fillColor(COLOR.texto).text(p, MARGEN, doc.y, { width: ANCHO });
+        doc.moveDown(0.4);
+      }
+      doc.moveDown(0.6);
+    }
+    pie(doc, i.leyenda);
   });
 }

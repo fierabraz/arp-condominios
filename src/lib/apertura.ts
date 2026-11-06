@@ -232,10 +232,11 @@ export function revisarApertura(d: DatosApertura, r: Resumen) {
   if (d.cuentas.length === 0) bloqueos.push("Registra al menos una cuenta bancaria o caja (aunque su saldo sea 0).");
   if (d.fondos.length === 0) bloqueos.push("Registra al menos un fondo (aunque su saldo sea 0).");
   if (d.deudas.length === 0) advertencias.push("No hay deudas registradas: confirma que ninguna unidad debía nada a la fecha de corte.");
-  if (r.deudas.porEstado.POR_VERIFICAR.cantidad) advertencias.push(`${r.deudas.porEstado.POR_VERIFICAR.cantidad} deudas por verificar.`);
-  if (r.deudas.porEstado.DISCUTIDA.cantidad) advertencias.push(`${r.deudas.porEstado.DISCUTIDA.cantidad} deudas discutidas.`);
+  const cuantas = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
+  if (r.deudas.porEstado.POR_VERIFICAR.cantidad) advertencias.push(`${cuantas(r.deudas.porEstado.POR_VERIFICAR.cantidad, "deuda", "deudas")} por verificar.`);
+  if (r.deudas.porEstado.DISCUTIDA.cantidad) advertencias.push(`${cuantas(r.deudas.porEstado.DISCUTIDA.cantidad, "deuda discutida", "deudas discutidas")}.`);
   if (r.creditos.porIdentificar) advertencias.push("Hay pagos por identificar: asígnalos a su unidad cuando se sepa de quién son.");
-  if (r.obligaciones.sinFondo) advertencias.push(`${r.obligaciones.sinFondo} obligaciones con terceros sin fondo que las pague.`);
+  if (r.obligaciones.sinFondo) advertencias.push(`${cuantas(r.obligaciones.sinFondo, "obligación", "obligaciones")} con terceros sin fondo que las pague.`);
   if (d.cuentas.length && d.fondos.length && r.cuadre.nivel !== "cuadra") {
     advertencias.push(
       `El banco ajustado no calza con los fondos: diferencia de ${r.cuadre.diferencia.toLocaleString("es-CL")} pesos` +

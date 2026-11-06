@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { avanceConfiguracion, pasosConfiguracion, revisarCambio, type DatosConfiguracion } from "./configuracion";
+import { avanceConfiguracion, pasosConfiguracion, requisitosActivacion, requisitosPara, revisarCambio, type DatosConfiguracion } from "./configuracion";
 
 const base: DatosConfiguracion = {
   estado: "EN_CONFIGURACION",
@@ -80,4 +80,50 @@ test("el paso 02 resume la estructura física y lleva a ella, sin exigirla", () 
   const con = pasosConfiguracion({ ...base, estructura: { agrupaciones: 3, espacios: 1, instalaciones: 0 } })[1];
   assert.equal(con.estado, "completo");
   assert.match(con.detalle, /3 torres, sectores o pisos, 1 estacionamiento o bodega\.$/);
+});
+
+test("paso 08: la lista de requisitos y el permiso para habilitar dicen lo mismo", () => {
+  const casos: DatosConfiguracion[] = [
+    base,
+    { ...base, tipo: null },
+    { ...base, unidades: 0, sumaAlicuotas: 0 },
+    { ...base, unidadesSinPropietario: 2 },
+    { ...base, sumaAlicuotas: 60, unidades: 1 },
+    { ...base, modalidad: "EXISTENTE" },
+  ];
+  for (const d of casos) {
+    for (const destino of ["HABILITADA_ADMINISTRATIVA", "HABILITADA_FINANCIERA"] as const) {
+      const faltan = requisitosPara(requisitosActivacion(d), destino).filter((r) => !r.cumple && r.tipo !== "advertencia");
+      assert.equal(revisarCambio(d, destino).ok, faltan.length === 0, `${destino} con ${JSON.stringify({ ...d, fechaIncorporacion: 0 })}`);
+    }
+  }
+});
+
+test("paso 08: una comunidad existente muestra su apertura y la aprobación como restringida", () => {
+  const ap = { estado: "EN_REVISION" as const, fechaCorte: new Date("2026-11-30"), deudas: 3, fondos: 1, cuentas: 1 };
+  const d = { ...base, modalidad: "EXISTENTE" as const, apertura: ap };
+  const rs = requisitosActivacion(d, { bloqueos: [], advertencias: ["2 deudas por verificar."] });
+  assert.deepEqual(
+    rs.filter((r) => r.nivel === "HABILITADA_FINANCIERA").map((r) => [r.clave, r.cumple]),
+    [
+      ["alicuotas", true],
+      ["apertura", true],
+      ["apertura-revision", true],
+      ["apertura-completa", true],
+      ["apertura-observaciones", false],
+      ["apertura-aprobacion", false],
+    ],
+  );
+  assert.equal(rs.find((r) => r.clave === "apertura-aprobacion")?.tipo, "restringido");
+  // Aunque todo lo demás esté listo, cobrar sigue restringido; las observaciones solo advierten.
+  const r = revisarCambio(d, "HABILITADA_FINANCIERA", { bloqueos: [], advertencias: ["2 deudas por verificar."] });
+  assert.equal(r.ok, false);
+  assert.equal(r.bloqueos.length, 1);
+  assert.match(r.bloqueos[0], /restringido/);
+  assert.deepEqual(r.advertencias, ["2 deudas por verificar."]);
+  // Sin fondos ni cuentas, la revisión de la apertura también bloquea.
+  const sinFondos = revisarCambio(d, "HABILITADA_FINANCIERA", { bloqueos: ["Registra al menos un fondo (aunque su saldo sea 0)."], advertencias: [] });
+  assert.equal(sinFondos.bloqueos.length, 2);
+  // Una comunidad nueva no tiene requisitos de apertura.
+  assert.equal(requisitosActivacion(base).some((r) => r.clave.startsWith("apertura")), false);
 });

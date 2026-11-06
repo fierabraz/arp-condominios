@@ -204,12 +204,134 @@ export function avanceConfiguracion(d: DatosConfiguracion) {
 
 export type Revision = { ok: boolean; bloqueos: string[]; advertencias: string[] };
 
+/** Nivel que exige cada requisito: la habilitación financiera exige también los de la administrativa. */
+export type NivelRequisito = "HABILITADA_ADMINISTRATIVA" | "HABILITADA_FINANCIERA";
+
+/**
+ * Un requisito del paso 08. `bloqueo` impide habilitar; `advertencia` se puede continuar y queda
+ * anotado; `restringido` impide habilitar y no lo puede resolver el usuario: espera una decisión.
+ */
+export type Requisito = {
+  clave: string;
+  nivel: NivelRequisito;
+  texto: string;
+  tipo: "bloqueo" | "advertencia" | "restringido";
+  cumple: boolean;
+  /** Qué falta, cuando no se cumple. */
+  mensaje: string;
+  ruta?: string;
+};
+
+/** Lo que la revisión de la apertura (revisarApertura) dijo, si ya se calculó. */
+export type RevisionApertura = { bloqueos: string[]; advertencias: string[] };
+
+/**
+ * Validación del paso 08: todos los requisitos para cada nivel de habilitación, cumplidos o no.
+ * revisarCambio usa esta misma lista, así lo que muestra la pantalla y lo que se permite no se separan.
+ */
+export function requisitosActivacion(d: DatosConfiguracion, revisionApertura?: RevisionApertura): Requisito[] {
+  const faltan = faltanIdentificacion(d);
+  const alic = alicuotasDe(d);
+  const ADM = "HABILITADA_ADMINISTRATIVA" as const;
+  const FIN = "HABILITADA_FINANCIERA" as const;
+  const r: Requisito[] = [
+    {
+      clave: "identificacion",
+      nivel: ADM,
+      texto: "Identificación completa",
+      tipo: "bloqueo",
+      cumple: faltan.length === 0,
+      mensaje: `Completa la identificación: ${faltan.join(", ")}.`,
+      ruta: "/editar",
+    },
+    { clave: "unidades", nivel: ADM, texto: "Al menos una unidad", tipo: "bloqueo", cumple: d.unidades > 0, mensaje: "Agrega al menos una unidad.", ruta: "/unidades" },
+    {
+      clave: "propietarios",
+      nivel: ADM,
+      texto: "Todas las unidades con propietario",
+      tipo: "advertencia",
+      cumple: d.unidades > 0 && d.unidadesSinPropietario === 0,
+      mensaje: d.unidades === 0 ? "Todavía no hay unidades." : `${unidadesTxt(d.unidadesSinPropietario)} sin propietario registrado.`,
+      ruta: "/unidades",
+    },
+    {
+      clave: "alicuotas",
+      nivel: FIN,
+      texto: "Unidades y alícuotas completas (100 %)",
+      tipo: "bloqueo",
+      cumple: d.unidades > 0 && alic.tipo === "ok",
+      mensaje: d.unidades === 0 ? "Todavía no hay unidades con alícuota." : alic.texto,
+      ruta: "/unidades",
+    },
+  ];
+  if (d.modalidad !== "EXISTENTE") return r;
+
+  const ap = d.apertura;
+  r.push(
+    {
+      clave: "apertura",
+      nivel: FIN,
+      texto: "Apertura registrada (fecha de corte, deudas, fondos y bancos)",
+      tipo: "bloqueo",
+      cumple: !!ap,
+      mensaje: "Es una comunidad existente: antes de cobrar hay que registrar su apertura (fecha de corte, deudas, fondos y bancos) en el paso 04.",
+      ruta: "/apertura",
+    },
+    {
+      clave: "apertura-revision",
+      nivel: FIN,
+      texto: "Apertura marcada lista para revisión",
+      tipo: "bloqueo",
+      cumple: ap?.estado === "EN_REVISION",
+      mensaje: ap ? "La apertura está en borrador: márcala lista para revisión." : "Primero registra la apertura.",
+      ruta: "/apertura",
+    },
+  );
+  if (ap && revisionApertura) {
+    r.push(
+      {
+        clave: "apertura-completa",
+        nivel: FIN,
+        texto: "Apertura con fondos y cuentas bancarias",
+        tipo: "bloqueo",
+        cumple: revisionApertura.bloqueos.length === 0,
+        mensaje: revisionApertura.bloqueos.join(" "),
+        ruta: "/apertura",
+      },
+      {
+        clave: "apertura-observaciones",
+        nivel: FIN,
+        texto: "Apertura sin observaciones",
+        tipo: "advertencia",
+        cumple: revisionApertura.advertencias.length === 0,
+        mensaje: revisionApertura.advertencias.join(" "),
+        ruta: "/apertura",
+      },
+    );
+  }
+  r.push({
+    clave: "apertura-aprobacion",
+    nivel: FIN,
+    texto: "Aprobación de la apertura",
+    tipo: "restringido",
+    cumple: false,
+    mensaje:
+      "Aprobar la apertura y empezar a cobrar sobre esos saldos queda restringido hasta que se aprueben las reglas de apertura (D-COM-05 a D-COM-08).",
+  });
+  return r;
+}
+
+/** Requisitos que exige pasar a `destino` (los de su nivel y los de los niveles anteriores). */
+export const requisitosPara = (rs: Requisito[], destino: Estado) =>
+  rs.filter((x) => ORDEN_ESTADOS.indexOf(x.nivel) <= ORDEN_ESTADOS.indexOf(destino));
+
 /**
  * ¿Se puede pasar la comunidad a `destino`? Bajar de estado se permite (no borra nada), salvo
- * dejar de operar finanzas si ya hay cobros emitidos; subir exige los requisitos de cada estado. Lo financiero de una comunidad EXISTENTE queda
- * restringido: su apertura (Entrega 5) es un borrador que todavía no se puede aprobar.
+ * dejar de operar finanzas si ya hay cobros emitidos; subir exige los requisitos de cada estado
+ * (requisitosActivacion). Lo financiero de una comunidad EXISTENTE queda restringido: su apertura
+ * es un borrador que todavía no se puede aprobar.
  */
-export function revisarCambio(d: DatosConfiguracion, destino: Estado): Revision {
+export function revisarCambio(d: DatosConfiguracion, destino: Estado, revisionApertura?: RevisionApertura): Revision {
   const bloqueos: string[] = [];
   const advertencias: string[] = [];
   if (destino === d.estado) return { ok: false, bloqueos: ["La propiedad ya está en ese estado."], advertencias };
@@ -220,25 +342,12 @@ export function revisarCambio(d: DatosConfiguracion, destino: Estado): Revision 
     }
     return { ok: bloqueos.length === 0, bloqueos, advertencias };
   }
-
-  // Habilitación administrativa (también se exige para la financiera).
-  const faltan = faltanIdentificacion(d);
-  if (faltan.length) bloqueos.push(`Completa la identificación: ${faltan.join(", ")}.`);
-  if (d.unidades === 0) bloqueos.push("Agrega al menos una unidad.");
-  if (d.unidades > 0 && d.unidadesSinPropietario > 0) {
-    advertencias.push(`${unidadesTxt(d.unidadesSinPropietario)} sin propietario registrado.`);
-  }
-
-  if (destino === "HABILITADA_FINANCIERA") {
-    const alic = alicuotasDe(d);
-    if (d.unidades > 0 && alic.tipo !== "ok") bloqueos.push(alic.texto);
-    if (d.modalidad === "EXISTENTE") {
-      bloqueos.push(
-        d.apertura
-          ? "Es una comunidad existente: su apertura está registrada como borrador, pero aprobarla y empezar a cobrar sobre esos saldos queda restringido hasta que se aprueben las reglas de apertura (D-COM-05 a D-COM-08)."
-          : "Es una comunidad existente: antes de cobrar hay que registrar su apertura (fecha de corte, deudas, fondos y bancos) en el paso 04.",
-      );
-    }
+  for (const x of requisitosPara(requisitosActivacion(d, revisionApertura), destino)) {
+    if (x.cumple) continue;
+    // Sin unidades ya hay un bloqueo: no se repite como advertencia.
+    if (x.clave === "propietarios" && d.unidades === 0) continue;
+    if (x.clave === "alicuotas" && d.unidades === 0) continue;
+    (x.tipo === "advertencia" ? advertencias : bloqueos).push(x.mensaje);
   }
   return { ok: bloqueos.length === 0, bloqueos, advertencias };
 }
