@@ -3,8 +3,11 @@
 // 1) leerPlanilla convierte las filas de la hoja en FilaImportada,
 // 2) planificar compara con lo que ya existe y dice qué se va a crear o cambiar.
 
+import { normalizarRut, revisarVinculo, TIPOS_VINCULO, type TipoVinculo } from "./vinculos";
+
 export type Tipo = "DEPARTAMENTO" | "CASA" | "OFICINA" | "LOCAL" | "ESTACIONAMIENTO" | "BODEGA";
-export type Relacion = "PROPIETARIO" | "RESIDENTE";
+/** COM-001 · Entrega 4: la columna Relación acepta los cinco vínculos de la Entrega 3. */
+export type Relacion = TipoVinculo;
 
 /** Una fila de la planilla ya interpretada. Los campos vacíos quedan como undefined. */
 export type FilaImportada = {
@@ -17,9 +20,12 @@ export type FilaImportada = {
   correo?: string;
   telefono?: string;
   relaciones: Relacion[];
+  /** Fecha de inicio del vínculo ("2026-03-01"). Vacía = sin fecha registrada. */
+  desde?: string;
 };
 
-export type ErrorFila = { fila: number; mensaje: string };
+/** Error de una fila, con la hoja para encontrarlo en Excel. */
+export type ErrorFila = { fila: number; mensaje: string; hoja?: string };
 
 export const COLUMNAS = [
   { clave: "numero", titulo: "Unidad", ayuda: "Número o nombre de la unidad (101, Casa 4, B-12). Obligatorio." },
@@ -29,10 +35,19 @@ export const COLUMNAS = [
   { clave: "documento", titulo: "RUT", ayuda: "RUT o documento. Sirve para reconocer a la misma persona en varias unidades." },
   { clave: "correo", titulo: "Correo", ayuda: "Necesario para invitarlo a la app." },
   { clave: "telefono", titulo: "Teléfono", ayuda: "Celular, para mandarle la invitación por WhatsApp." },
-  { clave: "relacion", titulo: "Relación", ayuda: "Propietario, Residente o Ambos. Vacío = Propietario." },
+  {
+    clave: "relacion",
+    titulo: "Relación",
+    ayuda: "Propietario, Copropietario, Arrendatario, Residente u Ocupante. Puedes poner dos: \"Propietario y residente\" (o \"Ambos\"). Vacío = Propietario.",
+  },
+  { clave: "desde", titulo: "Desde", ayuda: "Fecha en que empezó el vínculo (01-03-2026). Opcional: vacía queda \"sin fecha registrada\"." },
 ] as const;
 
-type ClaveColumna = (typeof COLUMNAS)[number]["clave"];
+export type ClaveColumna = (typeof COLUMNAS)[number]["clave"];
+/** Lo que se puede elegir al asignar una columna a mano: un dato de Convive o ignorarla. */
+export type Destino = ClaveColumna | "ignorar";
+/** Asignación de columnas: título normalizado de la planilla → dato de Convive. */
+export type Mapeo = Record<string, Destino>;
 
 /** "Alícuota (%)" → "alicuota": sin acentos, signos ni mayúsculas. */
 export const normalizarTitulo = (s: string) =>
@@ -51,10 +66,11 @@ const SINONIMOS: Record<ClaveColumna, string[]> = {
   documento: ["rut", "documento", "dni", "cedula", "run", "rutodocumento"],
   correo: ["correo", "email", "mail", "correoelectronico"],
   telefono: ["telefono", "celular", "fono", "movil", "whatsapp"],
-  relacion: ["relacion", "rol", "calidad", "vinculo"],
+  relacion: ["relacion", "rol", "calidad", "vinculo", "tipovinculo", "tipodevinculo"],
+  desde: ["desde", "fechainicio", "fechadeinicio", "inicio", "fechaingreso", "fechadeingreso", "vigentedesde"],
 };
 
-function columnaDe(titulo: string): ClaveColumna | undefined {
+export function columnaDe(titulo: string): ClaveColumna | undefined {
   const t = normalizarTitulo(titulo);
   if (!t) return undefined;
   for (const [clave, nombres] of Object.entries(SINONIMOS) as [ClaveColumna, string[]][]) {
@@ -80,16 +96,47 @@ const TIPOS: Record<string, Tipo> = {
   bodega: "BODEGA",
 };
 
-function leerRelacion(valor: string): Relacion[] | null {
-  const t = normalizarTitulo(valor);
-  if (!t) return ["PROPIETARIO"];
-  const propietario = /propietari|dueno|duena/.test(t) || t === "p";
-  const residente = /residente|arrendatari|ocupante|inquilin/.test(t) || t === "r";
-  if (t === "ambos" || (propietario && residente)) return ["PROPIETARIO", "RESIDENTE"];
-  if (propietario) return ["PROPIETARIO"];
-  if (residente) return ["RESIDENTE"];
-  return null;
+const PALABRAS_VINCULO: [RegExp, Relacion][] = [
+  [/^(co|cop)$|copropietari|codueno|coduena/, "COPROPIETARIO"],
+  [/^p$|propietari|dueno|duena/, "PROPIETARIO"],
+  [/arrendatari|inquilin|arriendo/, "ARRENDATARIO"],
+  [/^r$|residente/, "RESIDENTE"],
+  [/ocupante/, "OCUPANTE"],
+];
+
+/** "Propietario y residente", "Ambos", "Arrendatario"… → vínculos; null si algo no se entiende. */
+export function leerRelacion(valor: string): Relacion[] | null {
+  if (!normalizarTitulo(valor)) return ["PROPIETARIO"];
+  if (normalizarTitulo(valor) === "ambos") return ["PROPIETARIO", "RESIDENTE"];
+  const partes = valor.split(/\s+y\s+|[,/+;]|\s+e\s+/i).map(normalizarTitulo).filter(Boolean);
+  const tipos = new Set<Relacion>();
+  for (const parte of partes) {
+    const t = PALABRAS_VINCULO.find(([re]) => re.test(parte));
+    if (!t) return null;
+    tipos.add(t[1]);
+  }
+  return [...tipos];
 }
+
+/**
+ * Fecha de una celda: fecha de Excel, "01-03-2026", "1/3/2026" o "2026-03-01" → "2026-03-01".
+ * null si no se entiende.
+ */
+export function leerFecha(valor: unknown): string | null {
+  if (valor instanceof Date) return Number.isNaN(valor.getTime()) ? null : valor.toISOString().slice(0, 10);
+  const s = String(valor ?? "").trim();
+  let a: number, m: number, d: number;
+  let r = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (r) [a, m, d] = [Number(r[1]), Number(r[2]), Number(r[3])];
+  else if ((r = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/))) [d, m, a] = [Number(r[1]), Number(r[2]), Number(r[3])];
+  else return null;
+  const f = new Date(Date.UTC(a, m - 1, d));
+  if (f.getUTCFullYear() !== a || f.getUTCMonth() !== m - 1 || f.getUTCDate() !== d || a < 1900) return null;
+  return f.toISOString().slice(0, 10);
+}
+
+/** Letra de la columna de Excel: 0 → A, 27 → AB. */
+export const letraColumna = (i: number): string => (i < 26 ? "" : letraColumna(Math.floor(i / 26) - 1)) + String.fromCharCode(65 + (i % 26));
 
 /** "1,25", "1.25", "1,25 %" o un número de la planilla → número; null si no se entiende. */
 export function leerNumero(valor: unknown): number | null {
@@ -101,8 +148,8 @@ export function leerNumero(valor: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-/** RUT sin puntos ni espacios y con la K en mayúscula, para comparar. */
-export const normalizarDocumento = (s: string) => s.replace(/[.\s]/g, "").toUpperCase();
+/** RUT sin puntos, espacios ni guion y con la K en mayúscula, para comparar. */
+export const normalizarDocumento = normalizarRut;
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -112,33 +159,113 @@ const texto = (v: unknown) => {
   return s === "" ? undefined : s;
 };
 
-export type Lectura = { filas: FilaImportada[]; errores: ErrorFila[]; avisos: string[]; sinTitulos?: boolean };
+/** Una columna de la planilla y el dato de Convive al que corresponde. */
+export type ColumnaLeida = { indice: number; letra: string; titulo: string; clave?: ClaveColumna; ejemplos: string[] };
+
+export type Lectura = {
+  filas: FilaImportada[];
+  errores: ErrorFila[];
+  avisos: string[];
+  sinTitulos?: boolean;
+  /** Columnas de la fila de títulos, para mostrarlas o asignarlas a mano. */
+  columnas?: ColumnaLeida[];
+};
+
+export type OpcionesLectura = {
+  /** Asignación hecha a mano o guardada en un perfil: manda sobre el reconocimiento automático. */
+  mapeo?: Mapeo;
+  /** Nombre de la hoja, para los mensajes. */
+  hoja?: string;
+  /** Hoy, para no aceptar vínculos que empiezan en el futuro. */
+  hoy?: string;
+};
+
+/** Qué dato es cada título, primero según la asignación a mano y después por su nombre. */
+const claveDe = (titulo: string, mapeo?: Mapeo): ClaveColumna | undefined => {
+  const n = normalizarTitulo(titulo);
+  if (mapeo && n in mapeo) return mapeo[n] === "ignorar" ? undefined : (mapeo[n] as ClaveColumna);
+  return columnaDe(titulo);
+};
+
+/** La fila de títulos: la primera que tenga la columna de la unidad. */
+export function filaDeTitulos(hoja: unknown[][], mapeo?: Mapeo) {
+  return hoja.findIndex((fila) => fila.some((c) => claveDe(String(c ?? ""), mapeo) === "numero"));
+}
+
+/**
+ * La fila que parece de títulos cuando no se reconoce ninguno: entre las primeras 20, la que tiene
+ * más celdas escritas (así se salta un título como "Listado de copropietarios"). -1 si está vacía.
+ */
+export function filaProbableDeTitulos(hoja: unknown[][]) {
+  let mejor = -1;
+  let maximo = 0;
+  hoja.slice(0, 20).forEach((f, i) => {
+    const n = f.filter((c) => texto(c) !== undefined).length;
+    if (n > maximo) [mejor, maximo] = [i, n];
+  });
+  return mejor;
+}
+
+/** Columnas de una fila de títulos con hasta 3 valores de ejemplo. */
+export function columnasDe(hoja: unknown[][], iTitulos: number, mapeo?: Mapeo): ColumnaLeida[] {
+  const titulos = hoja[iTitulos] ?? [];
+  const usadas = new Set<ClaveColumna>();
+  const columnas: ColumnaLeida[] = [];
+  titulos.forEach((c, i) => {
+    const titulo = texto(c);
+    if (!titulo) return;
+    let clave = claveDe(titulo, mapeo);
+    if (clave && usadas.has(clave)) clave = undefined; // dos columnas para el mismo dato: vale la primera
+    if (clave) usadas.add(clave);
+    const ejemplos = hoja
+      .slice(iTitulos + 1)
+      .map((f) => texto(f[i]))
+      .filter((v): v is string => v !== undefined)
+      .slice(0, 3);
+    columnas.push({ indice: i, letra: letraColumna(i), titulo, clave, ejemplos });
+  });
+  return columnas;
+}
+
+/** Texto que Excel tomaría como fórmula si se vuelve a exportar: no se acepta en nombres. */
+const PARECE_FORMULA = /^[=@]/;
 
 /**
  * Lee las filas de la hoja (primera fila con "Unidad" = títulos). Devuelve las filas válidas
- * y los errores de cada fila; una fila con error no se carga.
+ * y los errores de cada fila, con hoja, fila y columna; una fila con error no se carga.
  */
-export function leerPlanilla(hoja: unknown[][]): Lectura {
+export function leerPlanilla(hoja: unknown[][], opciones: OpcionesLectura = {}): Lectura {
+  const { mapeo, hoy } = opciones;
+  const enHoja = opciones.hoja;
   const errores: ErrorFila[] = [];
   const avisos: string[] = [];
-  const iTitulos = hoja.findIndex((fila) => fila.some((c) => columnaDe(String(c ?? "")) === "numero"));
+  const iTitulos = filaDeTitulos(hoja, mapeo);
   if (iTitulos === -1) {
+    const iPrimera = filaProbableDeTitulos(hoja);
     return {
       filas: [],
-      errores: [{ fila: 1, mensaje: 'No encontré la fila de títulos. La planilla debe tener una columna llamada "Unidad".' }],
+      errores: [
+        {
+          fila: 1,
+          hoja: enHoja,
+          mensaje: 'No encontré la columna de la unidad. Indica qué columna es cada dato o usa la planilla de Convive (columna "Unidad").',
+        },
+      ],
       avisos,
       sinTitulos: true,
+      columnas: iPrimera === -1 ? [] : columnasDe(hoja, iPrimera, mapeo),
     };
   }
+  const columnas = columnasDe(hoja, iTitulos, mapeo);
   const indices: Partial<Record<ClaveColumna, number>> = {};
-  hoja[iTitulos].forEach((c, i) => {
-    const clave = columnaDe(String(c ?? ""));
-    if (clave && indices[clave] === undefined) indices[clave] = i;
-  });
-  const sinUsar = hoja[iTitulos]
-    .filter((c, i) => texto(c) && !Object.values(indices).includes(i))
-    .map((c) => `"${texto(c)}"`);
+  for (const c of columnas) if (c.clave) indices[c.clave] = c.indice;
+  // Las que se marcaron "No usar" a propósito no se avisan.
+  const sinUsar = columnas.filter((c) => !c.clave && mapeo?.[normalizarTitulo(c.titulo)] !== "ignorar").map((c) => `"${c.titulo}"`);
   if (sinUsar.length) avisos.push(`Estas columnas no se usan y se ignoraron: ${sinUsar.join(", ")}.`);
+  const col = (clave: ClaveColumna) => {
+    const c = columnas.find((x) => x.clave === clave);
+    return c ? ` (columna ${c.letra}, "${c.titulo}")` : "";
+  };
 
   const filas: FilaImportada[] = [];
   for (let i = iTitulos + 1; i < hoja.length; i++) {
@@ -149,7 +276,7 @@ export function leerPlanilla(hoja: unknown[][]): Lectura {
 
     const numero = texto(celda("numero"));
     if (!numero) {
-      errores.push({ fila: n, mensaje: "Falta el número de la unidad." });
+      errores.push({ fila: n, hoja: enHoja, mensaje: `Falta el número de la unidad${col("numero")}.` });
       continue;
     }
     const fila: FilaImportada = { fila: n, numero, relaciones: [] };
@@ -158,12 +285,12 @@ export function leerPlanilla(hoja: unknown[][]): Lectura {
     const tipo = texto(celda("tipo"));
     if (tipo) {
       fila.tipo = TIPOS[normalizarTitulo(tipo)];
-      if (!fila.tipo) problemas.push(`no reconozco el tipo "${tipo}"`);
+      if (!fila.tipo) problemas.push(`no reconozco el tipo "${tipo}"${col("tipo")}`);
     }
     const alicuota = celda("alicuota");
     if (texto(alicuota) !== undefined) {
       const a = leerNumero(alicuota);
-      if (a === null || a <= 0 || a > 100) problemas.push(`la alícuota "${texto(alicuota)}" debe ser un número mayor que 0 y hasta 100`);
+      if (a === null || a <= 0 || a > 100) problemas.push(`la alícuota "${texto(alicuota)}" debe ser un número mayor que 0 y hasta 100${col("alicuota")}`);
       else fila.alicuota = a;
     }
     fila.nombre = texto(celda("nombre"));
@@ -171,17 +298,25 @@ export function leerPlanilla(hoja: unknown[][]): Lectura {
     fila.correo = texto(celda("correo"))?.toLowerCase();
     fila.telefono = texto(celda("telefono"));
     const relacion = texto(celda("relacion"));
+    const desde = celda("desde");
     if (fila.nombre) {
-      if (fila.nombre.length < 2) problemas.push("el nombre es muy corto");
-      if (fila.correo && !CORREO.test(fila.correo)) problemas.push(`el correo "${fila.correo}" no es válido`);
+      if (fila.nombre.length < 2) problemas.push(`el nombre es muy corto${col("nombre")}`);
+      if (PARECE_FORMULA.test(fila.nombre)) problemas.push(`el nombre no puede empezar con "=" ni "@"${col("nombre")}`);
+      if (fila.correo && !CORREO.test(fila.correo)) problemas.push(`el correo "${fila.correo}" no es válido${col("correo")}`);
       const rel = leerRelacion(relacion ?? "");
-      if (!rel) problemas.push(`no reconozco la relación "${relacion}" (usa Propietario, Residente o Ambos)`);
+      if (!rel) problemas.push(`no reconozco la relación "${relacion}" (usa ${Object.values(TIPOS_VINCULO).map((t) => t.texto).join(", ")})${col("relacion")}`);
       else fila.relaciones = rel;
+      if (texto(desde) !== undefined) {
+        const f = leerFecha(desde);
+        if (!f) problemas.push(`no entiendo la fecha "${texto(desde)}" (usa 01-03-2026)${col("desde")}`);
+        else if (hoy && f > hoy) problemas.push(`la fecha ${texto(desde)} es futura${col("desde")}`);
+        else fila.desde = f;
+      }
     } else if (fila.documento || fila.correo || fila.telefono) {
       problemas.push("tiene datos de una persona pero falta su nombre");
     }
     if (problemas.length) {
-      errores.push({ fila: n, mensaje: `Unidad ${numero}: ${problemas.join("; ")}.` });
+      errores.push({ fila: n, hoja: enHoja, mensaje: `Unidad ${numero}: ${problemas.join("; ")}.` });
       continue;
     }
     filas.push(fila);
@@ -195,7 +330,30 @@ export function leerPlanilla(hoja: unknown[][]): Lectura {
     for (const f of conAlicuota) f.alicuota = Math.round(f.alicuota! * 100 * 1e6) / 1e6;
     avisos.push("Las alícuotas venían como fracción (por ejemplo 0,0125); las convertí a porcentaje (1,25 %).");
   }
-  return { filas, errores, avisos };
+  return { filas, errores, avisos, columnas };
+}
+
+/**
+ * Perfil guardado que corresponde a esta planilla: el que tenga todos sus títulos en la fila de
+ * títulos. Si hay varios, el que asigna más columnas.
+ */
+export function perfilQueCalza<P extends { columnas: Mapeo }>(hoja: unknown[][], perfiles: P[]): P | null {
+  const titulos = new Set(hoja.slice(0, 30).flatMap((f) => f.map((c) => normalizarTitulo(String(c ?? ""))).filter(Boolean)));
+  const calzan = perfiles.filter((p) => {
+    const claves = Object.keys(p.columnas);
+    return claves.length > 0 && claves.every((k) => titulos.has(k)) && Object.values(p.columnas).includes("numero");
+  });
+  calzan.sort((a, b) => Object.keys(b.columnas).length - Object.keys(a.columnas).length);
+  return calzan[0] ?? null;
+}
+
+/** Revisa una asignación hecha a mano: la unidad es obligatoria y cada dato va en una sola columna. */
+export function revisarMapeo(mapeo: Mapeo): string | null {
+  const usados = Object.values(mapeo).filter((d) => d !== "ignorar");
+  if (!usados.includes("numero")) return "Indica qué columna tiene el número de la unidad.";
+  const repetido = usados.find((d, i) => usados.indexOf(d) !== i);
+  if (repetido) return `El dato "${COLUMNAS.find((c) => c.clave === repetido)!.titulo}" está asignado a dos columnas.`;
+  return null;
 }
 
 /** Lee un CSV (separado por punto y coma, coma o tabulación, como lo guarda Excel). */
@@ -247,6 +405,7 @@ export type PersonaExistente = {
   correo: string | null;
   telefono: string | null;
 };
+/** Vínculo vigente de una persona con una unidad (VinculoUnidad sin fecha de término). */
 export type VinculoExistente = { unidadId: string; personaId: string; relacion: Relacion };
 
 export type UnidadPlan = {
@@ -268,7 +427,7 @@ export type PersonaPlan = {
   /** Datos que la persona ya registrada no tenía y se agregan. */
   completar?: { documento?: string; correo?: string; telefono?: string };
 };
-export type VinculoPlan = { numero: string; persona: string; relacion: Relacion; nuevo: boolean };
+export type VinculoPlan = { numero: string; persona: string; relacion: Relacion; desde?: string; nuevo: boolean };
 
 export type Plan = {
   unidades: UnidadPlan[];
@@ -394,9 +553,29 @@ export function planificar(
     for (const relacion of f.relaciones) {
       const llave = `${unidad.numero}|${clave}|${relacion}`;
       if (vistos.has(llave)) continue;
-      vistos.add(llave);
       const nuevo = !(unidad.id && persona.id && yaVinculados.has(`${unidad.id}|${persona.id}|${relacion}`));
-      vinculos.push({ numero: unidad.numero, persona: clave, relacion, nuevo });
+      if (nuevo) {
+        // Las mismas reglas que al vincular a mano (Entrega 3), contra lo que ya hay y lo que viene antes en la planilla.
+        const enUnidad = [
+          ...existentes.vinculos
+            .filter((v) => v.unidadId === unidad.id)
+            .map((v) => ({ personaId: `id:${v.personaId}`, nombre: personaPorId.get(v.personaId)?.nombre ?? "Otra persona", tipo: v.relacion, hasta: null })),
+          ...vinculos
+            .filter((v) => v.numero === unidad.numero)
+            .map((v) => ({ personaId: v.persona, nombre: personas.get(v.persona)!.nombre, tipo: v.relacion, hasta: null })),
+        ];
+        const error = revisarVinculo(
+          { personaId: clave, tipo: relacion, desde: new Date(0), terminoPrevisto: null },
+          enUnidad,
+          new Date(8.64e15),
+        );
+        if (error) {
+          errores.push({ fila: f.fila, mensaje: `Unidad ${unidad.numero}, ${persona.nombre}: ${error}` });
+          continue;
+        }
+      }
+      vistos.add(llave);
+      vinculos.push({ numero: unidad.numero, persona: clave, relacion, desde: f.desde, nuevo });
     }
   }
 

@@ -3,6 +3,7 @@ import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ETIQUETAS_TIPO_UNIDAD } from "@/lib/formato";
 import { COLUMNAS } from "@/lib/importacion";
+import { ORDEN_TIPOS, TIPOS_VINCULO } from "@/lib/vinculos";
 
 /**
  * Planilla para la carga desde Excel. Trae lo que la propiedad ya tiene (una fila por persona
@@ -17,7 +18,8 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
     include: {
       unidades: {
         orderBy: { numero: "asc" },
-        include: { personas: { include: { persona: true }, orderBy: { relacion: "asc" } } },
+        // COM-001: los vínculos vigentes (con su tipo y fecha de inicio), no solo propietario o residente.
+        include: { vinculos: { where: { hasta: null }, include: { persona: true }, orderBy: { creadoEn: "asc" } } },
       },
     },
   });
@@ -27,16 +29,21 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
   const filas: (string | number | null)[][] = [];
   for (const u of condominio.unidades) {
     const base = [u.numero, ETIQUETAS_TIPO_UNIDAD[u.tipo], Number(u.alicuota)];
-    // Una persona que es propietaria y residente de la misma unidad va en una sola fila ("Ambos").
-    const porPersona = new Map<string, { p: (typeof u.personas)[number]["persona"]; rel: string[] }>();
-    for (const v of u.personas) {
-      const ya = porPersona.get(v.personaId) ?? { p: v.persona, rel: [] };
-      ya.rel.push(v.relacion === "PROPIETARIO" ? "Propietario" : "Residente");
-      porPersona.set(v.personaId, ya);
+    // Los vínculos de una persona con la misma fecha van en una fila: "Propietario y residente".
+    const grupos = new Map<string, { p: (typeof u.vinculos)[number]["persona"]; tipos: (typeof u.vinculos)[number]["tipo"][]; desde: Date | null }>();
+    for (const v of u.vinculos) {
+      const llave = `${v.personaId}|${v.desde?.toISOString() ?? ""}`;
+      const ya = grupos.get(llave) ?? { p: v.persona, tipos: [], desde: v.desde };
+      ya.tipos.push(v.tipo);
+      grupos.set(llave, ya);
     }
-    if (porPersona.size === 0) filas.push([...base, null, null, null, null, null]);
-    for (const { p, rel } of porPersona.values()) {
-      filas.push([...base, p.nombre, p.documento, p.correo, p.telefono, rel.length > 1 ? "Ambos" : rel[0]]);
+    if (grupos.size === 0) filas.push([...base, null, null, null, null, null, null]);
+    for (const { p, tipos, desde } of grupos.values()) {
+      const texto = ORDEN_TIPOS.filter((t) => tipos.includes(t))
+        .map((t, i) => (i === 0 ? TIPOS_VINCULO[t].texto : TIPOS_VINCULO[t].texto.toLowerCase()))
+        .join(" y ");
+      const fecha = desde ? desde.toISOString().slice(0, 10).split("-").reverse().join("-") : null;
+      filas.push([...base, p.nombre, p.documento, p.correo, p.telefono, texto, fecha]);
     }
   }
 
@@ -49,6 +56,9 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
     [],
     [{ value: "Consejos", fontWeight: "bold" as const }, null],
     [{ value: "•" }, { value: "Una fila por persona y unidad. Si una unidad tiene dueño y arrendatario, van en dos filas con el mismo número de unidad." }],
+    [{ value: "•" }, { value: "Una unidad tiene un solo propietario; si hay más dueños, los demás van como copropietarios. Un dueño no puede ser arrendatario de su unidad." }],
+    [{ value: "•" }, { value: "El ocupante queda registrado, pero no recibe acceso a la app ni cobros." }],
+    [{ value: "•" }, { value: "Para terminar un vínculo (por ejemplo, un arrendatario que se fue) hazlo en la ficha de la unidad: la planilla solo agrega." }],
     [{ value: "•" }, { value: "Una unidad sin nombre de persona se carga sola (útil para bodegas y estacionamientos)." }],
     [{ value: "•" }, { value: "Si la unidad ya existe, se actualizan su tipo y alícuota. A las personas ya registradas (mismo RUT o correo) solo se les agregan los datos que les falten." }],
     [{ value: "•" }, { value: "Nada se borra: quitar una fila de la planilla no elimina la unidad ni la persona." }],
@@ -59,7 +69,7 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
     {
       sheet: "Unidades",
       data: [titulos, ...filas.map((f) => f.map((value) => (value === null ? null : { value })))],
-      columns: [{ width: 12 }, { width: 16 }, { width: 13 }, { width: 30 }, { width: 14 }, { width: 28 }, { width: 16 }, { width: 14 }],
+      columns: [{ width: 12 }, { width: 16 }, { width: 13 }, { width: 30 }, { width: 14 }, { width: 28 }, { width: 16 }, { width: 26 }, { width: 12 }],
       stickyRowsCount: 1,
     },
     { sheet: "Instrucciones", data: ayuda, columns: [{ width: 16 }, { width: 110 }] },
