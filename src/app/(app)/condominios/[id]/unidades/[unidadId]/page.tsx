@@ -208,6 +208,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
             historial.votos && `${historial.votos} ${historial.votos === 1 ? "voto" : "votos"}`,
             historial.vinculos && `${historial.vinculos} ${historial.vinculos === 1 ? "vínculo terminado" : "vínculos terminados"}`,
             historial.apertura && `${historial.apertura} ${historial.apertura === 1 ? "saldo de apertura" : "saldos de apertura"}`,
+            historial.reservas && `${historial.reservas} ${historial.reservas === 1 ? "reserva" : "reservas"}`,
           ]
             .filter(Boolean)
             .join(", ")}

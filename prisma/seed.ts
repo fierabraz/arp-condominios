@@ -227,6 +227,31 @@ async function main() {
     })),
   });
 
+  // RES-001: espacios comunes para reservar.
+  await db.espacioReservable.createMany({
+    data: [
+      {
+        administradoraId: adm.id,
+        condominioId: condominio.id,
+        nombre: "Quincho",
+        descripcion: "Quincho techado con parrilla, junto a la piscina",
+        capacidad: 25,
+        turnos: ["Almuerzo (12:00 a 17:00)", "Noche (19:00 a 00:00)"],
+        costo: 15000,
+        maximoPorMes: 2,
+        normas: "Dejar el quincho limpio y la basura en el contenedor.\nMúsica hasta las 00:00.",
+      },
+      {
+        administradoraId: adm.id,
+        condominioId: condominio.id,
+        nombre: "Sala de eventos",
+        capacidad: 40,
+        turnos: ["Día completo"],
+        requiereAprobacion: true,
+      },
+    ],
+  });
+
   console.log(`Datos de demostración creados. Contraseña de todas las cuentas: ${CLAVE_DEMO}`);
 }
 
