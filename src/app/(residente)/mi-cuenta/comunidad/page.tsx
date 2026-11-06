@@ -1,11 +1,11 @@
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PageHeader, Vacio } from "@/components/ui";
 import { TarjetaPublicacion } from "@/components/publicacion";
 import { unidadesVisibles } from "../../datos-residente";
 
 export default async function ComunidadPage({ searchParams }: PageProps<"/mi-cuenta/comunidad">) {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const { condominioIds } = await unidadesVisibles(usuario, (await searchParams).unidad);
   const publicaciones = await db.publicacion.findMany({
     where: { condominioId: { in: condominioIds } },

@@ -1,10 +1,10 @@
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { cambiarClave } from "@/app/(app)/contrasena/actions";
 import { ClaveForm } from "@/app/(app)/contrasena/clave-form";
 
 export default async function PerfilResidentePage() {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   return (
     <>
       <PageHeader titulo="Mi perfil" descripcion={`${usuario.nombre} · ${usuario.correo}`} />

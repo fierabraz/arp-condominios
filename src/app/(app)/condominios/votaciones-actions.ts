@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { puedeVerPropiedad, requireAdministradora, requireUsuario } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora, requirePermiso } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
 import { finDelDiaChile, formatoFecha, hoyChile } from "@/lib/formato";
@@ -123,7 +123,7 @@ export async function registrarVotoPresencial(votacionId: string, _: EstadoForm,
 
 /** Un propietario vota por una de sus unidades desde su cuenta. */
 export async function votar(votacionId: string, unidadId: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const opcionId = aTexto(formData.get("opcionId"));
   if (!opcionId) return { mensaje: "Elige una opción." };
   const v = await db.votacion.findFirst({ where: { id: votacionId, administradoraId: usuario.administradoraId ?? "" } });

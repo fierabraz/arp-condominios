@@ -14,7 +14,7 @@ import { opcionesAgrupaciones } from "@/lib/estructura";
 
 export default async function UnidadesPage({ params }: PageProps<"/condominios/[id]/unidades">) {
   const { id } = await params;
-  const { usuario, administradoraId } = await requireAdministradora(["ADMINISTRADOR", "COMITE"]);
+  const { usuario, administradoraId } = await requireAdministradora("propiedad.ver");
   if (!puedeVerPropiedad(usuario, id)) notFound();
 
   const condominio = await db.condominio.findFirst({
@@ -31,7 +31,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
   const opcionesAgrupacion = opcionesAgrupaciones(agrupaciones);
   const conDeuda = new Set((await morosidad(id, administradoraId)).map((m) => m.unidadId));
 
-  const editable = puedeEditar(usuario.rol);
+  const editable = puedeEditar(usuario);
   const conDiaPropio = condominio.unidades.filter((u) => u.diaPago !== null).length;
   const sumaAlicuotas = condominio.unidades.reduce((s, u) => s + Number(u.alicuota), 0);
   const estado = estadoAlicuotas({ cargadas: condominio.unidades.length, suma: sumaAlicuotas, total: condominio.totalUnidades });

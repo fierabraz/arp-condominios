@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { ClaveSchema, CorreoSchema } from "@/lib/usuarios";
 
@@ -18,7 +18,7 @@ const AdministradoraSchema = z.object({
 });
 
 export async function crearAdministradora(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  await requireUsuario(["SUPERADMIN"]);
+  await requirePermiso("plataforma");
   const datos = AdministradoraSchema.safeParse({
     nombre: aTexto(formData.get("nombre")),
     pais: aTexto(formData.get("pais")) ?? "CL",

@@ -107,7 +107,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
           accion={cambiarDiaPago.bind(null, unidad.id)}
           diaPago={unidad.diaPago}
           diaPropiedad={unidad.condominio.diaVencimiento}
-          editable={puedeEditar(usuario.rol)}
+          editable={puedeEditar(usuario)}
         />
       </Card>
 

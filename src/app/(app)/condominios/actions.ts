@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { puedeVerPropiedad, requireAdministradora, requirePrincipal } from "@/lib/auth";
-import { esPrincipal, filtroPersonas } from "@/lib/permisos";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
+import { filtroPersonas, puede } from "@/lib/permisos";
 import { aFechaDia, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { EstadoComunidad, ModalidadIncorporacion, TipoComunidad, TipoUnidad, TipoVinculo } from "@/generated/prisma/enums";
 import { ESTADOS, revisarCambio } from "@/lib/configuracion";
@@ -86,7 +86,7 @@ function paraGuardar(d: z.infer<typeof CondominioSchema>) {
 
 export async function crearCondominio(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
   // Solo el administrador principal crea propiedades (los demás solo ven las que les asignan).
-  const { usuario, administradoraId } = await requirePrincipal();
+  const { usuario, administradoraId } = await requireAdministradora("propiedades.crear");
   const datos = leerCondominio(formData);
   if (!datos.success) return erroresDe(datos.error);
 
@@ -133,7 +133,7 @@ export async function cambiarEstadoComunidad(id: string, destino: EstadoComunida
   const datos = await datosDeUna(administradoraId, id);
   if (!datos) return { mensaje: "Propiedad no encontrada." };
   const tocaFinanzas = destino === "HABILITADA_FINANCIERA" || datos.estado === "HABILITADA_FINANCIERA";
-  if (tocaFinanzas && !esPrincipal(usuario)) {
+  if (tocaFinanzas && !puede(usuario, "propiedad.habilitarCobros")) {
     return { mensaje: "Solo el administrador principal puede habilitar o deshabilitar los cobros de una propiedad." };
   }
   const revision = revisarCambio(datos, destino);

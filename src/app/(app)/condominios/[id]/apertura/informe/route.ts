@@ -12,7 +12,7 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
   const usuario = await getUsuarioActual();
   if (!usuario?.administradoraId) return new Response("No autorizado", { status: 401 });
   // El comité no lo descarga mientras no se decida qué ve (D-COM-09).
-  if (!puedeEditar(usuario.rol) || !puedeVerPropiedad(usuario, id)) return new Response("No encontrado", { status: 404 });
+  if (!puedeEditar(usuario) || !puedeVerPropiedad(usuario, id)) return new Response("No encontrado", { status: 404 });
 
   const datos = await datosInformeApertura(id, usuario.administradoraId, usuario.nombre);
   if (!datos || datos.comunidad.modalidad !== "EXISTENTE") return new Response("No encontrado", { status: 404 });

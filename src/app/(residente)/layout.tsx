@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Bell, ChevronDown, LogOut, UserRound } from "lucide-react";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { cerrarSesion } from "@/app/login/actions";
 import { LogoResidente } from "@/components/logo";
 import { datosInicio } from "./datos-residente";
@@ -17,7 +17,7 @@ const iniciales = (nombre: string) =>
 
 // Espacio de los residentes: separado del de administración, sin su menú ni sus módulos.
 export default async function ResidenteLayout({ children }: LayoutProps<"/">) {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const datos = await datosInicio(usuario);
   const avisos = datos.alertas.filter((a) => a.nivel !== "informativo").length;
   const unidades = datos.todas.map((u) => ({ id: u.id, nombre: u.nombre, condominioNombre: u.condominioNombre }));

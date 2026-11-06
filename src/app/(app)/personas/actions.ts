@@ -9,6 +9,7 @@ import { filtroPersonas } from "@/lib/permisos";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
 import { buscarDuplicado } from "@/lib/vinculos";
+import { motivosParaNoEliminar, sinUso } from "@/lib/personas";
 
 const PersonaSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
@@ -81,12 +82,20 @@ export async function eliminarPersona(id: string) {
   const { usuario, administradoraId } = await requireAdministradora();
   const persona = await db.persona.findFirst({
     where: { id, administradoraId, ...filtroPersonas(usuario) },
-    select: { nombre: true, _count: { select: { vinculos: true } } },
+    select: { nombre: true, _count: { select: { vinculos: true, unidades: true } }, usuario: { select: { id: true } } },
   });
-  // Quien tiene o tuvo vínculos con unidades no se borra: se perdería el historial (COM-001).
-  if (persona && persona._count.vinculos > 0) redirect(`/personas/${id}`);
-  const { count } = persona ? await db.persona.deleteMany({ where: { id, administradoraId } }) : { count: 0 };
-  if (count > 0) await registrar(usuario, "Borró una persona", persona?.nombre ?? "");
+  if (!persona) redirect("/personas");
+  // SEG-20: quien tiene o tuvo vínculos, está en una unidad o tiene cuenta no se borra.
+  // La página explica qué hacer antes; la condición se repite al borrar por si algo cambió entre medio.
+  const motivos = motivosParaNoEliminar({
+    unidades: persona._count.unidades,
+    vinculos: persona._count.vinculos,
+    tieneCuenta: !!persona.usuario,
+  });
+  if (motivos.length > 0) redirect(`/personas/${id}`);
+  const { count } = await db.persona.deleteMany({ where: { id, administradoraId, ...sinUso } });
+  if (count === 0) redirect(`/personas/${id}`);
+  await registrar(usuario, "Borró una persona", persona.nombre);
   revalidatePath("/personas");
   redirect("/personas");
 }

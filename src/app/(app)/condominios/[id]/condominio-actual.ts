@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 
 /** Carga el condominio si el usuario puede verlo (administrador asignado o comité de ese condominio). */
 export async function condominioVisible(id: string) {
-  const { usuario, administradoraId } = await requireAdministradora(["ADMINISTRADOR", "COMITE"]);
+  const { usuario, administradoraId } = await requireAdministradora("propiedad.ver");
   if (!puedeVerPropiedad(usuario, id)) notFound();
   const condominio = await db.condominio.findFirst({ where: { id, administradoraId } });
   if (!condominio) notFound();
@@ -13,7 +13,7 @@ export async function condominioVisible(id: string) {
     usuario,
     administradoraId,
     condominio,
-    editable: puedeEditar(usuario.rol),
+    editable: puedeEditar(usuario),
     moneda: usuario.administradora?.moneda ?? "CLP",
   };
 }

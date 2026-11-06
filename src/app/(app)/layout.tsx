@@ -55,7 +55,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         rol={ETIQUETAS_ROL[usuario.rol]}
         cerrarSesion={cerrarSesion}
         propiedades={propiedades}
-        editable={puedeEditar(usuario.rol)}
+        editable={puedeEditar(usuario)}
       />
       <main className="min-w-0 flex-1 p-4 md:p-8">
         <div className="mx-auto max-w-6xl">{children}</div>
