@@ -12,6 +12,7 @@ function enlaces(rol: Rol, condominioId: string | null, principal: boolean): Enl
     case "SUPERADMIN":
       return [
         { href: "/plataforma", texto: "Administradoras", icono: "edificios" },
+        { href: "/plataforma/planes", texto: "Planes", icono: "permisos" },
         { href: "/plataforma/usuarios", texto: "Usuarios", icono: "personas" },
         { href: "/plataforma/correo", texto: "Correo", icono: "correo" },
       ];

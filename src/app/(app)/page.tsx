@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { requireUsuario } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { condominiosPermitidos, esPrincipal, filtroCondominios, filtroPersonas, filtroPorCondominio } from "@/lib/permisos";
-import { BotonLink, Card, PageHeader, Vacio } from "@/components/ui";
+import { Card, PageHeader, Vacio } from "@/components/ui";
 import { TarjetaPropiedad } from "@/components/tarjeta-propiedad";
+import { BotonNuevaComunidad } from "@/components/cupo-comunidades";
+import { cupoDe } from "@/lib/planes-servicio";
 import { resumenPropiedades } from "@/lib/resumen-propiedades";
 import { formatoMoneda } from "@/lib/formato";
 
@@ -17,6 +19,8 @@ export default async function InicioPage() {
   const administradoraId = usuario.administradoraId!;
   const ahora = new Date();
   const principal = esPrincipal(usuario);
+  // SUS-001: cupo de comunidades del plan (solo lo necesita quien puede crear).
+  const cupo = principal ? await cupoDe(administradoraId) : null;
   const [propiedades, condominios, unidades, personas, porCobrar, vencido] = await Promise.all([
     resumenPropiedades(administradoraId, condominiosPermitidos(usuario) ?? undefined),
     db.condominio.count({ where: { administradoraId, ...filtroCondominios(usuario) } }),
@@ -57,7 +61,7 @@ export default async function InicioPage() {
           <h2 id="mis-propiedades" className="text-xl font-bold text-convive-oscuro">
             {principal ? "Mis propiedades" : "Propiedades asignadas"}
           </h2>
-          {principal && <BotonLink href="/condominios/nuevo">Nueva comunidad</BotonLink>}
+          {principal && <BotonNuevaComunidad cupo={cupo!} />}
         </div>
         {propiedades.length === 0 ? (
           <Vacio>

@@ -30,6 +30,12 @@ export async function crearAdministradora(_: EstadoForm, formData: FormData): Pr
   if (!datos.success) return erroresDe(datos.error);
   const d = datos.data;
 
+  // SUS-001: plan con el que parte (opcional; sin plan = sin límite).
+  const planId = aTexto(formData.get("planId")) ?? null;
+  if (planId && !(await db.plan.findFirst({ where: { id: planId, activo: true } }))) {
+    return { errores: { planId: ["Elige un plan de la lista."] } };
+  }
+
   if (await db.usuario.findUnique({ where: { correo: d.adminCorreo } })) {
     return { errores: { adminCorreo: ["Ese correo ya tiene una cuenta."] } };
   }
@@ -39,6 +45,7 @@ export async function crearAdministradora(_: EstadoForm, formData: FormData): Pr
       nombre: d.nombre,
       pais: d.pais,
       moneda: d.moneda,
+      planId,
       usuarios: {
         create: {
           nombre: d.adminNombre,

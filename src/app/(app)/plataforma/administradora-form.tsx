@@ -1,13 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useRef } from "react";
-import { Boton, Campo, Input, Mensaje } from "@/components/ui";
+import { Boton, Campo, Input, Mensaje, Select } from "@/components/ui";
 import type { EstadoForm } from "@/lib/forms";
 
 export function AdministradoraForm({
   accion,
+  planes,
 }: {
   accion: (estado: EstadoForm, formData: FormData) => Promise<EstadoForm>;
+  planes: { id: string; texto: string }[];
 }) {
   const [estado, enviar, pendiente] = useActionState(accion, {});
   const form = useRef<HTMLFormElement>(null);
@@ -34,6 +36,16 @@ export function AdministradoraForm({
       </Campo>
       <Campo etiqueta="Contraseña inicial" error={e.adminClave}>
         <Input name="adminClave" type="text" minLength={8} required />
+      </Campo>
+      <Campo etiqueta="Plan (cuántas comunidades puede crear)" error={e.planId}>
+        <Select name="planId" defaultValue="">
+          <option value="">Sin plan (sin límite)</option>
+          {planes.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.texto}
+            </option>
+          ))}
+        </Select>
       </Campo>
       <div className="flex items-center gap-3 sm:col-span-3">
         <Boton type="submit" disabled={pendiente}>
