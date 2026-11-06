@@ -262,18 +262,20 @@ model Condominio {
   observaciones      String?
   creadoEn           DateTime                @default(now())
 
-  unidades      Unidad[]
-  periodos      Periodo[]
-  usuarios      Usuario[]
-  asignaciones  AsignacionCondominio[]
-  publicaciones Publicacion[]
-  votaciones    Votacion[]
-  agrupaciones  Agrupacion[]
-  espacios      Espacio[]
-  instalaciones Instalacion[]
-  apertura      Apertura?
-  reservables   EspacioReservable[]
-  reservas      Reserva[]
+  unidades       Unidad[]
+  periodos       Periodo[]
+  usuarios       Usuario[]
+  asignaciones   AsignacionCondominio[]
+  publicaciones  Publicacion[]
+  votaciones     Votacion[]
+  agrupaciones   Agrupacion[]
+  espacios       Espacio[]
+  instalaciones  Instalacion[]
+  apertura       Apertura?
+  reservables    EspacioReservable[]
+  reservas       Reserva[]
+  plano          PlanoComunidad?
+  elementosPlano ElementoPlano[]
 
   @@index([administradoraId])
 }
@@ -961,4 +963,46 @@ model Reserva {
   @@index([espacioId, fecha])
   @@index([unidadId])
   @@index([condominioId, estado])
+}
+
+// COM-001-VIS · Generador visual. Guarda las respuestas del asistente (para continuar después) y
+// qué registro creó cada elemento del plan. No tiene unidades propias: usa Agrupacion, Unidad,
+// Espacio e Instalacion.
+model PlanoComunidad {
+  id               String     @id @default(cuid())
+  administradoraId String
+  condominioId     String     @unique
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  respuestas       Json
+  // clave interna del plan (ej. "T1-P3-U2") → id permanente del registro creado
+  registros        Json       @default("{}")
+  generadoEn       DateTime?
+  creadoEn         DateTime   @default(now())
+  actualizadoEn    DateTime   @updatedAt
+
+  @@index([administradoraId])
+}
+
+enum TipoElementoPlano {
+  AGRUPACION
+  UNIDAD
+  ESPACIO
+  INSTALACION
+}
+
+// Ubicación de un registro en la vista en planta. Solo es dibujo: no cambia propiedad,
+// prorrateo ni derechos de uso. Base para la futura vista técnica (Convive Ultra).
+model ElementoPlano {
+  id               String            @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  condominio       Condominio        @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  tipo             TipoElementoPlano
+  registroId       String
+  x                Float
+  y                Float
+  actualizadoEn    DateTime          @updatedAt
+
+  @@unique([condominioId, tipo, registroId])
+  @@index([administradoraId])
 }
