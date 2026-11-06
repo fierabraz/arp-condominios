@@ -4,6 +4,7 @@
 // (Agrupacion, Unidad, Espacio, Instalacion): no hay un sistema paralelo de unidades.
 
 import { revalidatePath } from "next/cache";
+import { crearDentroDelCupo, SinCupoError } from "@/lib/planes-servicio";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -60,7 +61,11 @@ export async function crearComunidadVisual(_: EstadoForm, formData: FormData): P
     return { ...erroresDe(datos.error), valores: Object.fromEntries([...formData.entries()].map(([k, v]) => [k, String(v)])) };
   }
   const { tipo, modalidad, ...resto } = datos.data;
-  const condominio = await db.condominio.create({
+  // PLA-002: solo dentro del cupo del plan que asignó la plataforma.
+  let condominio;
+  try {
+    condominio = await crearDentroDelCupo(administradoraId, (tx) =>
+      tx.condominio.create({
     data: {
       ...resto,
       comuna: resto.comuna ?? null,
@@ -69,7 +74,14 @@ export async function crearComunidadVisual(_: EstadoForm, formData: FormData): P
       modalidad: modalidad ?? null,
       plano: { create: { administradoraId, respuestas: { ...respuestasIniciales(tipo), paso: 1 } as Prisma.InputJsonValue } },
     },
-  });
+      }),
+    );
+  } catch (e) {
+    if (e instanceof SinCupoError) {
+      return { mensaje: e.message, valores: Object.fromEntries([...formData.entries()].map(([k, v]) => [k, String(v)])) };
+    }
+    throw e;
+  }
   await registrar(usuario, "Creó una propiedad", `${condominio.nombre} (en configuración, con el generador visual)`, condominio.id);
   redirect(`/condominios/${condominio.id}/generador?creada=1`);
 }

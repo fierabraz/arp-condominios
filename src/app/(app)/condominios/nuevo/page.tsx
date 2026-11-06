@@ -1,13 +1,32 @@
 import Link from "next/link";
 import { requireAdministradora } from "@/lib/auth";
-import { Card, PageHeader } from "@/components/ui";
+import { BotonLink, Card, PageHeader } from "@/components/ui";
 import { CondominioForm } from "../condominio-form";
 import { crearCondominio } from "../actions";
 import { crearComunidadVisual } from "../generador-actions";
 import { NuevaComunidad } from "./nueva-comunidad";
+import { LineaCupo } from "@/components/cupo-comunidades";
+import { cupoDe } from "@/lib/planes-servicio";
 
 export default async function NuevoCondominioPage({ searchParams }: PageProps<"/condominios/nuevo">) {
-  await requireAdministradora("propiedades.crear");
+  const { administradoraId } = await requireAdministradora("propiedades.crear");
+  // PLA-002: sin cupo en el plan no se muestra el formulario (la acción también lo revisa).
+  const cupo = await cupoDe(administradoraId);
+  if (!cupo.puede) {
+    return (
+      <>
+        <PageHeader titulo="Nueva comunidad" descripcion="Tu plan no permite crear más comunidades por ahora." />
+        <Card>
+          <p role="status" className="rounded-xl bg-alerta-suave px-4 py-3 text-alerta">
+            {cupo.motivo}
+          </p>
+          <div className="mt-4">
+            <BotonLink href="/condominios">Volver a Mis propiedades</BotonLink>
+          </div>
+        </Card>
+      </>
+    );
+  }
   const formulario = (await searchParams).formulario === "1";
   if (formulario) {
     return (
@@ -21,6 +40,7 @@ export default async function NuevoCondominioPage({ searchParams }: PageProps<"/
             </Link>
           }
         />
+        {cupo.plan && <div className="mb-3"><LineaCupo cupo={cupo} /></div>}
         <Card>
           <CondominioForm accion={crearCondominio} textoBoton="Guardar y continuar" />
         </Card>
@@ -38,6 +58,7 @@ export default async function NuevoCondominioPage({ searchParams }: PageProps<"/
           </Link>
         }
       />
+      {cupo.plan && <div className="mb-3"><LineaCupo cupo={cupo} /></div>}
       <Card>
         <NuevaComunidad accion={crearComunidadVisual} />
       </Card>
