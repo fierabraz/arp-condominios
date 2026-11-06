@@ -113,9 +113,23 @@ export function aplicarPago(monto: number, pendientes: AvisoPendiente[]) {
   return { aplicaciones, sobrante: disponible };
 }
 
-/** Fecha de vencimiento: el día indicado del mes siguiente al período. */
+/**
+ * Fecha de vencimiento: el día indicado del mes siguiente al período. Si ese mes es más corto
+ * (día 31 en noviembre, 30 en febrero), vence el último día del mes.
+ */
 export function fechaVencimiento(anio: number, mes: number, dia: number) {
-  return new Date(Date.UTC(mes === 12 ? anio + 1 : anio, mes === 12 ? 0 : mes, dia, 12));
+  const anioV = mes === 12 ? anio + 1 : anio;
+  const mesV = mes === 12 ? 0 : mes; // 0-11
+  const ultimo = new Date(Date.UTC(anioV, mesV + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(anioV, mesV, Math.min(Math.max(dia, 1), ultimo), 12));
+}
+
+export const DIA_PAGO_MIN = 1;
+export const DIA_PAGO_MAX = 31;
+
+/** Día en que vence el cobro de una unidad: el suyo si lo tiene, si no el de la propiedad. */
+export function diaPagoDe(unidad: { diaPago: number | null }, condominio: { diaVencimiento: number }) {
+  return unidad.diaPago ?? condominio.diaVencimiento;
 }
 
 export const MESES = [
