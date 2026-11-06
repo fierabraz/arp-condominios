@@ -14,7 +14,7 @@ export default async function CondominiosPage() {
       <PageHeader
         titulo="Mis propiedades"
         descripcion={principal ? "Edificios y condominios que administras" : "Edificios y condominios que tienes asignados"}
-        acciones={principal ? <BotonLink href="/condominios/nuevo">Crear propiedad</BotonLink> : undefined}
+        acciones={principal ? <BotonLink href="/condominios/nuevo">Nueva comunidad</BotonLink> : undefined}
       />
       {propiedades.length === 0 ? (
         <Vacio>

@@ -161,6 +161,11 @@ export default async function ConfiguracionPage({ params, searchParams }: PagePr
                 </span>
                 {p.ruta && p.accion && editable && (
                   <span className="flex flex-wrap gap-2">
+                    {p.numero === "02" && (
+                      <BotonLink href={`${base}/generador`} variante={datos.unidades === 0 ? "primario" : "secundario"}>
+                        Generador visual
+                      </BotonLink>
+                    )}
                     {p.otra && (
                       <BotonLink href={`${base}${p.otra.ruta}`} variante="secundario">
                         {p.otra.accion}

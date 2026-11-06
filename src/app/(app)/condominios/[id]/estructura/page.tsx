@@ -67,6 +67,11 @@ export default async function EstructuraPage({ params, searchParams }: PageProps
       <PageHeader
         titulo="Estructura física"
         descripcion="Cómo está organizada la propiedad: torres, sectores y pisos; estacionamientos y bodegas; y sus instalaciones."
+        acciones={
+          <BotonLink href={`/condominios/${id}/generador`} variante="secundario">
+            Ver en planta (generador visual)
+          </BotonLink>
+        }
       />
 
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
