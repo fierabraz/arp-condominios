@@ -185,6 +185,7 @@ model Administradora {
   publicaciones Publicacion[]
   votaciones   Votacion[]
   registros    RegistroCambio[]
+  perfilesImportacion PerfilImportacion[]
 }
 
 model Usuario {
@@ -688,4 +689,20 @@ model RegistroCambio {
 
   @@index([administradoraId, creadoEn])
   @@index([condominioId, creadoEn])
+}
+
+// COM-001 · Entrega 4: cómo leer la planilla propia de una administradora (qué columna es qué).
+// Es de la administradora y no se comparte con otras.
+model PerfilImportacion {
+  id               String   @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  nombre           String
+  // Título de columna normalizado → campo de Convive (o "ignorar").
+  columnas         Json
+  creadoPor        String
+  creadoEn         DateTime @default(now())
+  actualizadoEn    DateTime @updatedAt
+
+  @@unique([administradoraId, nombre])
 }

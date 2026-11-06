@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { AlertTriangle, CheckCircle2, Upload } from "lucide-react";
-import { Boton, Input, Insignia, Mensaje, Tabla } from "@/components/ui";
+import { Boton, Input, Insignia, Mensaje, Select, Tabla } from "@/components/ui";
 import type { EstadoImportacion } from "../../importar-actions";
 import { COLOR_ALICUOTAS, estadoAlicuotas } from "@/lib/alicuotas";
+import { COLUMNAS, type ErrorFila } from "@/lib/importacion";
+import { TIPOS_VINCULO } from "@/lib/vinculos";
 
 type Accion = (estado: EstadoImportacion, formData: FormData) => Promise<EstadoImportacion>;
 
@@ -19,17 +21,22 @@ const TIPOS: Record<string, string> = {
 };
 const pct = (n: number) => `${n.toLocaleString("es-CL", { maximumFractionDigits: 6 })} %`;
 const TAMANO_MAXIMO = 900 * 1024;
+const fecha = (iso: string) => iso.split("-").reverse().join("-");
+/** "Hoja Unidades, fila 4: …" para encontrar el error en Excel. */
+const textoError = (e: ErrorFila) => (e.fila > 0 ? `${e.hoja ? `Hoja ${e.hoja}, fila` : "Fila"} ${e.fila}: ${e.mensaje}` : e.mensaje);
 
 export function ImportarForm({
   condominioId,
   totalUnidades,
   revisar,
+  asignar,
   confirmar,
 }: {
   condominioId: string;
   /** Total de unidades guardado en la propiedad (null si no se ha indicado). */
   totalUnidades: number | null;
   revisar: Accion;
+  asignar: Accion;
   confirmar: Accion;
 }) {
   // Cada vez que se vuelve a empezar, el formulario se monta de nuevo y queda limpio.
@@ -40,6 +47,7 @@ export function ImportarForm({
       condominioId={condominioId}
       totalUnidades={totalUnidades}
       revisar={revisar}
+      asignar={asignar}
       confirmar={confirmar}
       otraVez={() => setVuelta((v) => v + 1)}
     />
@@ -50,16 +58,24 @@ function Pasos({
   condominioId,
   totalUnidades,
   revisar,
+  asignar,
   confirmar,
   otraVez,
 }: {
   condominioId: string;
   totalUnidades: number | null;
   revisar: Accion;
+  asignar: Accion;
   confirmar: Accion;
   otraVez: () => void;
 }) {
-  const [revision, enviarArchivo, leyendo] = useActionState(revisar, { etapa: "inicio" });
+  const [editando, setEditando] = useState(false);
+  // Subir el archivo o asignar sus columnas a mano llevan a la misma revisión.
+  const [revision, enviarArchivo, leyendo] = useActionState(async (e: EstadoImportacion, fd: FormData) => {
+    const r = fd.get("paso") === "columnas" ? await asignar(e, fd) : await revisar(e, fd);
+    setEditando(false);
+    return r;
+  }, { etapa: "inicio" });
   const [final, enviarConfirmacion, guardando] = useActionState(confirmar, { etapa: "inicio" });
   const [errorArchivo, setErrorArchivo] = useState<string>();
   const base = `/condominios/${condominioId}`;
@@ -77,7 +93,7 @@ function Pasos({
           <li>
             {r.personasNuevas} personas nuevas{r.personasCompletadas ? ` y ${r.personasCompletadas} con datos completados` : ""}
           </li>
-          <li>{r.vinculosNuevos} propietarios o residentes vinculados a sus unidades</li>
+          <li>{r.vinculosNuevos} {r.vinculosNuevos === 1 ? "vínculo nuevo" : "vínculos nuevos"} de personas con sus unidades</li>
         </ul>
         <AvisoAlicuotas estado={estado} condominioId={condominioId} />
         <div className="flex flex-wrap gap-2">
@@ -92,6 +108,18 @@ function Pasos({
           </Boton>
         </div>
       </div>
+    );
+  }
+
+  if (revision.etapa === "columnas" || (revision.etapa === "revision" && editando)) {
+    return (
+      <AsignarColumnas
+        estado={revision}
+        enviar={enviarArchivo}
+        enviando={leyendo}
+        otraVez={otraVez}
+        volver={revision.etapa === "revision" ? () => setEditando(false) : undefined}
+      />
     );
   }
 
@@ -111,7 +139,11 @@ function Pasos({
       <div className="space-y-6">
         <div>
           <h2 className="text-lg font-bold">Revisión de {revision.archivo}</h2>
-          <p className="text-sm text-texto-suave">Todavía no se guardó nada.</p>
+          <p className="text-sm text-texto-suave">
+            {revision.nombreHoja !== revision.archivo && <>Hoja «{revision.nombreHoja}». </>}
+            {revision.perfil && <>Se leyó con el perfil «{revision.perfil}». </>}
+            Todavía no se guardó nada.
+          </p>
         </div>
 
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -130,7 +162,7 @@ function Pasos({
             </p>
             <ul className="max-h-64 list-inside list-disc space-y-1 overflow-y-auto">
               {errores.map((e, i) => (
-                <li key={i}>{e.fila > 0 ? `Fila ${e.fila}: ${e.mensaje}` : e.mensaje}</li>
+                <li key={i}>{textoError(e)}</li>
               ))}
             </ul>
           </div>
@@ -210,7 +242,10 @@ function Pasos({
                       <td className="text-texto-suave">
                         {vinculosNuevos
                           .filter((v) => v.persona === p.clave)
-                          .map((v) => `${v.numero} (${v.relacion === "PROPIETARIO" ? "propietario" : "residente"})`)
+                          .map(
+                            (v) =>
+                              `${v.numero} (${TIPOS_VINCULO[v.relacion].texto.toLowerCase()}${v.desde ? ` desde el ${fecha(v.desde)}` : ""})`,
+                          )
                           .join(", ") || "—"}
                       </td>
                       <td>
@@ -245,6 +280,11 @@ function Pasos({
           <Boton type="submit" disabled={bloqueado || guardando}>
             {guardando ? "Cargando…" : "Confirmar y cargar"}
           </Boton>
+          {revision.hoja && (
+            <Boton type="button" variante="secundario" onClick={() => setEditando(true)} disabled={guardando}>
+              Cambiar columnas
+            </Boton>
+          )}
           <Boton type="button" variante="secundario" onClick={otraVez} disabled={guardando}>
             Subir otra planilla
           </Boton>
@@ -295,10 +335,124 @@ function Pasos({
         </label>
       )}
       <Mensaje texto={errorArchivo} />
-      {(revision.etapa === "inicio" ? revision.errores : undefined)?.map((e, i) => <Mensaje key={i} texto={e.fila > 1 ? `Fila ${e.fila}: ${e.mensaje}` : e.mensaje} />)}
+      {(revision.etapa === "inicio" ? revision.errores : undefined)?.map((e, i) => <Mensaje key={i} texto={textoError(e)} />)}
       <Boton type="submit" disabled={leyendo}>
         <Upload size={16} aria-hidden="true" /> {leyendo ? "Leyendo planilla…" : "Revisar planilla"}
       </Boton>
+    </form>
+  );
+}
+
+type EstadoColumnas = Extract<EstadoImportacion, { etapa: "columnas" | "revision" }>;
+
+/** Planilla propia: el usuario dice qué dato de Convive tiene cada columna. */
+function AsignarColumnas({
+  estado,
+  enviar,
+  enviando,
+  otraVez,
+  volver,
+}: {
+  estado: EstadoColumnas;
+  enviar: (fd: FormData) => void;
+  enviando: boolean;
+  otraVez: () => void;
+  volver?: () => void;
+}) {
+  const [guardar, setGuardar] = useState(!estado.perfil);
+  const errores = estado.etapa === "columnas" ? estado.errores : undefined;
+  return (
+    <form action={enviar} className="space-y-4">
+      <div>
+        <h2 className="text-lg font-bold">¿Qué tiene cada columna?</h2>
+        <p className="text-sm text-texto-suave">
+          {estado.archivo}
+          {estado.nombreHoja !== estado.archivo && <> · hoja «{estado.nombreHoja}»</>}. Elige a qué dato de Convive corresponde cada
+          columna de tu planilla. Las que digan «No usar» se ignoran. Todavía no se guardó nada.
+        </p>
+      </div>
+      {errores?.map((e, i) => <Mensaje key={i} texto={textoError(e)} />)}
+      {estado.hoja && estado.columnas.length > 0 ? (
+        <>
+          <input type="hidden" name="paso" value="columnas" />
+          <input type="hidden" name="hoja" value={estado.hoja} />
+          <input type="hidden" name="archivo" value={estado.archivo} />
+          {estado.totalEscrito && <input type="hidden" name="totalUnidades" value={estado.totalEscrito} />}
+          <Tabla>
+            <thead>
+              <tr>
+                <th>Columna</th>
+                <th>Ejemplos</th>
+                <th>Dato de Convive</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estado.columnas.map((c) => (
+                <tr key={c.indice}>
+                  <td>
+                    <span className="mr-2 text-texto-suave">{c.letra}</span>
+                    <span className="font-semibold">{c.titulo}</span>
+                  </td>
+                  <td className="text-sm text-texto-suave">{c.ejemplos.join(" · ") || "—"}</td>
+                  <td>
+                    <Select name={`col:${c.titulo}`} defaultValue={c.clave ?? "ignorar"} aria-label={`Dato de la columna ${c.letra}, ${c.titulo}`}>
+                      <option value="ignorar">No usar</option>
+                      {COLUMNAS.map((d) => (
+                        <option key={d.clave} value={d.clave}>
+                          {d.titulo}
+                        </option>
+                      ))}
+                    </Select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabla>
+          <div className="rounded-xl border border-borde p-4">
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" name="guardarPerfil" checked={guardar} onChange={(e) => setGuardar(e.target.checked)} className="mt-1" />
+              <span>
+                <span className="font-semibold">Recordar estas columnas</span>
+                <span className="block text-texto-suave">
+                  La próxima planilla con estos mismos títulos se leerá sola. Solo lo ve tu administradora.
+                </span>
+              </span>
+            </label>
+            {guardar && (
+              <label className="mt-3 block max-w-sm">
+                <span className="mb-1 block text-sm font-semibold">Nombre del perfil</span>
+                <Input name="nombrePerfil" required minLength={2} maxLength={60} defaultValue={estado.perfil ?? "Planilla propia"} />
+              </label>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Boton type="submit" disabled={enviando}>
+              {enviando ? "Leyendo planilla…" : "Revisar con estas columnas"}
+            </Boton>
+            {volver && (
+              <Boton type="button" variante="secundario" onClick={volver} disabled={enviando}>
+                Volver a la revisión
+              </Boton>
+            )}
+            <Boton type="button" variante="secundario" onClick={otraVez} disabled={enviando}>
+              Subir otra planilla
+            </Boton>
+          </div>
+        </>
+      ) : (
+        <>
+          <Mensaje
+            texto={
+              estado.hoja
+                ? "No encontré títulos de columnas en la planilla. Agrega una fila de títulos (Unidad, Alícuota, Nombre…) y súbela otra vez."
+                : "Esta planilla es muy grande para elegir las columnas aquí. Cambia el título de la columna de la unidad a «Unidad» o usa la planilla de Convive."
+            }
+          />
+          <Boton type="button" variante="secundario" onClick={otraVez}>
+            Subir otra planilla
+          </Boton>
+        </>
+      )}
     </form>
   );
 }

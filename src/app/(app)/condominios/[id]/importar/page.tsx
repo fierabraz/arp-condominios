@@ -1,15 +1,21 @@
 import { notFound } from "next/navigation";
-import { Download } from "lucide-react";
+import { Download, ShieldCheck } from "lucide-react";
 import { BotonDocumento, Card, PageHeader } from "@/components/ui";
-import { COLUMNAS } from "@/lib/importacion";
+import { db } from "@/lib/db";
+import { COLUMNAS, type Mapeo } from "@/lib/importacion";
 import { condominioVisible } from "../condominio-actual";
-import { confirmarImportacion, revisarPlanilla } from "../../importar-actions";
+import { asignarColumnas, confirmarImportacion, eliminarPerfil, revisarPlanilla } from "../../importar-actions";
+import { BotonAccion } from "../estructura/formularios";
 import { ImportarForm } from "./importar-form";
+
+const tituloDe = (clave: string) => COLUMNAS.find((c) => c.clave === clave)?.titulo ?? "No usar";
 
 export default async function ImportarPage({ params }: PageProps<"/condominios/[id]/importar">) {
   const { id } = await params;
-  const { condominio, editable } = await condominioVisible(id);
+  const { condominio, editable, administradoraId } = await condominioVisible(id);
   if (!editable) notFound();
+  // Los perfiles son de esta administradora: nunca se muestran ni se aplican en otra.
+  const perfiles = await db.perfilImportacion.findMany({ where: { administradoraId }, orderBy: { nombre: "asc" } });
 
   return (
     <>
@@ -36,8 +42,8 @@ export default async function ImportarPage({ params }: PageProps<"/condominios/[
             <p className="text-sm font-bold text-marca">Paso 2</p>
             <p className="mt-1 font-semibold">Complétala en Excel</p>
             <p className="mt-1 text-sm text-texto-suave">
-              Una fila por persona y unidad. También sirve tu propia planilla si tiene columnas parecidas (Unidad, Alícuota,
-              Nombre, RUT, Correo…).
+              Una fila por persona y unidad. También sirve tu propia planilla: si no reconocemos sus columnas, eliges qué es
+              cada una y lo recordamos para la próxima.
             </p>
           </Card>
         </li>
@@ -57,9 +63,47 @@ export default async function ImportarPage({ params }: PageProps<"/condominios/[
           condominioId={id}
           totalUnidades={condominio.totalUnidades}
           revisar={revisarPlanilla.bind(null, id)}
+          asignar={asignarColumnas.bind(null, id)}
           confirmar={confirmarImportacion.bind(null, id)}
         />
       </Card>
+
+      <p className="mb-6 flex items-start gap-2 text-sm text-texto-suave">
+        <ShieldCheck size={18} className="mt-0.5 shrink-0 text-marca" aria-hidden="true" />
+        <span>
+          El archivo no se guarda: solo se leen los valores de sus celdas (las fórmulas y macros no se ejecutan). Acepta .xlsx y
+          .csv de hasta 900 KB. Nada se envía a otros servicios.
+        </span>
+      </p>
+
+      {perfiles.length > 0 && (
+        <section aria-labelledby="perfiles" className="mb-6">
+          <h2 id="perfiles" className="mb-1 text-lg font-bold">
+            Planillas propias recordadas
+          </h2>
+          <p className="mb-3 text-sm text-texto-suave">Cuando una planilla tiene estos títulos, sus columnas se leen solas.</p>
+          <Card className="p-0">
+            <ul className="divide-y divide-borde">
+              {perfiles.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 text-sm">
+                  <span>
+                    <span className="font-semibold">{p.nombre}</span>
+                    <span className="block text-texto-suave">
+                      {Object.entries(p.columnas as Mapeo)
+                        .filter(([, d]) => d !== "ignorar")
+                        .map(([t, d]) => `${t} → ${tituloDe(d)}`)
+                        .join(" · ")}
+                    </span>
+                  </span>
+                  <BotonAccion accion={eliminarPerfil.bind(null, id, p.id)} pregunta={`¿Olvidar el perfil «${p.nombre}»? Lo ya cargado no cambia.`}>
+                    Olvidar
+                  </BotonAccion>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </section>
+      )}
 
       <details className="sombra-convive rounded-2xl border border-borde bg-white p-5 text-sm">
         <summary className="cursor-pointer font-semibold">Qué va en cada columna</summary>
