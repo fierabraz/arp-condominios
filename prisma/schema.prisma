@@ -186,6 +186,8 @@ model Administradora {
   votaciones          Votacion[]
   perfilesImportacion PerfilImportacion[]
   aperturas           Apertura[]
+  espaciosReservables EspacioReservable[]
+  reservas            Reserva[]
 }
 
 model Usuario {
@@ -269,6 +271,8 @@ model Condominio {
   espacios      Espacio[]
   instalaciones Instalacion[]
   apertura      Apertura?
+  reservables   EspacioReservable[]
+  reservas      Reserva[]
 
   @@index([administradoraId])
 }
@@ -423,6 +427,7 @@ model Unidad {
   votos              Voto[]
   deudasApertura     DeudaApertura[]
   creditosApertura   CreditoApertura[]
+  reservas           Reserva[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -497,6 +502,9 @@ model Gasto {
   monto            Decimal        @db.Decimal(14, 2)
   fecha            DateTime
   creadoEn         DateTime       @default(now())
+
+  // Si el cargo viene de una reserva de espacio común.
+  reserva Reserva?
 
   @@index([administradoraId])
   @@index([periodoId])
@@ -874,4 +882,89 @@ model ObligacionApertura {
   observaciones String?
   creadoPor     String
   creadoEn      DateTime               @default(now())
+}
+
+// ── Reserva de espacios comunes (RES-001) ──
+// Quincho, sala de eventos, piscina... El administrador define el espacio, sus turnos y reglas;
+// el residente reserva un día y un turno libre. Si el espacio tiene costo, al confirmarse la
+// reserva se agrega un cargo individual a la unidad en el mes de la reserva (o en el siguiente
+// mes abierto), y así sale en su aviso de cobro.
+
+enum EstadoReserva {
+  PENDIENTE // espera la aprobación de la administración
+  CONFIRMADA
+  RECHAZADA
+  CANCELADA
+}
+
+enum CobroReserva {
+  SIN_COBRO // el espacio no tiene costo
+  POR_CARGAR // confirmada: espera un mes abierto donde agregar el cargo
+  CARGADO // ya se agregó el cargo al mes (Reserva.gastoId)
+  ANULADO // reserva cancelada o rechazada antes de cargarse
+}
+
+model EspacioReservable {
+  id                     String         @id @default(cuid())
+  administradoraId       String
+  administradora         Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId           String
+  condominio             Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  nombre                 String
+  descripcion            String?
+  // Normas de uso que el residente acepta al reservar (horario, aseo, ruidos, garantía...).
+  normas                 String?
+  capacidad              Int?
+  // Turnos que se pueden reservar cada día, por ejemplo "Almuerzo (12:00 a 17:00)". Mínimo uno.
+  turnos                 String[]
+  // Lo que se cobra por reserva (0 = sin costo). Se suma al aviso de cobro de la unidad.
+  costo                  Decimal        @default(0) @db.Decimal(14, 2)
+  requiereAprobacion     Boolean        @default(false)
+  // Hasta cuántos días hacia adelante se puede reservar.
+  anticipacionMaximaDias Int            @default(60)
+  // Reservas por unidad en un mismo mes (null = sin límite).
+  maximoPorMes           Int?
+  // No deja reservar a unidades con deuda vencida.
+  bloquearMorosos        Boolean        @default(false)
+  activo                 Boolean        @default(true)
+  creadoEn               DateTime       @default(now())
+  actualizadoEn          DateTime       @updatedAt
+
+  reservas Reserva[]
+
+  @@unique([condominioId, nombre])
+  @@index([administradoraId])
+}
+
+model Reserva {
+  id                String            @id @default(cuid())
+  administradoraId  String
+  administradora    Administradora    @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId      String
+  condominio        Condominio        @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  espacioId         String
+  espacio           EspacioReservable @relation(fields: [espacioId], references: [id], onDelete: NoAction)
+  unidadId          String
+  unidad            Unidad            @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  fecha             DateTime          @db.Date
+  turno             String
+  estado            EstadoReserva
+  // Costo del espacio al momento de reservar.
+  monto             Decimal           @default(0) @db.Decimal(14, 2)
+  cobro             CobroReserva      @default(SIN_COBRO)
+  gastoId           String?           @unique
+  gasto             Gasto?            @relation(fields: [gastoId], references: [id], onDelete: SetNull)
+  observaciones     String?
+  // Quién la pidió (nombre), y si fue el residente desde su cuenta o la administración.
+  solicitadaPor     String
+  porAdministracion Boolean           @default(false)
+  respondidaPor     String?
+  respondidaEn      DateTime?
+  // Motivo del rechazo o de la cancelación.
+  motivo            String?
+  creadoEn          DateTime          @default(now())
+
+  @@index([espacioId, fecha])
+  @@index([unidadId])
+  @@index([condominioId, estado])
 }

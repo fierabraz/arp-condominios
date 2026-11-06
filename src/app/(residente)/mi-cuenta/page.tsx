@@ -37,7 +37,7 @@ export default async function InicioResidentePage({ searchParams }: PageProps<"/
     { texto: "Solicitar certificados", icono: "certificado" },
     { texto: "Enviar solicitudes", icono: "solicitud" },
     { texto: "Reportar incidencias", icono: "incidencia" },
-    { texto: "Reservar espacios comunes", icono: "reserva" },
+    { texto: "Reservar espacios comunes", icono: "reserva", href: enlace("/mi-cuenta/reservas") },
   ];
 
   return (

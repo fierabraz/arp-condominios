@@ -33,7 +33,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
       { clave: "bitacora", texto: "Bitácora", descripcion: "Registro de turnos y novedades del conserje." },
       { clave: "visitas", texto: "Visitas", descripcion: "Ingreso y salida de visitas por unidad." },
       { clave: "encomiendas", texto: "Encomiendas", descripcion: "Paquetes recibidos en conserjería y aviso al residente." },
-      { clave: "reservas", texto: "Reservas de espacios comunes", descripcion: "Quincho, salón de eventos y otros espacios, con calendario y cobro." },
+      { clave: "reservas", texto: "Reservas de espacios comunes", ruta: "/reservas", descripcion: "Quincho, salón de eventos y otros espacios, con calendario y cobro." },
     ],
   },
   {

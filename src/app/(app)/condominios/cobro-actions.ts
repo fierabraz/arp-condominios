@@ -12,6 +12,7 @@ import { MedioPago, TipoGasto } from "@/generated/prisma/enums";
 import { nombrePeriodo } from "@/lib/cobro";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { registrar, registrarEn } from "@/lib/registro";
+import { cargarCobrosPendientes } from "@/lib/reservas-servicio";
 
 const PeriodoSchema = z.object({
   anio: z.number({ error: "Ingresa el año." }).int().min(2000, { error: "Año no válido." }).max(2100, { error: "Año no válido." }),
@@ -32,6 +33,8 @@ export async function abrirPeriodo(condominioId: string, _: EstadoForm, formData
 
   const periodo = await db.periodo.create({ data: { ...datos.data, condominioId, administradoraId } });
   await registrar(usuario, "Abrió un mes", `${nombrePeriodo(periodo.anio, periodo.mes)} en ${condominio.nombre}`, condominioId);
+  // RES-001: las reservas con costo que esperaban un mes abierto se cargan ahora.
+  await cargarCobrosPendientes(condominioId, administradoraId);
   redirect(`/condominios/${condominioId}/periodos/${periodo.id}`);
 }
 
