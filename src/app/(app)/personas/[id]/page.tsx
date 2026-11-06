@@ -13,12 +13,14 @@ import { DIAS_INVITACION } from "@/lib/recuperacion";
 import { invitar } from "../../condominios/invitaciones-actions";
 import { PersonaForm } from "../persona-form";
 import { editarPersona, eliminarPersona } from "../actions";
+import { motivosParaNoEliminar } from "@/lib/personas";
 
 export default async function PersonaPage({ params }: PageProps<"/personas/[id]">) {
   const { id } = await params;
   const { usuario, administradoraId } = await requireAdministradora();
   const p = await db.persona.findFirst({ where: { id, administradoraId, ...filtroPersonas(usuario) }, include: {
-      _count: { select: { unidades: true } },
+      _count: { select: { unidades: true, vinculos: true } },
+      usuario: { select: { id: true } },
       vinculos: {
         where: { unidad: filtroPorCondominio(usuario) },
         include: { unidad: { select: { id: true, numero: true, condominioId: true, condominio: { select: { nombre: true } } } } },
@@ -29,6 +31,8 @@ export default async function PersonaPage({ params }: PageProps<"/personas/[id]"
   if (!p) notFound();
   const estado = (await estadoDePersona(p.id, administradoraId))!;
   const sinUnidad = p._count.unidades === 0;
+  // SEG-20: cuenta todos sus vínculos, también los de propiedades que esta cuenta no ve.
+  const motivos = motivosParaNoEliminar({ unidades: p._count.unidades, vinculos: p._count.vinculos, tieneCuenta: !!p.usuario });
 
   return (
     <>
@@ -73,8 +77,15 @@ export default async function PersonaPage({ params }: PageProps<"/personas/[id]"
           </ul>
         )}
       </Card>
-      {p.vinculos.length > 0 || p._count.unidades > 0 ? (
-        <p className="text-sm text-texto-suave">Esta persona tiene vínculos con unidades, así que no se elimina: su historial se conserva.</p>
+      {motivos.length > 0 ? (
+        <div className="text-sm text-texto-suave">
+          <p className="font-medium text-texto">Esta persona no se puede eliminar:</p>
+          <ul className="mt-1 list-disc pl-5">
+            {motivos.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
+        </div>
       ) : (
         <form action={eliminarPersona.bind(null, p.id)}>
           <Boton variante="peligro" type="submit">

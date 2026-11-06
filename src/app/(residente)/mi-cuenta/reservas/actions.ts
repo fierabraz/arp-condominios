@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
 import { formatoDia, hoyChile } from "@/lib/formato";
@@ -23,7 +23,7 @@ const ReservaSchema = z.object({
 });
 
 async function residente() {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const unidades = await unidadesDelResidente(usuario.personaId);
   return { usuario, unidades };
 }

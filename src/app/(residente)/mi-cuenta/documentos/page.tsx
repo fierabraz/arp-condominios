@@ -1,12 +1,12 @@
 import { Download } from "lucide-react";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PageHeader, Vacio } from "@/components/ui";
 import { nombrePeriodo } from "@/lib/cobro";
 import { unidadesVisibles } from "../../datos-residente";
 
 export default async function DocumentosPage({ searchParams }: PageProps<"/mi-cuenta/documentos">) {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const { condominioIds } = await unidadesVisibles(usuario, (await searchParams).unidad);
   const rendiciones = await db.periodo.findMany({
     where: { condominioId: { in: condominioIds }, estado: "CERRADO" },

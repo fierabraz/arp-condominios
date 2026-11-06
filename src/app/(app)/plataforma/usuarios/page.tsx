@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Boton, Insignia, Input, PageHeader, Select, Tabla, Vacio } from "@/components/ui";
 import { ETIQUETAS_ROL, formatoFechaHora } from "@/lib/formato";
@@ -10,7 +10,7 @@ const ROLES = Object.keys(ETIQUETAS_ROL) as Rol[];
 const texto = (v: string | string[] | undefined) => (typeof v === "string" ? v.trim() : "");
 
 export default async function UsuariosPlataformaPage({ searchParams }: PageProps<"/plataforma/usuarios">) {
-  await requireUsuario(["SUPERADMIN"]);
+  await requirePermiso("plataforma");
   const sp = await searchParams;
   const q = texto(sp.q);
   const administradora = texto(sp.administradora);

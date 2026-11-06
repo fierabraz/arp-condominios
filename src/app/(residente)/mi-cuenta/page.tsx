@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { Activity, AlertTriangle, BarChart3, CalendarDays, ChevronRight, Vote, Wallet } from "lucide-react";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { Vacio } from "@/components/ui";
 import { formatoFechaHora, formatoFechaLarga, formatoMoneda } from "@/lib/formato";
 import { MARCA } from "@/lib/marca";
@@ -11,7 +11,7 @@ import { PanelImportante } from "./panel-importante";
 import { TarjetaAccesos, type Acceso } from "./tarjeta-accesos";
 
 export default async function InicioResidentePage({ searchParams }: PageProps<"/mi-cuenta">) {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const { unidad } = await searchParams;
   const datos = await datosInicio(usuario, typeof unidad === "string" ? unidad : undefined);
   const { enlace, resumen, alertas, actividad } = datos;

@@ -68,3 +68,31 @@ test("residentes y plataforma no entran a propiedades desde la administración",
   assert.equal(esPrincipal(residente), false);
   assert.equal(esPrincipal(plataforma), false);
 });
+
+test("SEG-17: catálogo de permisos por perfil (si cambia, esta tabla debe cambiar a propósito)", async () => {
+  const { PERMISOS, perfilDe, puede } = await import("./permisos");
+  const cuentas = { principal, asignado, comite, residente, plataforma };
+  const tabla = Object.fromEntries(
+    Object.entries(cuentas).map(([nombre, a]) => [nombre, Object.keys(PERMISOS).filter((p) => puede(a, p as keyof typeof PERMISOS))]),
+  );
+  assert.deepEqual(tabla, {
+    principal: ["propiedad.ver", "propiedad.administrar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
+    asignado: ["propiedad.ver", "propiedad.administrar"],
+    comite: ["propiedad.ver"],
+    residente: ["portal.residente"],
+    plataforma: ["plataforma"],
+  });
+  assert.equal(perfilDe(principal), "PRINCIPAL");
+  assert.equal(perfilDe(asignado), "ADMINISTRADOR");
+});
+
+test("SEG-17: con una propiedad, además debe alcanzarla", async () => {
+  const { puede } = await import("./permisos");
+  assert.equal(puede(principal, "propiedad.administrar", "Z"), true);
+  assert.equal(puede(asignado, "propiedad.administrar", "A"), true);
+  assert.equal(puede(asignado, "propiedad.administrar", "B"), false);
+  assert.equal(puede(comite, "propiedad.ver", "B"), true);
+  assert.equal(puede(comite, "propiedad.administrar", "B"), false);
+  assert.equal(puede(residente, "propiedad.ver", "A"), false);
+  assert.equal(puede(sinAsignar, "propiedad.ver", "A"), false);
+});

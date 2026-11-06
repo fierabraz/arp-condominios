@@ -4,8 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { decrypt, SESSION_COOKIE } from "@/lib/session";
-import type { Rol } from "@/generated/prisma/enums";
-import { alcanzaCondominio, esPrincipal } from "@/lib/permisos";
+import { puede, type Permiso } from "@/lib/permisos";
 
 // Capa de acceso a datos: toda página y acción pasa por aquí para saber
 // quién es el usuario y a qué administradora pertenece.
@@ -41,26 +40,34 @@ export const getUsuarioActual = cache(async () => {
 
 export type UsuarioActual = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
 
-export async function requireUsuario(roles?: Rol[]) {
+/** Cualquier cuenta con sesión. Para exigir algo más se usa requirePermiso. */
+export async function requireUsuario() {
   const usuario = await getUsuarioActual();
   // Sesión válida pero usuario borrado: limpiar la cookie.
   if (!usuario) redirect("/salir");
-  if (roles && !roles.includes(usuario.rol)) redirect("/");
   return usuario;
 }
 
-/** Usuario que trabaja dentro de una administradora; devuelve su id para filtrar consultas. */
-export async function requireAdministradora(roles: Rol[] = ["ADMINISTRADOR"]) {
-  const usuario = await requireUsuario(roles);
+/**
+ * SEG-17: la única puerta de entrada por permiso. Si la cuenta no lo tiene, vuelve al inicio.
+ * El catálogo de qué perfil puede qué está en src/lib/permisos.ts (PERMISOS).
+ */
+export async function requirePermiso(permiso: Permiso) {
+  const usuario = await requireUsuario();
+  if (!puede(usuario, permiso)) redirect("/");
+  return usuario;
+}
+
+/** Cuenta que trabaja dentro de una administradora; devuelve su id para filtrar consultas. */
+export async function requireAdministradora(permiso: Permiso = "propiedad.administrar") {
+  const usuario = await requirePermiso(permiso);
   if (!usuario.administradoraId) redirect("/");
   return { usuario, administradoraId: usuario.administradoraId };
 }
 
 /** Solo el administrador principal: crear propiedades y manejar las cuentas de la administradora. */
 export async function requirePrincipal() {
-  const r = await requireAdministradora();
-  if (!esPrincipal(r.usuario)) redirect("/");
-  return r;
+  return requireAdministradora("cuentas.administrar");
 }
 
 /**
@@ -68,9 +75,10 @@ export async function requirePrincipal() {
  * una propiedad, unidad, período, pago, publicación o votación pasa por aquí.
  */
 export function puedeVerPropiedad(usuario: UsuarioActual, condominioId: string) {
-  return alcanzaCondominio(usuario, condominioId);
+  return puede(usuario, "propiedad.ver", condominioId);
 }
 
-export function puedeEditar(rol: Rol) {
-  return rol === "ADMINISTRADOR";
+/** Puede cambiar datos (el comité solo mira). */
+export function puedeEditar(usuario: UsuarioActual) {
+  return puede(usuario, "propiedad.administrar");
 }

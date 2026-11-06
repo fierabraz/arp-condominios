@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUsuario, type UsuarioActual } from "@/lib/auth";
+import { requirePermiso, type UsuarioActual } from "@/lib/auth";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { ETIQUETAS_ROL } from "@/lib/formato";
 import { anotarIntento } from "@/lib/intentos";
@@ -15,7 +15,7 @@ import { ClaveSchema, CorreoSchema } from "@/lib/usuarios";
 // Administración de cuentas desde la plataforma: solo la cuenta SUPERADMIN.
 
 async function cuenta(id: string) {
-  const yo = await requireUsuario(["SUPERADMIN"]);
+  const yo = await requirePermiso("plataforma");
   const u = await db.usuario.findUnique({ where: { id } });
   return { yo, u };
 }

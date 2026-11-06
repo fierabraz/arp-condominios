@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Boton, Card, Insignia, PageHeader } from "@/components/ui";
 import { ETIQUETAS_ROL, formatoFechaHora } from "@/lib/formato";
@@ -9,7 +9,7 @@ import { cambiarClaveDe, cambiarEstado, desbloquear, editarDatos } from "../acti
 import { ClaveForm, DatosForm } from "../formularios";
 
 export default async function UsuarioPlataformaPage({ params }: PageProps<"/plataforma/usuarios/[usuarioId]">) {
-  const yo = await requireUsuario(["SUPERADMIN"]);
+  const yo = await requirePermiso("plataforma");
   const { usuarioId } = await params;
   const u = await db.usuario.findUnique({
     where: { id: usuarioId },

@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { puedeVerPropiedad, requireAdministradora, requirePrincipal } from "@/lib/auth";
+import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { registrar } from "@/lib/registro";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import {
@@ -48,7 +48,7 @@ const NuevaSchema = z.object({
 
 /** «Nueva comunidad» con el asistente: crea la comunidad (en configuración) y abre el generador. */
 export async function crearComunidadVisual(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const { usuario, administradoraId } = await requirePrincipal();
+  const { usuario, administradoraId } = await requireAdministradora("propiedades.crear");
   const datos = NuevaSchema.safeParse({
     nombre: aTexto(formData.get("nombre")),
     direccion: aTexto(formData.get("direccion")),

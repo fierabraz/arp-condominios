@@ -184,7 +184,6 @@ model Administradora {
   proveedores         Proveedor[]
   publicaciones       Publicacion[]
   votaciones          Votacion[]
-  registros           RegistroCambio[]
   perfilesImportacion PerfilImportacion[]
   aperturas           Apertura[]
   espaciosReservables EspacioReservable[]
@@ -695,18 +694,25 @@ model TokenRecuperacion {
 
 // Registro de cambios: quién hizo qué y cuándo. Guarda nombres y textos (no relaciones)
 // para que el historial se conserve aunque después se borre lo registrado.
+// SEG-25: el registro no depende de la administradora: si alguna vez se elimina una,
+// su historial queda guardado (por eso administradoraId no es una relación).
 model RegistroCambio {
-  id               String          @id @default(cuid())
+  id               String   @id @default(cuid())
   administradoraId String?
-  administradora   Administradora? @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   condominioId     String?
   usuarioId        String?
   usuarioNombre    String
   accion           String
   detalle          String
-  creadoEn         DateTime        @default(now())
+  // Qué registro cambió (por ejemplo "Pago" y su id) y cómo estaba antes y después.
+  entidad          String?
+  entidadId        String?
+  antes            Json?
+  despues          Json?
+  creadoEn         DateTime @default(now())
 
   @@index([administradoraId, creadoEn])
+  @@index([entidad, entidadId])
   @@index([condominioId, creadoEn])
 }
 

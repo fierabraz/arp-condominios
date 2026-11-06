@@ -1,4 +1,4 @@
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { configuracionCorreo } from "@/lib/correo";
 import { NOMBRE_PROVEEDOR } from "@/lib/correo-proveedores";
 import { Card, Insignia, PageHeader } from "@/components/ui";
@@ -6,7 +6,7 @@ import { enviarCorreoPrueba } from "./actions";
 import { PruebaCorreoForm } from "./prueba-form";
 
 export default async function CorreoPlataformaPage() {
-  const usuario = await requireUsuario(["SUPERADMIN"]);
+  const usuario = await requirePermiso("plataforma");
   const config = configuracionCorreo();
   const real = config.proveedor !== "PRUEBA";
 

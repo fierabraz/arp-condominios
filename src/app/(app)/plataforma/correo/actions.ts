@@ -1,6 +1,6 @@
 "use server";
 
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { enviarCorreo, escaparHtml, proveedorActivo } from "@/lib/correo";
 import { NOMBRE_PROVEEDOR } from "@/lib/correo-proveedores";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
@@ -9,7 +9,7 @@ import { CorreoSchema } from "@/lib/usuarios";
 import { z } from "zod";
 
 export async function enviarCorreoPrueba(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
-  const usuario = await requireUsuario(["SUPERADMIN"]);
+  const usuario = await requirePermiso("plataforma");
   const datos = z.object({ para: CorreoSchema }).safeParse({ para: aTexto(formData.get("para")) });
   if (!datos.success) return erroresDe(datos.error);
   const proveedor = NOMBRE_PROVEEDOR[proveedorActivo()];

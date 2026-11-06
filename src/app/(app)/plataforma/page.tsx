@@ -1,11 +1,11 @@
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { AdministradoraForm } from "./administradora-form";
 import { crearAdministradora } from "./actions";
 
 export default async function PlataformaPage() {
-  await requireUsuario(["SUPERADMIN"]);
+  await requirePermiso("plataforma");
   const administradoras = await db.administradora.findMany({
     orderBy: { creadoEn: "desc" },
     include: { _count: { select: { condominios: true, unidades: true, usuarios: true } } },

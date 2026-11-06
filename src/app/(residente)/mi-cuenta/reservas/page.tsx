@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { Card, Insignia, Mensaje, PageHeader, Vacio } from "@/components/ui";
 import { CalendarioReservas } from "@/components/calendario-reservas";
@@ -11,7 +11,7 @@ import { unidadesVisibles } from "../../datos-residente";
 import { cancelarMiReserva, reservarEspacio } from "./actions";
 
 export default async function ReservasResidentePage({ searchParams }: PageProps<"/mi-cuenta/reservas">) {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const sp = await searchParams;
   const sel = await unidadesVisibles(usuario, sp.unidad);
   const $ = (n: number | { toString(): string }) => formatoMoneda(n, usuario.administradora?.moneda ?? "CLP");

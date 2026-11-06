@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requirePrincipal } from "@/lib/auth";
+import { requireAdministradora } from "@/lib/auth";
 import { Card, PageHeader } from "@/components/ui";
 import { CondominioForm } from "../condominio-form";
 import { crearCondominio } from "../actions";
@@ -7,7 +7,7 @@ import { crearComunidadVisual } from "../generador-actions";
 import { NuevaComunidad } from "./nueva-comunidad";
 
 export default async function NuevoCondominioPage({ searchParams }: PageProps<"/condominios/nuevo">) {
-  await requirePrincipal();
+  await requireAdministradora("propiedades.crear");
   const formulario = (await searchParams).formulario === "1";
   if (formulario) {
     return (

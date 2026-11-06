@@ -5,7 +5,7 @@ import "dotenv/config";
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../src/lib/db";
-import { anularPago, emitirPeriodo, ErrorCobro, registrarPago } from "../src/lib/cobro-servicio";
+import { anularPago, emitirPeriodo, ErrorCobro, PagoDuplicado, registrarPago } from "../src/lib/cobro-servicio";
 import { puedeVerCondominio, puedeVerUnidad } from "../src/lib/acceso";
 import type { UsuarioActual } from "../src/lib/auth";
 
@@ -74,7 +74,10 @@ describe("pagos simultáneos (SEG-23)", () => {
     // Una unidad con un aviso de 100.000; diez pagos de 15.000 al mismo tiempo = 150.000.
     const { adm, unidades } = await escenario("simultaneos", 1, 100_000);
     const unidad = unidades[0];
-    await Promise.all(Array.from({ length: 10 }, () => registrarPago(adm.id, pagoDe(unidad.id, 15_000))));
+    // Son pagos iguales a propósito: se confirma que son distintos para probar solo el bloqueo.
+    await Promise.all(
+      Array.from({ length: 10 }, () => registrarPago(adm.id, pagoDe(unidad.id, 15_000), { permitirDuplicado: true })),
+    );
 
     const { avisos, pagos } = await saldosDe(unidad.id);
     assert.equal(avisos.length, 1);
@@ -147,6 +150,112 @@ describe("anular pagos sin borrarlos (SEG-21)", () => {
     const pago = await registrarPago(a.adm.id, pagoDe(a.unidades[0].id, 5_000));
     await assert.rejects(anularPago(pago.id, b.adm.id, { por: "Intruso", motivo: "Prueba de acceso" }), ErrorCobro);
     assert.equal((await db.pago.findUniqueOrThrow({ where: { id: pago.id } })).anuladoEn, null);
+  });
+});
+
+describe("pagos duplicados (SEG-22)", () => {
+  test("un pago igual (unidad, monto y día) no se guarda sin confirmar; confirmado, sí", async () => {
+    const { adm, unidades } = await escenario("duplicados", 1, 100_000);
+    const unidad = unidades[0];
+    await registrarPago(adm.id, pagoDe(unidad.id, 30_000));
+    await assert.rejects(registrarPago(adm.id, { ...pagoDe(unidad.id, 30_000), fecha: new Date("2026-02-01T18:00:00Z") }), PagoDuplicado);
+    assert.equal(await db.pago.count({ where: { unidadId: unidad.id } }), 1);
+    // Otro monto u otro día no es duplicado.
+    await registrarPago(adm.id, pagoDe(unidad.id, 30_001));
+    await registrarPago(adm.id, { ...pagoDe(unidad.id, 30_000), fecha: new Date("2026-02-02") });
+    // Confirmado como distinto, se guarda.
+    await registrarPago(adm.id, pagoDe(unidad.id, 30_000), { permitirDuplicado: true });
+    assert.equal(await db.pago.count({ where: { unidadId: unidad.id } }), 4);
+  });
+
+  test("dos pagos iguales enviados a la vez: entra uno y el otro pide confirmar", async () => {
+    const { adm, unidades } = await escenario("duplicados-a-la-vez", 1, 100_000);
+    const r = await Promise.allSettled([1, 2].map(() => registrarPago(adm.id, pagoDe(unidades[0].id, 25_000))));
+    assert.equal(r.filter((x) => x.status === "fulfilled").length, 1);
+    assert.ok(r.some((x) => x.status === "rejected" && x.reason instanceof PagoDuplicado));
+  });
+
+  test("un pago anulado no cuenta como duplicado", async () => {
+    const { adm, unidades } = await escenario("duplicado-anulado", 1, 100_000);
+    const p = await registrarPago(adm.id, pagoDe(unidades[0].id, 10_000));
+    await anularPago(p.id, adm.id, { por: "Prueba", motivo: "Transferencia rechazada" });
+    await registrarPago(adm.id, pagoDe(unidades[0].id, 10_000));
+  });
+});
+
+describe("registro de cambios en la misma operación (SEG-25)", () => {
+  const autorDe = (administradoraId: string) => ({ id: "usuario-prueba", nombre: "Prueba", administradoraId });
+
+  test("el pago y su registro quedan juntos, con el id del pago y cómo quedó", async () => {
+    const { adm, condominio, unidades } = await escenario("auditoria", 1, 100_000);
+    const pago = await registrarPago(adm.id, pagoDe(unidades[0].id, 40_000), {
+      anotar: (p) => ({
+        autor: autorDe(adm.id),
+        accion: "Registró un pago",
+        detalle: "Unidad 101",
+        condominioId: condominio.id,
+        entidad: "Pago",
+        entidadId: p.id,
+        despues: { monto: "40000" },
+      }),
+    });
+    const r = await db.registroCambio.findFirstOrThrow({ where: { entidad: "Pago", entidadId: pago.id } });
+    assert.deepEqual(r.despues, { monto: "40000" });
+
+    await anularPago(pago.id, adm.id, { por: "Prueba", motivo: "Error de digitación" }, ({ devuelto }) => ({
+      autor: autorDe(adm.id),
+      accion: "Anuló un pago",
+      detalle: "Unidad 101",
+      condominioId: condominio.id,
+      entidad: "Pago",
+      entidadId: pago.id,
+      antes: { estado: "Vigente" },
+      despues: { estado: "Anulado", devuelto },
+    }));
+    const anulacion = await db.registroCambio.findFirstOrThrow({ where: { entidadId: pago.id, accion: "Anuló un pago" } });
+    assert.deepEqual(anulacion.despues, { estado: "Anulado", devuelto: "40000" });
+  });
+
+  test("si el registro falla, el pago no se guarda y la deuda no cambia", async () => {
+    const { adm, unidades } = await escenario("auditoria-falla", 1, 100_000);
+    const unidad = unidades[0];
+    const antes = await saldosDe(unidad.id);
+    await assert.rejects(
+      registrarPago(adm.id, pagoDe(unidad.id, 40_000), {
+        // Falta el nombre de quien lo hizo: la base rechaza el registro.
+        anotar: () => ({ autor: { ...autorDe(adm.id), nombre: null as unknown as string }, accion: "Registró un pago", detalle: "x" }),
+      }),
+      /usuarioNombre/,
+    );
+    const despues = await saldosDe(unidad.id);
+    assert.equal(despues.pagos.length, 0);
+    assert.deepEqual(despues.avisos, antes.avisos);
+  });
+
+  test("si el registro del cierre falla, el mes sigue abierto y no se emiten avisos", async () => {
+    const adm = await db.administradora.create({ data: { nombre: `Prueba cierre-falla ${sufijo}` } });
+    creadas.push(adm.id);
+    const c = await db.condominio.create({
+      data: { administradoraId: adm.id, nombre: "Edificio cierre", direccion: "Calle 1", porcentajeReserva: 0, estado: "HABILITADA_FINANCIERA" },
+    });
+    await db.unidad.create({ data: { administradoraId: adm.id, condominioId: c.id, numero: "101", alicuota: 100 } });
+    const periodo = await db.periodo.create({ data: { administradoraId: adm.id, condominioId: c.id, anio: 2026, mes: 3 } });
+    await assert.rejects(
+      emitirPeriodo(periodo.id, adm.id, () => ({ autor: { ...autorDe(adm.id), nombre: null as unknown as string }, accion: "Cerró", detalle: "x" })),
+      /usuarioNombre/,
+    );
+    assert.equal((await db.periodo.findUniqueOrThrow({ where: { id: periodo.id } })).estado, "ABIERTO");
+    assert.equal(await db.avisoCobro.count({ where: { periodoId: periodo.id } }), 0);
+  });
+
+  test("el registro se conserva aunque se elimine la administradora", async () => {
+    const adm = await db.administradora.create({ data: { nombre: `Prueba borrar ${sufijo}` } });
+    const r = await db.registroCambio.create({
+      data: { administradoraId: adm.id, usuarioNombre: "Prueba", accion: "Prueba", detalle: "x" },
+    });
+    await db.administradora.delete({ where: { id: adm.id } });
+    assert.ok(await db.registroCambio.findUnique({ where: { id: r.id } }));
+    await db.registroCambio.delete({ where: { id: r.id } });
   });
 });
 

@@ -1,4 +1,4 @@
-import { requireUsuario } from "@/lib/auth";
+import { requirePermiso } from "@/lib/auth";
 import { Insignia, PageHeader, Vacio } from "@/components/ui";
 import { formatoPorcentaje } from "@/lib/formato";
 import { EstadoCuenta } from "@/components/estado-cuenta";
@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { cuentasDe, unidadesVisibles } from "../../datos-residente";
 
 export default async function PagosPage({ searchParams }: PageProps<"/mi-cuenta/pagos">) {
-  const usuario = await requireUsuario(["RESIDENTE"]);
+  const usuario = await requirePermiso("portal.residente");
   const moneda = usuario.administradora?.moneda ?? "CLP";
   const { visibles } = await unidadesVisibles(usuario, (await searchParams).unidad);
   const cuentas = await cuentasDe(usuario, visibles);

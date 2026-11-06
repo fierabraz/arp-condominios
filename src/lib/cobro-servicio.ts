@@ -1,6 +1,7 @@
 import "server-only";
 import { MENSAJE_SIN_FINANZAS, operaFinanzas } from "./configuracion";
 import { db } from "@/lib/db";
+import { registrarEn, type Auditoria } from "@/lib/registro";
 import type { MedioPago } from "@/generated/prisma/enums";
 import {
   aMinimo,
@@ -62,6 +63,16 @@ async function aplicarMonto(tx: Tx, pagoId: string, unidadId: string, monto: num
 }
 
 export class ErrorCobro extends Error {}
+
+/** SEG-22: ya hay un pago vigente igual (misma unidad, monto y día). No se guardó nada. */
+export class PagoDuplicado extends ErrorCobro {
+  constructor(readonly existente: { fecha: Date; referencia: string | null; creadoEn: Date }) {
+    super("Ya hay un pago igual registrado para esta unidad.");
+  }
+}
+
+/** Cómo anotar el cambio en el registro (SEG-25): lo que falta se completa con el resultado. */
+type AnotarCon<T> = (resultado: T) => Auditoria;
 
 /**
  * Bloquea las unidades hasta que termine la transacción: si dos personas registran o anulan
@@ -150,7 +161,7 @@ export async function previsualizarPeriodo(periodoId: string, administradoraId: 
 }
 
 /** Cierra el período y emite un aviso de cobro por unidad. */
-export async function emitirPeriodo(periodoId: string, administradoraId: string) {
+export async function emitirPeriodo(periodoId: string, administradoraId: string, anotar?: AnotarCon<number>) {
   return db.$transaction(async (tx) => {
     // Bloquear el período: dos cierres a la vez esperan uno al otro y el segundo ve que ya se cerró.
     await tx.$queryRaw`SELECT id FROM "Periodo" WHERE id = ${periodoId} FOR UPDATE`;
@@ -191,6 +202,7 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string)
       where: { id: periodoId },
       data: { estado: "CERRADO", cerradoEn: ahora, vencimiento },
     });
+    if (anotar) await registrarEn(tx, anotar(lineas.length));
     return lineas.length;
   });
 }
@@ -199,6 +211,7 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string)
 export async function registrarPago(
   administradoraId: string,
   datos: { unidadId: string; monto: number; fecha: Date; medio: MedioPago; referencia?: string },
+  opciones: { permitirDuplicado?: boolean; anotar?: AnotarCon<{ id: string }> } = {},
 ) {
   return db.$transaction(async (tx) => {
     const unidad = await tx.unidad.findFirst({
@@ -210,10 +223,22 @@ export async function registrarPago(
     await bloquearUnidades(tx, [unidad.id]);
     const dec = await monedaDe(tx, administradoraId);
     const monto = aMinimo(datos.monto, dec);
+    if (!opciones.permitirDuplicado) {
+      // SEG-22: con la unidad bloqueada, para que dos registros iguales a la vez también se detecten.
+      const inicio = new Date(datos.fecha);
+      inicio.setUTCHours(0, 0, 0, 0);
+      const fin = new Date(inicio.getTime() + 24 * 60 * 60 * 1000);
+      const igual = await tx.pago.findFirst({
+        where: { unidadId: unidad.id, anuladoEn: null, monto: deMinimo(monto, dec), fecha: { gte: inicio, lt: fin } },
+        select: { fecha: true, referencia: true, creadoEn: true },
+      });
+      if (igual) throw new PagoDuplicado(igual);
+    }
     const pago = await tx.pago.create({
       data: { ...datos, monto: deMinimo(monto, dec), administradoraId },
     });
     await aplicarMonto(tx, pago.id, unidad.id, monto, dec);
+    if (opciones.anotar) await registrarEn(tx, opciones.anotar(pago));
     return pago;
   });
 }
@@ -227,6 +252,7 @@ export async function anularPago(
   pagoId: string,
   administradoraId: string,
   anulacion: { por: string; motivo: string },
+  anotar?: AnotarCon<{ id: string; devuelto: string }>,
 ) {
   return db.$transaction(async (tx) => {
     const pago = await tx.pago.findFirst({
@@ -247,7 +273,12 @@ export async function anularPago(
     }
     await tx.aplicacionPago.deleteMany({ where: { pagoId: pago.id } });
     // Si la unidad tenía otros saldos a favor, ahora pueden cubrir lo que quedó pendiente.
-    await aplicarSaldosAFavor(tx, pago.unidadId, await monedaDe(tx, administradoraId));
+    const dec = await monedaDe(tx, administradoraId);
+    await aplicarSaldosAFavor(tx, pago.unidadId, dec);
+    if (anotar) {
+      const devuelto = deMinimo(aplicaciones.reduce((s, a) => s + aMinimo(a.monto.toString(), dec), 0), dec);
+      await registrarEn(tx, anotar({ id: pago.id, devuelto: String(devuelto) }));
+    }
     return pago;
   });
 }
