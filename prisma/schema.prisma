@@ -167,49 +167,50 @@ enum MedioPago {
 }
 
 model Administradora {
-  id        String   @id @default(cuid())
-  nombre    String
-  pais      String   @default("CL")
-  moneda    String   @default("CLP")
-  creadoEn  DateTime @default(now())
+  id       String   @id @default(cuid())
+  nombre   String
+  pais     String   @default("CL")
+  moneda   String   @default("CLP")
+  creadoEn DateTime @default(now())
 
-  usuarios     Usuario[]
-  condominios  Condominio[]
-  personas     Persona[]
-  unidades     Unidad[]
-  periodos     Periodo[]
-  gastos       Gasto[]
-  avisos       AvisoCobro[]
-  pagos        Pago[]
-  proveedores  Proveedor[]
-  publicaciones Publicacion[]
-  votaciones   Votacion[]
-  registros    RegistroCambio[]
+  usuarios            Usuario[]
+  condominios         Condominio[]
+  personas            Persona[]
+  unidades            Unidad[]
+  periodos            Periodo[]
+  gastos              Gasto[]
+  avisos              AvisoCobro[]
+  pagos               Pago[]
+  proveedores         Proveedor[]
+  publicaciones       Publicacion[]
+  votaciones          Votacion[]
+  registros           RegistroCambio[]
   perfilesImportacion PerfilImportacion[]
+  aperturas           Apertura[]
 }
 
 model Usuario {
-  id               String   @id @default(cuid())
-  administradoraId String?
-  administradora   Administradora? @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
-  nombre           String
-  correo           String   @unique
-  claveHash        String
-  rol              Rol
+  id                 String          @id @default(cuid())
+  administradoraId   String?
+  administradora     Administradora? @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  nombre             String
+  correo             String          @unique
+  claveHash          String
+  rol                Rol
   // Para COMITE: condominio que puede ver. Para RESIDENTE: persona vinculada.
-  condominioId     String?
+  condominioId       String?
   // Para ADMINISTRADOR: el principal ve todas las propiedades de la administradora (también las
   // nuevas) y maneja las cuentas; los demás ven solo las asignadas en AsignacionCondominio.
-  accesoTodas      Boolean  @default(false)
-  condominio       Condominio? @relation(fields: [condominioId], references: [id], onDelete: SetNull)
-  personaId        String?  @unique
-  persona          Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
-  creadoEn         DateTime @default(now())
+  accesoTodas        Boolean         @default(false)
+  condominio         Condominio?     @relation(fields: [condominioId], references: [id], onDelete: SetNull)
+  personaId          String?         @unique
+  persona            Persona?        @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  creadoEn           DateTime        @default(now())
   // Al cambiar la contraseña se cierran las sesiones abiertas antes de esa fecha.
   claveActualizadaEn DateTime?
   // Una cuenta desactivada no puede ingresar y sus sesiones abiertas dejan de servir.
-  activo           Boolean  @default(true)
-  ultimoIngresoEn  DateTime?
+  activo             Boolean         @default(true)
+  ultimoIngresoEn    DateTime?
 
   tokensRecuperacion TokenRecuperacion[]
   asignaciones       AsignacionCondominio[]
@@ -230,34 +231,34 @@ model AsignacionCondominio {
 }
 
 model Condominio {
-  id                 String   @id @default(cuid())
+  id                 String                  @id @default(cuid())
   administradoraId   String
-  administradora     Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  administradora     Administradora          @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   nombre             String
   rut                String?
   direccion          String
   comuna             String?
   // Porcentaje del gasto común que va al fondo de reserva (ej. 5 = 5 %)
-  porcentajeReserva  Decimal  @default(5) @db.Decimal(5, 2)
+  porcentajeReserva  Decimal                 @default(5) @db.Decimal(5, 2)
   // Tasa de interés mensual por mora (ej. 1.5 = 1,5 % mensual)
-  tasaInteresMora    Decimal  @default(0) @db.Decimal(5, 2)
+  tasaInteresMora    Decimal                 @default(0) @db.Decimal(5, 2)
   // Día de vencimiento general; cada unidad puede tener el suyo (Unidad.diaPago).
-  diaVencimiento     Int      @default(10)
+  diaVencimiento     Int                     @default(10)
   // Cuántas unidades con alícuota tiene la propiedad en total (para seguir el avance de la carga)
   totalUnidades      Int?
   // COM-001 · configurador. Las comunidades que ya existían quedan HABILITADA_FINANCIERA
   // (ver la migración); las nuevas nacen EN_CONFIGURACION.
-  estado             EstadoComunidad @default(EN_CONFIGURACION)
+  estado             EstadoComunidad         @default(EN_CONFIGURACION)
   estadoCambiadoEn   DateTime?
   tipo               TipoComunidad?
   modalidad          ModalidadIncorporacion?
   region             String?
-  fechaIncorporacion DateTime? @db.Date
+  fechaIncorporacion DateTime?               @db.Date
   // Antecedentes legales: inscripción del reglamento de copropiedad, notaría, fecha, etc.
   reglamento         String?
   // Información complementaria disponible (texto libre).
   observaciones      String?
-  creadoEn           DateTime @default(now())
+  creadoEn           DateTime                @default(now())
 
   unidades      Unidad[]
   periodos      Periodo[]
@@ -268,23 +269,24 @@ model Condominio {
   agrupaciones  Agrupacion[]
   espacios      Espacio[]
   instalaciones Instalacion[]
+  apertura      Apertura?
 
   @@index([administradoraId])
 }
 
 // COM-001 · Estructura física: sector, torre, edificio, piso... Puede anidarse (torre > piso).
 model Agrupacion {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   condominioId     String
-  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
   tipo             TipoAgrupacion
   nombre           String
   padreId          String?
-  padre            Agrupacion?  @relation("Subagrupaciones", fields: [padreId], references: [id], onDelete: Restrict)
-  hijas            Agrupacion[] @relation("Subagrupaciones")
-  orden            Int      @default(0)
-  creadoEn         DateTime @default(now())
+  padre            Agrupacion?    @relation("Subagrupaciones", fields: [padreId], references: [id], onDelete: Restrict)
+  hijas            Agrupacion[]   @relation("Subagrupaciones")
+  orden            Int            @default(0)
+  creadoEn         DateTime       @default(now())
 
   unidades      Unidad[]
   espacios      Espacio[]
@@ -297,29 +299,29 @@ model Agrupacion {
 // Estacionamiento o bodega, con su condición jurídica, destino y accesibilidad por separado.
 // Si es UNIDAD_PRIVADA, se cobra a través de la unidad (Unidad) que lo representa.
 model Espacio {
-  id                 String   @id @default(cuid())
-  administradoraId   String
-  condominioId       String
-  condominio         Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
-  clase              ClaseEspacio
-  codigo             String
-  agrupacionId       String?
-  agrupacion         Agrupacion? @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
-  ubicacion          String?
-  regimen            RegimenEspacio @default(POR_DEFINIR)
-  destino            DestinoEspacio?
-  accesible          Boolean  @default(false)
-  estado             EstadoEspacio @default(DISPONIBLE)
+  id                String          @id @default(cuid())
+  administradoraId  String
+  condominioId      String
+  condominio        Condominio      @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  clase             ClaseEspacio
+  codigo            String
+  agrupacionId      String?
+  agrupacion        Agrupacion?     @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  ubicacion         String?
+  regimen           RegimenEspacio  @default(POR_DEFINIR)
+  destino           DestinoEspacio?
+  accesible         Boolean         @default(false)
+  estado            EstadoEspacio   @default(DISPONIBLE)
   // UNIDAD_PRIVADA: la unidad (con alícuota) que es este mismo espacio.
-  unidadPropiaId     String?
-  unidadPropia       Unidad?  @relation("EspacioUnidadPropia", fields: [unidadPropiaId], references: [id], onDelete: SetNull)
+  unidadPropiaId    String?
+  unidadPropia      Unidad?         @relation("EspacioUnidadPropia", fields: [unidadPropiaId], references: [id], onDelete: SetNull)
   // ACCESORIO: la unidad principal a la que pertenece.
-  unidadPrincipalId  String?
-  unidadPrincipal    Unidad?  @relation("EspacioUnidadPrincipal", fields: [unidadPrincipalId], references: [id], onDelete: SetNull)
-  respaldo           String?  // documento que acredita la condición (escritura, reglamento, plano)
-  observaciones      String?
-  creadoEn           DateTime @default(now())
-  actualizadoEn      DateTime @updatedAt
+  unidadPrincipalId String?
+  unidadPrincipal   Unidad?         @relation("EspacioUnidadPrincipal", fields: [unidadPrincipalId], references: [id], onDelete: SetNull)
+  respaldo          String? // documento que acredita la condición (escritura, reglamento, plano)
+  observaciones     String?
+  creadoEn          DateTime        @default(now())
+  actualizadoEn     DateTime        @updatedAt
 
   asignaciones AsignacionEspacio[]
 
@@ -329,22 +331,22 @@ model Espacio {
 
 // Autorización de uso de un espacio. No se borra: al terminar se le pone fecha "hasta".
 model AsignacionEspacio {
-  id            String   @id @default(cuid())
+  id            String         @id @default(cuid())
   espacioId     String
-  espacio       Espacio  @relation(fields: [espacioId], references: [id], onDelete: Cascade)
+  espacio       Espacio        @relation(fields: [espacioId], references: [id], onDelete: Cascade)
   tipo          TipoAsignacion
   unidadId      String?
-  unidad        Unidad?  @relation(fields: [unidadId], references: [id], onDelete: SetNull)
+  unidad        Unidad?        @relation(fields: [unidadId], references: [id], onDelete: SetNull)
   personaId     String?
-  persona       Persona? @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  persona       Persona?       @relation(fields: [personaId], references: [id], onDelete: SetNull)
   // Nombre de a quién se asignó, para que el historial se lea aunque después cambie la unidad o la persona.
   beneficiario  String
-  desde         DateTime @db.Date
-  hasta         DateTime? @db.Date
+  desde         DateTime       @db.Date
+  hasta         DateTime?      @db.Date
   respaldo      String?
   observaciones String?
   creadoPor     String
-  creadoEn      DateTime @default(now())
+  creadoEn      DateTime       @default(now())
   terminadaPor  String?
   terminadaEn   DateTime?
 
@@ -353,73 +355,75 @@ model AsignacionEspacio {
 
 // Inventario básico de instalaciones, equipos y espacios comunes. Base para mantenciones futuras.
 model Instalacion {
-  id               String   @id @default(cuid())
+  id               String            @id @default(cuid())
   administradoraId String
   condominioId     String
-  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  condominio       Condominio        @relation(fields: [condominioId], references: [id], onDelete: Cascade)
   tipo             TipoInstalacion
   codigo           String
   nombre           String
   agrupacionId     String?
-  agrupacion       Agrupacion? @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  agrupacion       Agrupacion?       @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
   ubicacion        String?
   descripcion      String?
   estado           EstadoInstalacion @default(SIN_INFORMACION)
   proveedorId      String?
-  proveedor        Proveedor? @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  proveedor        Proveedor?        @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
   observaciones    String?
-  creadoEn         DateTime @default(now())
-  actualizadoEn    DateTime @updatedAt
+  creadoEn         DateTime          @default(now())
+  actualizadoEn    DateTime          @updatedAt
 
   @@unique([condominioId, codigo])
   @@index([administradoraId])
 }
 
 model Persona {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   nombre           String
-  documento        String?  // RUT, DNI u otro
+  documento        String? // RUT, DNI u otro
   correo           String?
   telefono         String?
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime       @default(now())
 
-  unidades UnidadPersona[]
-  vinculos VinculoUnidad[]
-  usuario  Usuario?
+  unidades            UnidadPersona[]
+  vinculos            VinculoUnidad[]
+  usuario             Usuario?
   asignacionesEspacio AsignacionEspacio[]
 
   @@index([administradoraId])
 }
 
 model Unidad {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   condominioId     String
-  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
   numero           String
-  tipo             TipoUnidad @default(DEPARTAMENTO)
+  tipo             TipoUnidad     @default(DEPARTAMENTO)
   // Porcentaje de participación en el gasto común (ej. 1.25 = 1,25 %)
-  alicuota         Decimal  @db.Decimal(9, 6)
+  alicuota         Decimal        @db.Decimal(9, 6)
   // COM-001: dónde está (torre, piso, sector...). Opcional.
   agrupacionId     String?
-  agrupacion       Agrupacion? @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  agrupacion       Agrupacion?    @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
   // Día del mes en que vence el cobro de esta unidad (1 a 31; si el mes es más corto, el último día).
   // null: usa el día de vencimiento de la propiedad. Lo define la administración.
   diaPago          Int?
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime       @default(now())
 
-  espaciosPropios    Espacio[] @relation("EspacioUnidadPropia")
-  espaciosVinculados Espacio[] @relation("EspacioUnidadPrincipal")
+  espaciosPropios    Espacio[]           @relation("EspacioUnidadPropia")
+  espaciosVinculados Espacio[]           @relation("EspacioUnidadPrincipal")
   asignaciones       AsignacionEspacio[]
-  personas UnidadPersona[]
-  vinculos VinculoUnidad[]
-  gastos   Gasto[]
-  avisos   AvisoCobro[]
-  pagos    Pago[]
-  votos    Voto[]
+  personas           UnidadPersona[]
+  vinculos           VinculoUnidad[]
+  gastos             Gasto[]
+  avisos             AvisoCobro[]
+  pagos              Pago[]
+  votos              Voto[]
+  deudasApertura     DeudaApertura[]
+  creditosApertura   CreditoApertura[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -450,23 +454,23 @@ model VinculoUnidad {
 
 model UnidadPersona {
   unidadId  String
-  unidad    Unidad  @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  unidad    Unidad         @relation(fields: [unidadId], references: [id], onDelete: Cascade)
   personaId String
-  persona   Persona @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  persona   Persona        @relation(fields: [personaId], references: [id], onDelete: Cascade)
   relacion  RelacionUnidad
 
   @@id([unidadId, personaId, relacion])
 }
 
 model Periodo {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   condominioId     String
-  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
   anio             Int
   mes              Int
-  estado           EstadoPeriodo @default(ABIERTO)
+  estado           EstadoPeriodo  @default(ABIERTO)
   vencimiento      DateTime?
   cerradoEn        DateTime?
 
@@ -478,44 +482,44 @@ model Periodo {
 }
 
 model Gasto {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   periodoId        String
-  periodo          Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  periodo          Periodo        @relation(fields: [periodoId], references: [id], onDelete: Cascade)
   tipo             TipoGasto
   // Solo para gastos INDIVIDUALES
   unidadId         String?
-  unidad           Unidad?  @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  unidad           Unidad?        @relation(fields: [unidadId], references: [id], onDelete: Cascade)
   categoria        String
   descripcion      String
   proveedor        String?
-  documento        String?  // número de boleta o factura
-  monto            Decimal  @db.Decimal(14, 2)
+  documento        String? // número de boleta o factura
+  monto            Decimal        @db.Decimal(14, 2)
   fecha            DateTime
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime       @default(now())
 
   @@index([administradoraId])
   @@index([periodoId])
 }
 
 model AvisoCobro {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   periodoId        String
-  periodo          Periodo  @relation(fields: [periodoId], references: [id], onDelete: Cascade)
+  periodo          Periodo        @relation(fields: [periodoId], references: [id], onDelete: Cascade)
   unidadId         String
-  unidad           Unidad   @relation(fields: [unidadId], references: [id], onDelete: Cascade)
-  gastoComun       Decimal  @db.Decimal(14, 2)
-  fondoReserva     Decimal  @db.Decimal(14, 2)
-  cargos           Decimal  @db.Decimal(14, 2)
+  unidad           Unidad         @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  gastoComun       Decimal        @db.Decimal(14, 2)
+  fondoReserva     Decimal        @db.Decimal(14, 2)
+  cargos           Decimal        @db.Decimal(14, 2)
   // Interés por mora sobre la deuda vencida al momento de emitir
-  interes          Decimal  @default(0) @db.Decimal(14, 2)
-  total            Decimal  @db.Decimal(14, 2)
-  saldo            Decimal  @db.Decimal(14, 2)
+  interes          Decimal        @default(0) @db.Decimal(14, 2)
+  total            Decimal        @db.Decimal(14, 2)
+  saldo            Decimal        @db.Decimal(14, 2)
   vencimiento      DateTime
-  emitidoEn        DateTime @default(now())
+  emitidoEn        DateTime       @default(now())
 
   aplicaciones AplicacionPago[]
   envios       EnvioAviso[]
@@ -525,16 +529,16 @@ model AvisoCobro {
 }
 
 model Pago {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   unidadId         String
-  unidad           Unidad   @relation(fields: [unidadId], references: [id], onDelete: Cascade)
-  monto            Decimal  @db.Decimal(14, 2)
+  unidad           Unidad         @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  monto            Decimal        @db.Decimal(14, 2)
   fecha            DateTime
   medio            MedioPago
   referencia       String?
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime       @default(now())
   // Un pago anulado no se borra: deja de contar para la deuda y el saldo a favor,
   // pero queda a la vista con quién lo anuló, cuándo y por qué.
   anuladoEn        DateTime?
@@ -547,12 +551,12 @@ model Pago {
 }
 
 model AplicacionPago {
-  id       String     @id @default(cuid())
-  pagoId   String
-  pago     Pago       @relation(fields: [pagoId], references: [id], onDelete: Cascade)
-  avisoId  String
-  aviso    AvisoCobro @relation(fields: [avisoId], references: [id], onDelete: Cascade)
-  monto    Decimal    @db.Decimal(14, 2)
+  id      String     @id @default(cuid())
+  pagoId  String
+  pago    Pago       @relation(fields: [pagoId], references: [id], onDelete: Cascade)
+  avisoId String
+  aviso   AvisoCobro @relation(fields: [avisoId], references: [id], onDelete: Cascade)
+  monto   Decimal    @db.Decimal(14, 2)
 }
 
 // Registro de cada correo enviado con un aviso de cobro.
@@ -570,7 +574,7 @@ model EnvioAviso {
 
 // Catálogo de proveedores de la administradora (mantención, aseo, servicios, etc.).
 model Proveedor {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   nombre           String
@@ -579,25 +583,26 @@ model Proveedor {
   contacto         String?
   telefono         String?
   correo           String?
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime       @default(now())
 
-  instalaciones Instalacion[]
+  instalaciones        Instalacion[]
+  obligacionesApertura ObligacionApertura[]
 
   @@unique([administradoraId, nombre])
 }
 
 // Publicaciones del muro de la propiedad: avisos, convocatorias, noticias.
 model Publicacion {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   condominioId     String
-  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
   titulo           String
   contenido        String
   autor            String
-  creadoEn         DateTime @default(now())
-  actualizadoEn    DateTime @updatedAt
+  creadoEn         DateTime       @default(now())
+  actualizadoEn    DateTime       @updatedAt
 
   @@index([condominioId, creadoEn])
 }
@@ -605,19 +610,19 @@ model Publicacion {
 // Votaciones en línea de la propiedad. Vota una vez cada unidad; votan sus propietarios
 // desde su cuenta, o la administración registra el voto (por ejemplo, en una asamblea).
 model Votacion {
-  id               String   @id @default(cuid())
+  id               String          @id @default(cuid())
   administradoraId String
-  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  administradora   Administradora  @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   condominioId     String
-  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  condominio       Condominio      @relation(fields: [condominioId], references: [id], onDelete: Cascade)
   titulo           String
   descripcion      String?
-  estado           EstadoVotacion @default(BORRADOR)
+  estado           EstadoVotacion  @default(BORRADOR)
   ponderacion      PonderacionVoto @default(ALICUOTA)
   cierraEn         DateTime
   publicadaEn      DateTime?
   cerradaEn        DateTime?
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime        @default(now())
 
   opciones OpcionVotacion[]
   votos    Voto[]
@@ -636,17 +641,17 @@ model OpcionVotacion {
 }
 
 model Voto {
-  id          String         @id @default(cuid())
-  votacionId  String
-  votacion    Votacion       @relation(fields: [votacionId], references: [id], onDelete: Cascade)
-  opcionId    String
-  opcion      OpcionVotacion @relation(fields: [opcionId], references: [id], onDelete: Cascade)
-  unidadId    String
-  unidad      Unidad         @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  id         String         @id @default(cuid())
+  votacionId String
+  votacion   Votacion       @relation(fields: [votacionId], references: [id], onDelete: Cascade)
+  opcionId   String
+  opcion     OpcionVotacion @relation(fields: [opcionId], references: [id], onDelete: Cascade)
+  unidadId   String
+  unidad     Unidad         @relation(fields: [unidadId], references: [id], onDelete: Cascade)
   // Quién emitió el voto: la persona (propietario) o la administración.
-  emitidoPor  String
-  presencial  Boolean        @default(false)
-  creadoEn    DateTime       @default(now())
+  emitidoPor String
+  presencial Boolean        @default(false)
+  creadoEn   DateTime       @default(now())
 
   @@unique([votacionId, unidadId])
 }
@@ -666,14 +671,14 @@ model IntentoIngreso {
 // Enlaces de un solo uso para crear una contraseña (recuperación o invitación).
 // Se guarda solo el hash del token.
 model TokenRecuperacion {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   usuarioId String
-  usuario   Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
   tipo      TipoToken @default(RECUPERACION)
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiraEn  DateTime
   usadoEn   DateTime?
-  creadoEn  DateTime @default(now())
+  creadoEn  DateTime  @default(now())
 
   @@index([usuarioId])
 }
@@ -681,7 +686,7 @@ model TokenRecuperacion {
 // Registro de cambios: quién hizo qué y cuándo. Guarda nombres y textos (no relaciones)
 // para que el historial se conserve aunque después se borre lo registrado.
 model RegistroCambio {
-  id               String   @id @default(cuid())
+  id               String          @id @default(cuid())
   administradoraId String?
   administradora   Administradora? @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   condominioId     String?
@@ -689,7 +694,7 @@ model RegistroCambio {
   usuarioNombre    String
   accion           String
   detalle          String
-  creadoEn         DateTime @default(now())
+  creadoEn         DateTime        @default(now())
 
   @@index([administradoraId, creadoEn])
   @@index([condominioId, creadoEn])
@@ -698,15 +703,169 @@ model RegistroCambio {
 // COM-001 · Entrega 4: cómo leer la planilla propia de una administradora (qué columna es qué).
 // Es de la administradora y no se comparte con otras.
 model PerfilImportacion {
-  id               String   @id @default(cuid())
+  id               String         @id @default(cuid())
   administradoraId String
   administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
   nombre           String
   // Título de columna normalizado → campo de Convive (o "ignorar").
   columnas         Json
   creadoPor        String
-  creadoEn         DateTime @default(now())
-  actualizadoEn    DateTime @updatedAt
+  creadoEn         DateTime       @default(now())
+  actualizadoEn    DateTime       @updatedAt
 
   @@unique([administradoraId, nombre])
+}
+
+// ── COM-001 · Entrega 5: apertura financiera de una comunidad existente ──
+// Un registro por comunidad con la fecha de corte y los saldos que trae del sistema anterior.
+// Es un borrador: todavía no se aprueba ni cambia cobros, pagos, intereses o fondos (restringido
+// hasta aprobar las reglas D-COM-05 a D-COM-08 y FIN-001).
+
+enum EstadoApertura {
+  BORRADOR
+  EN_REVISION
+}
+
+enum EstadoDeudaApertura {
+  CONFIRMADA
+  DISCUTIDA
+  EN_CONVENIO
+  POR_VERIFICAR
+}
+
+enum TipoFondoApertura {
+  ORDINARIO
+  RESERVA
+  PROYECTO
+  OTRO
+}
+
+enum TipoCuentaApertura {
+  CORRIENTE
+  VISTA
+  AHORRO
+  CAJA
+}
+
+enum TipoObligacionApertura {
+  PROVEEDOR
+  REMUNERACION
+  IMPUESTO
+  OTRO
+}
+
+model Apertura {
+  id               String         @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String         @unique
+  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  // Último día del sistema anterior; Convive registra desde el día siguiente.
+  fechaCorte       DateTime       @db.Date
+  estado           EstadoApertura @default(BORRADOR)
+  observaciones    String?
+  preparadoPor     String
+  creadoEn         DateTime       @default(now())
+  actualizadoEn    DateTime       @updatedAt
+
+  deudas       DeudaApertura[]
+  creditos     CreditoApertura[]
+  fondos       FondoApertura[]
+  cuentas      CuentaApertura[]
+  obligaciones ObligacionApertura[]
+}
+
+// Una deuda por unidad, período y concepto (desglosada: el total es un cálculo, nunca un registro).
+model DeudaApertura {
+  id            String              @id @default(cuid())
+  aperturaId    String
+  apertura      Apertura            @relation(fields: [aperturaId], references: [id], onDelete: Cascade)
+  unidadId      String
+  unidad        Unidad              @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  // Mes de origen, "2026-09".
+  periodo       String
+  concepto      String
+  montoOriginal Int?
+  abonos        Int?
+  saldo         Int
+  vencimiento   DateTime?           @db.Date
+  estado        EstadoDeudaApertura @default(CONFIRMADA)
+  respaldo      String?
+  observaciones String?
+  // "pantalla" o el nombre del archivo y la fila de la planilla.
+  origen        String?
+  creadoPor     String
+  creadoEn      DateTime            @default(now())
+
+  @@unique([aperturaId, unidadId, periodo, concepto])
+  @@index([unidadId])
+}
+
+// Saldo a favor de una unidad, o pago por identificar (sin unidad).
+model CreditoApertura {
+  id          String    @id @default(cuid())
+  aperturaId  String
+  apertura    Apertura  @relation(fields: [aperturaId], references: [id], onDelete: Cascade)
+  unidadId    String?
+  unidad      Unidad?   @relation(fields: [unidadId], references: [id], onDelete: Cascade)
+  monto       Int
+  fecha       DateTime? @db.Date
+  descripcion String?
+  creadoPor   String
+  creadoEn    DateTime  @default(now())
+
+  @@index([unidadId])
+}
+
+model FondoApertura {
+  id                String            @id @default(cuid())
+  aperturaId        String
+  apertura          Apertura          @relation(fields: [aperturaId], references: [id], onDelete: Cascade)
+  tipo              TipoFondoApertura
+  nombre            String
+  // Lo que le corresponde al fondo a la fecha de corte (dinero recaudado).
+  saldoContable     Int
+  // Aportes emitidos y no pagados: no es dinero disponible.
+  pendienteRecaudar Int?
+  observaciones     String?
+  creadoPor         String
+  creadoEn          DateTime          @default(now())
+
+  @@unique([aperturaId, nombre])
+}
+
+model CuentaApertura {
+  id                  String             @id @default(cuid())
+  aperturaId          String
+  apertura            Apertura           @relation(fields: [aperturaId], references: [id], onDelete: Cascade)
+  tipo                TipoCuentaApertura
+  banco               String
+  // Solo los últimos dígitos del número de cuenta.
+  numeroFinal         String?
+  titular             String?
+  saldoCartola        Int
+  chequesNoCobrados   Int                @default(0)
+  depositosNoAbonados Int                @default(0)
+  observaciones       String?
+  creadoPor           String
+  creadoEn            DateTime           @default(now())
+}
+
+model ObligacionApertura {
+  id            String                 @id @default(cuid())
+  aperturaId    String
+  apertura      Apertura               @relation(fields: [aperturaId], references: [id], onDelete: Cascade)
+  tipo          TipoObligacionApertura
+  acreedor      String
+  proveedorId   String?
+  proveedor     Proveedor?             @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  documento     String?
+  fecha         DateTime?              @db.Date
+  vencimiento   DateTime?              @db.Date
+  monto         Int
+  // Fondo con el que se pagará (nombre de un fondo de la apertura).
+  fondo         String?
+  observaciones String?
+  creadoPor     String
+  creadoEn      DateTime               @default(now())
 }

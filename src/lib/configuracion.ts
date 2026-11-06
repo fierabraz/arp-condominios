@@ -74,6 +74,8 @@ export type DatosConfiguracion = {
   cobrosEmitidos: number;
   /** Estructura física registrada (COM-001 · Entrega 2). Es opcional: no todas las propiedades la necesitan. */
   estructura?: { agrupaciones: number; espacios: number; instalaciones: number };
+  /** Apertura financiera de una comunidad existente (COM-001 · Entrega 5), si se empezó. */
+  apertura?: { estado: "BORRADOR" | "EN_REVISION"; fechaCorte: Date; deudas: number; fondos: number; cuentas: number } | null;
 };
 
 export type EstadoPaso = "completo" | "observacion" | "pendiente" | "disponible" | "proximamente";
@@ -145,15 +147,20 @@ export function pasosConfiguracion(d: DatosConfiguracion): Paso[] {
             accion: "Completar propietarios",
           };
 
+  const ap = d.apertura;
+  const corte = ap ? ap.fechaCorte.toISOString().slice(0, 10).split("-").reverse().join("-") : "";
   const finanzas: Paso =
     d.modalidad === "EXISTENTE"
       ? {
           numero: "04",
           titulo: "Finanzas y apertura",
-          estado: "proximamente",
-          detalle: "Las reglas de cobro ya se pueden revisar. La apertura con deudas, fondos y bancos anteriores llega en una próxima entrega.",
-          ruta: "/editar",
-          accion: "Revisar reglas de cobro",
+          estado: !ap ? "pendiente" : ap.estado === "EN_REVISION" ? "completo" : "observacion",
+          detalle: !ap
+            ? "Registra la fecha de corte y lo que trae del sistema anterior: deudas por unidad, fondos, bancos y cuentas por pagar."
+            : `Corte ${corte}: ${ap.deudas} ${ap.deudas === 1 ? "deuda" : "deudas"}, ${ap.fondos} ${ap.fondos === 1 ? "fondo" : "fondos"}, ${ap.cuentas} ${ap.cuentas === 1 ? "cuenta" : "cuentas"}. ${ap.estado === "EN_REVISION" ? "Lista para revisión." : "En borrador."} Aprobarla queda restringido hasta aprobar las reglas.`,
+          ruta: "/apertura",
+          accion: ap ? "Ver apertura" : "Comenzar apertura",
+          otra: { ruta: "/editar", accion: "Reglas de cobro" },
         }
       : {
           numero: "04",
@@ -200,7 +207,7 @@ export type Revision = { ok: boolean; bloqueos: string[]; advertencias: string[]
 /**
  * ¿Se puede pasar la comunidad a `destino`? Bajar de estado se permite (no borra nada), salvo
  * dejar de operar finanzas si ya hay cobros emitidos; subir exige los requisitos de cada estado. Lo financiero de una comunidad EXISTENTE queda
- * restringido hasta que exista la apertura con fecha de corte (próxima entrega).
+ * restringido: su apertura (Entrega 5) es un borrador que todavía no se puede aprobar.
  */
 export function revisarCambio(d: DatosConfiguracion, destino: Estado): Revision {
   const bloqueos: string[] = [];
@@ -227,7 +234,9 @@ export function revisarCambio(d: DatosConfiguracion, destino: Estado): Revision 
     if (d.unidades > 0 && alic.tipo !== "ok") bloqueos.push(alic.texto);
     if (d.modalidad === "EXISTENTE") {
       bloqueos.push(
-        "Es una comunidad existente: antes de cobrar hay que registrar su apertura (fecha de corte, deudas, fondos y bancos), que llega en una próxima entrega.",
+        d.apertura
+          ? "Es una comunidad existente: su apertura está registrada como borrador, pero aprobarla y empezar a cobrar sobre esos saldos queda restringido hasta que se aprueben las reglas de apertura (D-COM-05 a D-COM-08)."
+          : "Es una comunidad existente: antes de cobrar hay que registrar su apertura (fecha de corte, deudas, fondos y bancos) en el paso 04.",
       );
     }
   }
