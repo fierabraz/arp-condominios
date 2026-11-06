@@ -57,7 +57,7 @@ export default async function InicioPage() {
           <h2 id="mis-propiedades" className="text-xl font-bold text-convive-oscuro">
             {principal ? "Mis propiedades" : "Propiedades asignadas"}
           </h2>
-          {principal && <BotonLink href="/condominios/nuevo">Crear propiedad</BotonLink>}
+          {principal && <BotonLink href="/condominios/nuevo">Nueva comunidad</BotonLink>}
         </div>
         {propiedades.length === 0 ? (
           <Vacio>
