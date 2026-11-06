@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Check, CircleAlert, CircleDashed, Clock, Info, Lock } from "lucide-react";
+import { Check, CircleAlert, CircleDashed, Clock, FileText, Info, Lock } from "lucide-react";
 import { BotonLink, Card, Insignia, Mensaje } from "@/components/ui";
 import { esPrincipal } from "@/lib/permisos";
 import {
@@ -9,11 +9,17 @@ import {
   MODALIDADES,
   ORDEN_ESTADOS,
   pasosConfiguracion,
+  requisitosActivacion,
   revisarCambio,
   TIPOS,
   TONO_ESTADO,
   type EstadoPaso,
+  type NivelRequisito,
+  type Requisito,
 } from "@/lib/configuracion";
+import { revisarApertura } from "@/lib/apertura";
+import { datosApertura } from "@/lib/apertura-servicio";
+import { db } from "@/lib/db";
 import { datosDeUna } from "@/lib/configuracion-servicio";
 import { formatoDia } from "@/lib/formato";
 import { cambiarEstadoComunidad } from "../../actions";
@@ -28,6 +34,20 @@ const ICONOS: Record<EstadoPaso, { icono: typeof Check; clase: string; texto: st
   proximamente: { icono: Clock, clase: "bg-gray-100 text-texto-suave", texto: "Próxima entrega" },
 };
 
+const ICONO_REQUISITO = (r: Requisito) =>
+  r.cumple
+    ? { icono: Check, clase: "text-exito", texto: "Cumplido" }
+    : r.tipo === "bloqueo"
+      ? { icono: Lock, clase: "text-peligro", texto: "Falta" }
+      : r.tipo === "advertencia"
+        ? { icono: CircleAlert, clase: "text-alerta", texto: "Advertencia" }
+        : { icono: Clock, clase: "text-texto-suave", texto: "Restringido" };
+
+const NIVELES: { nivel: NivelRequisito; titulo: string }[] = [
+  { nivel: "HABILITADA_ADMINISTRATIVA", titulo: "Para habilitar administrativamente" },
+  { nivel: "HABILITADA_FINANCIERA", titulo: "Para habilitar cobros (además de lo anterior)" },
+];
+
 export default async function ConfiguracionPage({ params, searchParams }: PageProps<"/condominios/[id]/configuracion">) {
   const { id } = await params;
   const { creada, guardado, cambiado } = await searchParams;
@@ -41,7 +61,17 @@ export default async function ConfiguracionPage({ params, searchParams }: PagePr
   const posicion = ORDEN_ESTADOS.indexOf(datos.estado);
   const siguiente = ORDEN_ESTADOS[posicion + 1];
   const anterior = posicion > 0 ? ORDEN_ESTADOS[posicion - 1] : undefined;
-  const revisionSiguiente = siguiente ? revisarCambio(datos, siguiente) : null;
+  // La revisión de la apertura (fondos, bancos, deudas por verificar) entra en la validación.
+  // Solo para administradores: el comité no ve el detalle de la apertura (D-COM-09, por decidir).
+  const aperturaId =
+    editable && datos.modalidad === "EXISTENTE" && datos.apertura
+      ? (await db.apertura.findUnique({ where: { condominioId: id }, select: { id: true } }))?.id
+      : undefined;
+  const revisionApertura = aperturaId
+    ? await datosApertura(aperturaId).then(({ datos: d, resumen }) => revisarApertura(d, resumen))
+    : undefined;
+  const requisitos = requisitosActivacion(datos, revisionApertura);
+  const revisionSiguiente = siguiente ? revisarCambio(datos, siguiente, revisionApertura) : null;
   const revisionAnterior = anterior ? revisarCambio(datos, anterior) : null;
   const necesitaPrincipal = (destino: string) =>
     !principal && (destino === "HABILITADA_FINANCIERA" || datos.estado === "HABILITADA_FINANCIERA");
@@ -170,27 +200,83 @@ export default async function ConfiguracionPage({ params, searchParams }: PagePr
           ))}
         </ol>
 
+        <div className="mb-4 grid gap-4 lg:grid-cols-2">
+          {NIVELES.map(({ nivel, titulo }) => {
+            const rs = requisitos.filter((r) => r.nivel === nivel);
+            const cumplidos = rs.filter((r) => r.cumple).length;
+            return (
+              <Card key={nivel}>
+                <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 className="font-bold">{titulo}</h3>
+                  <span className="text-sm text-texto-suave tabular-nums">
+                    {cumplidos} de {rs.length} cumplidos
+                  </span>
+                </div>
+                <ul className="space-y-3">
+                  {rs.map((r) => {
+                    const i = ICONO_REQUISITO(r);
+                    return (
+                      <li key={r.clave} className="flex gap-3 text-sm">
+                        <i.icono size={18} className={`mt-0.5 shrink-0 ${i.clase}`} aria-label={i.texto} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-semibold">{r.texto}</span>
+                          {!r.cumple && r.mensaje && (
+                            <span className={`block ${r.tipo === "bloqueo" ? "text-peligro" : r.tipo === "advertencia" ? "text-alerta" : "text-texto-suave"}`}>
+                              {r.mensaje}
+                              {r.tipo === "advertencia" && " Puedes continuar; quedará anotado."}
+                            </span>
+                          )}
+                          {!r.cumple && r.ruta && editable && (
+                            <Link href={`${base}${r.ruta}${r.ruta === "/editar" ? "?volver=configuracion" : ""}`} className="font-semibold text-marca hover:underline">
+                              Resolver
+                            </Link>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </Card>
+            );
+          })}
+        </div>
+
+        {aperturaId && (
+          <Card className="mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold">Informe de apertura</p>
+                <p className="text-sm text-texto-suave">
+                  PDF con la estructura, los saldos de apertura y sus advertencias, solo con cifras y conteos (sin nombres). Sale como borrador mientras la aprobación esté restringida.
+                </p>
+              </div>
+              <a
+                href={`${base}/apertura/informe`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-borde bg-white px-4 font-semibold text-marca hover:bg-marca-suave"
+              >
+                <FileText size={18} aria-hidden="true" /> Descargar informe (PDF)
+              </a>
+            </div>
+          </Card>
+        )}
+
         {editable && siguiente && revisionSiguiente && (
           <Card className="mb-4">
             <p className="font-semibold">Siguiente paso: {ESTADOS[siguiente].texto.toLowerCase()}</p>
             <p className="mb-3 text-sm text-texto-suave">{ESTADOS[siguiente].descripcion}</p>
             {revisionSiguiente.bloqueos.length > 0 && (
-              <ul className="mb-3 space-y-1 text-sm">
-                {revisionSiguiente.bloqueos.map((b) => (
-                  <li key={b} className="flex gap-2 text-peligro">
-                    <Lock size={15} className="mt-0.5 shrink-0" aria-hidden="true" /> {b}
-                  </li>
-                ))}
-              </ul>
+              <p className="mb-3 flex gap-2 text-sm text-peligro">
+                <Lock size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                {revisionSiguiente.bloqueos.length === 1 ? "Falta 1 requisito" : `Faltan ${revisionSiguiente.bloqueos.length} requisitos`} de la lista de arriba para dar este paso.
+              </p>
             )}
-            {revisionSiguiente.advertencias.length > 0 && (
-              <ul className="mb-3 space-y-1 text-sm">
-                {revisionSiguiente.advertencias.map((a) => (
-                  <li key={a} className="flex gap-2 text-alerta">
-                    <CircleAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" /> {a} Puedes continuar; quedará anotado.
-                  </li>
-                ))}
-              </ul>
+            {revisionSiguiente.ok && revisionSiguiente.advertencias.length > 0 && (
+              <p className="mb-3 flex gap-2 text-sm text-alerta">
+                <CircleAlert size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
+                Se puede habilitar con {revisionSiguiente.advertencias.length === 1 ? "1 advertencia" : `${revisionSiguiente.advertencias.length} advertencias`}; quedará anotado en el registro de cambios.
+              </p>
             )}
             {revisionSiguiente.ok && necesitaPrincipal(siguiente) && (
               <p className="text-sm text-texto-suave">Solo el administrador principal puede habilitar los cobros.</p>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Lock } from "lucide-react";
+import { FileText, Lock } from "lucide-react";
 import { db } from "@/lib/db";
 import { Card, Insignia, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { diaISO } from "@/lib/forms";
@@ -151,9 +151,19 @@ export default async function AperturaPage({ params }: PageProps<"/condominios/[
       <>
         {/* ── Resumen ── */}
         <section aria-labelledby="resumen" className="mb-10">
-          <h2 id="resumen" className="mb-3 text-xl font-bold">
-            Resumen a la fecha de corte
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 id="resumen" className="text-xl font-bold">
+              Resumen a la fecha de corte
+            </h2>
+            <a
+              href={`${base}/apertura/informe`}
+              target="_blank"
+              rel="noopener"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-borde bg-white px-4 font-semibold text-marca hover:bg-marca-suave"
+            >
+              <FileText size={18} aria-hidden="true" /> Informe de apertura (PDF)
+            </a>
+          </div>
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
             {[
               ["Deudas por cobrar", $(r.deudas.cobrable), `${r.deudas.unidades} ${r.deudas.unidades === 1 ? "unidad" : "unidades"}`],
