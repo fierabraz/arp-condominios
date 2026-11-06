@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Building2, ChevronDown, CreditCard, FileText, Home, Megaphone, UserRound, Vote } from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, CreditCard, FileText, Home, Megaphone, UserRound, Vote } from "lucide-react";
 
 const ENLACES = [
   { texto: "Inicio", corto: "Inicio", href: "/mi-cuenta", icono: Home, inferior: true },
@@ -10,6 +10,7 @@ const ENLACES = [
   { texto: "Comunidad", corto: "Comunidad", href: "/mi-cuenta/comunidad", icono: Megaphone, inferior: true },
   { texto: "Documentos", corto: "Documentos", href: "/mi-cuenta/documentos", icono: FileText, inferior: false },
   { texto: "Votaciones", corto: "Votaciones", href: "/mi-cuenta/votaciones", icono: Vote, inferior: true },
+  { texto: "Reservas", corto: "Reservas", href: "/mi-cuenta/reservas", icono: CalendarDays, inferior: false },
   { texto: "Mi perfil", corto: "Perfil", href: "/mi-cuenta/perfil", icono: UserRound, inferior: false },
 ];
 
