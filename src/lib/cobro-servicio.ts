@@ -8,6 +8,7 @@ import {
   calcularAvisos,
   decimalesMoneda,
   deMinimo,
+  diaPagoDe,
   fechaVencimiento,
 } from "@/lib/cobro";
 
@@ -164,7 +165,9 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string)
     const ahora = new Date();
     const { lineas, dec } = await calcularPeriodo(tx, periodo, administradoraId, ahora);
 
+    // Fecha general de la propiedad; cada unidad con día de pago propio vence ese día.
     const vencimiento = fechaVencimiento(periodo.anio, periodo.mes, condominio.diaVencimiento);
+    const diaDe = new Map(condominio.unidades.map((u) => [u.id, diaPagoDe(u, condominio)]));
     for (const l of lineas) {
       const total = deMinimo(l.total, dec);
       await tx.avisoCobro.create({
@@ -178,7 +181,7 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string)
           interes: deMinimo(l.interes, dec),
           total,
           saldo: total,
-          vencimiento,
+          vencimiento: fechaVencimiento(periodo.anio, periodo.mes, diaDe.get(l.unidadId)!),
         },
       });
       await aplicarSaldosAFavor(tx, l.unidadId, dec);

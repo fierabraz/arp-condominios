@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
+import { puedeEditar, puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { filtroPersonas } from "@/lib/permisos";
 import { db } from "@/lib/db";
 import { Boton, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { UnidadForm } from "../../../unidad-form";
-import { editarUnidad, eliminarUnidad, terminarVinculoPersona, vincularPersona } from "../../../actions";
+import { cambiarDiaPago, editarUnidad, eliminarUnidad, terminarVinculoPersona, vincularPersona } from "../../../actions";
+import { DiaPagoForm } from "./dia-pago-form";
 import { TerminarAsignacionForm } from "../../estructura/formularios";
 import { ORDEN_TIPOS, relacionDe, TIPOS_VINCULO } from "@/lib/vinculos";
 import { diaISO } from "@/lib/forms";
@@ -25,7 +26,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
     db.unidad.findFirst({
       where: { id: unidadId, condominioId: id, administradoraId },
       include: {
-        condominio: { select: { nombre: true } },
+        condominio: { select: { nombre: true, diaVencimiento: true } },
         vinculos: { include: { persona: { select: { nombre: true } } }, orderBy: [{ hasta: { sort: "desc", nulls: "first" } }, { creadoEn: "asc" }] },
       },
     }),
@@ -90,6 +91,23 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
             alicuota: unidad.alicuota.toString(),
             agrupacionId: unidad.agrupacionId,
           }}
+        />
+      </Card>
+
+      <Card className="mb-6">
+        <h2 className="mb-1 font-medium">Día de pago de gastos comunes</h2>
+        <p className="mb-4 text-sm text-texto-suave">
+          {unidad.diaPago === null
+            ? `Esta unidad paga el día ${unidad.condominio.diaVencimiento}, igual que la propiedad.`
+            : `Esta unidad paga el día ${unidad.diaPago} de cada mes (la propiedad usa el día ${unidad.condominio.diaVencimiento}).`}{" "}
+          Si alguien no puede pagar en la fecha general, elige otro día: el cobro vencerá ese día y la mora y el interés se
+          contarán desde ahí. Se aplica a los cobros que emitas desde ahora.
+        </p>
+        <DiaPagoForm
+          accion={cambiarDiaPago.bind(null, unidad.id)}
+          diaPago={unidad.diaPago}
+          diaPropiedad={unidad.condominio.diaVencimiento}
+          editable={puedeEditar(usuario.rol)}
         />
       </Card>
 

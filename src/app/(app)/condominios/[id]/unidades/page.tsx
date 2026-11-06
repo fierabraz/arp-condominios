@@ -32,6 +32,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
   const conDeuda = new Set((await morosidad(id, administradoraId)).map((m) => m.unidadId));
 
   const editable = puedeEditar(usuario.rol);
+  const conDiaPropio = condominio.unidades.filter((u) => u.diaPago !== null).length;
   const sumaAlicuotas = condominio.unidades.reduce((s, u) => s + Number(u.alicuota), 0);
   const estado = estadoAlicuotas({ cargadas: condominio.unidades.length, suma: sumaAlicuotas, total: condominio.totalUnidades });
 
@@ -87,6 +88,11 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
         <Card>
           <p className="text-sm text-texto-suave">Vence el día</p>
           <p className="mt-1 text-2xl font-bold">{condominio.diaVencimiento}</p>
+          {conDiaPropio > 0 && (
+            <p className="mt-1 text-xs text-texto-suave">
+              {conDiaPropio === 1 ? "1 unidad tiene" : `${conDiaPropio} unidades tienen`} su propio día de pago
+            </p>
+          )}
         </Card>
       </div>
 
@@ -133,6 +139,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
               numero: u.numero,
               tipo: ETIQUETAS_TIPO_UNIDAD[u.tipo],
               alicuota: formatoPorcentaje(u.alicuota),
+              diaPago: u.diaPago,
               propietarios: nombres("PROPIETARIO"),
               residentes: nombres("RESIDENTE"),
               deudaVencida: conDeuda.has(u.id),
