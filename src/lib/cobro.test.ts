@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { aplicarPago, calcularAvisos, fechaVencimiento, repartir } from "./cobro";
+import { aplicarPago, calcularAvisos, diaPagoDe, fechaVencimiento, repartir } from "./cobro";
 
 test("repartir suma exactamente el total", () => {
   const r = repartir(1000, [33.3333, 33.3333, 33.3334]);
@@ -84,6 +84,19 @@ test("un pago cubre primero la deuda más antigua y deja saldo a favor", () => {
 test("vencimiento cae en el mes siguiente, también en diciembre", () => {
   assert.equal(fechaVencimiento(2026, 10, 10).toISOString().slice(0, 10), "2026-11-10");
   assert.equal(fechaVencimiento(2026, 12, 5).toISOString().slice(0, 10), "2027-01-05");
+});
+
+test("día 29, 30 o 31 en un mes más corto vence el último día del mes", () => {
+  assert.equal(fechaVencimiento(2026, 10, 31).toISOString().slice(0, 10), "2026-11-30");
+  assert.equal(fechaVencimiento(2027, 1, 30).toISOString().slice(0, 10), "2027-02-28");
+  assert.equal(fechaVencimiento(2027, 12, 29).toISOString().slice(0, 10), "2028-01-29");
+  assert.equal(fechaVencimiento(2028, 1, 31).toISOString().slice(0, 10), "2028-02-29"); // bisiesto
+  assert.equal(fechaVencimiento(2026, 11, 31).toISOString().slice(0, 10), "2026-12-31");
+});
+
+test("cada unidad usa su día de pago, o el de la propiedad si no tiene", () => {
+  assert.equal(diaPagoDe({ diaPago: 5 }, { diaVencimiento: 10 }), 5);
+  assert.equal(diaPagoDe({ diaPago: null }, { diaVencimiento: 10 }), 10);
 });
 
 test("lee montos escritos a la chilena", async () => {

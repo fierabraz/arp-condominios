@@ -15,7 +15,7 @@ import { correoConfigurado } from "@/lib/correo";
 const ETIQUETAS_ENVIO = { ENVIADO: "Enviado", SIMULADO: "Prueba", ERROR: "Error" } as const;
 
 type Envio = { estado: string; creadoEn: Date };
-type Linea = { envio?: Envio; avisoId?: string; unidadId: string; gastoComun: number; fondoReserva: number; cargos: number; interes: number; total: number; saldo?: number };
+type Linea = { envio?: Envio; avisoId?: string; vencimiento?: Date; unidadId: string; gastoComun: number; fondoReserva: number; cargos: number; interes: number; total: number; saldo?: number };
 
 export default async function PeriodoPage({ params }: PageProps<"/condominios/[id]/periodos/[periodoId]">) {
   const { id, periodoId } = await params;
@@ -59,6 +59,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
       avisoId: a.id,
       envio: a.envios[0],
       unidadId: a.unidadId,
+      vencimiento: a.vencimiento,
       gastoComun: Number(a.gastoComun),
       fondoReserva: Number(a.fondoReserva),
       cargos: Number(a.cargos),
@@ -68,6 +69,10 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
     }));
     lineas.sort((a, b) => (numeroDe.get(a.unidadId) ?? "").localeCompare(numeroDe.get(b.unidadId) ?? "", "es", { numeric: true }));
   }
+  // Avisos con día de pago propio de la unidad (vencen en otra fecha que la general del período).
+  const diaPropio = (l: Linea) =>
+    !!l.vencimiento && !!periodo.vencimiento && l.vencimiento.getTime() !== periodo.vencimiento.getTime();
+  const conDiaPropio = lineas.filter(diaPropio).length;
   const totalLineas = lineas.reduce((s, l) => s + l.total, 0);
   const totalSaldo = lineas.reduce((s, l) => s + (l.saldo ?? 0), 0);
 
@@ -85,7 +90,9 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
         descripcion={
           abierto
             ? "Período abierto: registra los gastos del mes y ciérralo para emitir los cobros."
-            : `Cerrado. Los cobros vencen el ${formatoFecha(periodo.vencimiento!)}.`
+            : `Cerrado. Los cobros vencen el ${formatoFecha(periodo.vencimiento!)}${
+                conDiaPropio ? ` (${conDiaPropio === 1 ? "1 unidad tiene" : `${conDiaPropio} unidades tienen`} su propio día de pago)` : ""
+              }.`
         }
         acciones={
           !abierto && <BotonDocumento href={`/rendiciones/${periodo.id}/pdf`}>Rendición en PDF</BotonDocumento>
@@ -205,7 +212,12 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
           <tbody>
             {lineas.map((l) => (
               <tr key={l.unidadId}>
-                <td className="font-medium">{numeroDe.get(l.unidadId)}</td>
+                <td className="font-medium">
+                  {numeroDe.get(l.unidadId)}
+                  {diaPropio(l) && (
+                    <span className="block text-xs font-normal text-texto-suave">vence el {formatoFecha(l.vencimiento!)}</span>
+                  )}
+                </td>
                 <td className="text-right tabular-nums">{$(l.gastoComun)}</td>
                 <td className="text-right tabular-nums">{$(l.fondoReserva)}</td>
                 <td className="text-right tabular-nums">{l.cargos ? $(l.cargos) : "—"}</td>

@@ -11,6 +11,7 @@ import { EstadoComunidad, ModalidadIncorporacion, TipoComunidad, TipoUnidad, Tip
 import { ESTADOS, revisarCambio } from "@/lib/configuracion";
 import { datosDeUna } from "@/lib/configuracion-servicio";
 import { registrar } from "@/lib/registro";
+import { DIA_PAGO_MAX, DIA_PAGO_MIN } from "@/lib/cobro";
 import { historialUnidad } from "@/lib/unidades";
 import { TIPOS_VINCULO } from "@/lib/vinculos";
 import { crearVinculo, terminarVinculo } from "@/lib/vinculos-servicio";
@@ -238,6 +239,33 @@ export async function editarUnidad(
   );
   revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
   return { ok: true, mensaje: "Cambios guardados." };
+}
+
+/**
+ * Día de pago propio de una unidad: el cobro de esa unidad vence ese día del mes, y la mora y el
+ * interés se cuentan desde ahí. Vacío: usa el día de vencimiento de la propiedad. Vale para los
+ * cobros que se emitan desde ahora; los avisos ya emitidos conservan su fecha.
+ */
+export async function cambiarDiaPago(unidadId: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const { usuario, administradoraId } = await requireAdministradora();
+  const unidad = await db.unidad.findFirst({
+    where: { id: unidadId, administradoraId },
+    include: { condominio: { select: { diaVencimiento: true } } },
+  });
+  if (!unidad || !puedeVerPropiedad(usuario, unidad.condominioId)) return { mensaje: "Unidad no encontrada." };
+
+  const texto = aTexto(formData.get("diaPago"));
+  const diaPago = texto ? Number(texto) : null;
+  if (diaPago !== null && (!Number.isInteger(diaPago) || diaPago < DIA_PAGO_MIN || diaPago > DIA_PAGO_MAX)) {
+    return { errores: { diaPago: [`Elige un día entre ${DIA_PAGO_MIN} y ${DIA_PAGO_MAX}.`] } };
+  }
+  if (diaPago === unidad.diaPago) return { ok: true, mensaje: "Sin cambios." };
+
+  await db.unidad.update({ where: { id: unidadId }, data: { diaPago } });
+  const txt = (d: number | null) => (d === null ? `el de la propiedad (día ${unidad.condominio.diaVencimiento})` : `día ${d}`);
+  await registrar(usuario, "Cambió el día de pago de una unidad", `Unidad ${unidad.numero}: ${txt(unidad.diaPago)} → ${txt(diaPago)}`, unidad.condominioId);
+  revalidatePath(`/condominios/${unidad.condominioId}`, "layout");
+  return { ok: true, mensaje: "Día de pago guardado. Se aplica a los próximos cobros que emitas." };
 }
 
 export async function eliminarUnidad(unidadId: string) {

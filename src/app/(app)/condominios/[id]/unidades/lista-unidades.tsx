@@ -10,6 +10,8 @@ export type FilaUnidad = {
   numero: string;
   tipo: string;
   alicuota: string;
+  /** Día de pago propio de la unidad; null si usa el de la propiedad. */
+  diaPago: number | null;
   propietarios: string;
   residentes: string;
   deudaVencida: boolean;
@@ -96,6 +98,7 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
                   {u.residentes && <span className="text-sm">Residente: {u.residentes}</span>}
                   <span className="text-sm text-texto-suave">
                     {u.tipo} · alícuota {u.alicuota}
+                    {u.diaPago !== null && ` · paga el día ${u.diaPago}`}
                   </span>
                 </>
               );
@@ -129,7 +132,10 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
                 {visibles.map((u) => (
                   <tr key={u.id}>
                     <td>{numero(u)}</td>
-                    <td>{u.tipo}</td>
+                    <td>
+                      {u.tipo}
+                      {u.diaPago !== null && <span className="block text-xs text-texto-suave">Paga el día {u.diaPago}</span>}
+                    </td>
                     <td className="text-right tabular-nums">{u.alicuota}</td>
                     <td>{u.propietarios || <span className="text-alerta">Sin propietario</span>}</td>
                     <td>{u.residentes || "—"}</td>

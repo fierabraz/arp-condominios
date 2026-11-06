@@ -242,6 +242,7 @@ model Condominio {
   porcentajeReserva  Decimal                 @default(5) @db.Decimal(5, 2)
   // Tasa de interés mensual por mora (ej. 1.5 = 1,5 % mensual)
   tasaInteresMora    Decimal                 @default(0) @db.Decimal(5, 2)
+  // Día de vencimiento general; cada unidad puede tener el suyo (Unidad.diaPago).
   diaVencimiento     Int                     @default(10)
   // Cuántas unidades con alícuota tiene la propiedad en total (para seguir el avance de la carga)
   totalUnidades      Int?
@@ -407,6 +408,9 @@ model Unidad {
   // COM-001: dónde está (torre, piso, sector...). Opcional.
   agrupacionId     String?
   agrupacion       Agrupacion?    @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  // Día del mes en que vence el cobro de esta unidad (1 a 31; si el mes es más corto, el último día).
+  // null: usa el día de vencimiento de la propiedad. Lo define la administración.
+  diaPago          Int?
   creadoEn         DateTime       @default(now())
 
   espaciosPropios    Espacio[]           @relation("EspacioUnidadPropia")
