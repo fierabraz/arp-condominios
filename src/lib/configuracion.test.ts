@@ -55,7 +55,14 @@ test("una comunidad existente no se habilita financieramente sin apertura", () =
   const r = revisarCambio(d, "HABILITADA_FINANCIERA");
   assert.equal(r.ok, false);
   assert.match(r.bloqueos.join(" "), /apertura/);
-  assert.equal(pasosConfiguracion(d)[3].estado, "proximamente");
+  assert.equal(pasosConfiguracion(d)[3].estado, "pendiente");
+  assert.equal(pasosConfiguracion(d)[3].ruta, "/apertura");
+  // Con la apertura en revisión, el paso 04 queda completo pero cobrar sigue restringido.
+  const conApertura = { ...d, apertura: { estado: "EN_REVISION" as const, fechaCorte: new Date("2026-11-30"), deudas: 3, fondos: 2, cuentas: 1 } };
+  assert.equal(pasosConfiguracion(conApertura)[3].estado, "completo");
+  const r2 = revisarCambio(conApertura, "HABILITADA_FINANCIERA");
+  assert.equal(r2.ok, false);
+  assert.match(r2.bloqueos.join(" "), /restringido/);
 });
 
 test("bajar de estado se permite, salvo dejar de cobrar si ya emitió cobros", () => {

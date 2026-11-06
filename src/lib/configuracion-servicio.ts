@@ -19,6 +19,7 @@ export async function datosConfiguracion(administradoraId: string, ids: string[]
         totalUnidades: true,
         unidades: { select: { alicuota: true } },
         _count: { select: { agrupaciones: true, espacios: true, instalaciones: true } },
+        apertura: { select: { estado: true, fechaCorte: true, _count: { select: { deudas: true, fondos: true, cuentas: true } } } },
       },
     }),
     db.unidad.groupBy({
@@ -50,6 +51,7 @@ export async function datosConfiguracion(administradoraId: string, ids: string[]
         unidadesSinPropietario: sin.get(c.id) ?? 0,
         cobrosEmitidos: cerr.get(c.id) ?? 0,
         estructura: c._count,
+        apertura: c.apertura ? { estado: c.apertura.estado, fechaCorte: c.apertura.fechaCorte, ...c.apertura._count } : null,
       },
     ]),
   );
