@@ -30,7 +30,7 @@ export async function crearAdministradora(_: EstadoForm, formData: FormData): Pr
   if (!datos.success) return erroresDe(datos.error);
   const d = datos.data;
 
-  // PLA-002: plan con el que parte (opcional; sin plan = sin límite).
+  // SUS-001: plan con el que parte (opcional; sin plan = sin límite).
   const planId = aTexto(formData.get("planId")) ?? null;
   if (planId && !(await db.plan.findFirst({ where: { id: planId, activo: true } }))) {
     return { errores: { planId: ["Elige un plan de la lista."] } };

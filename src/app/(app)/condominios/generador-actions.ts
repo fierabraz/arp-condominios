@@ -61,7 +61,7 @@ export async function crearComunidadVisual(_: EstadoForm, formData: FormData): P
     return { ...erroresDe(datos.error), valores: Object.fromEntries([...formData.entries()].map(([k, v]) => [k, String(v)])) };
   }
   const { tipo, modalidad, ...resto } = datos.data;
-  // PLA-002: solo dentro del cupo del plan que asignó la plataforma.
+  // SUS-001: solo dentro del cupo del plan que asignó la plataforma.
   let condominio;
   try {
     condominio = await crearDentroDelCupo(administradoraId, (tx) =>

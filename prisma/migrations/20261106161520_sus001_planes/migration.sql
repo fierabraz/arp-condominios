@@ -1,4 +1,4 @@
--- PLA-002: planes por administradora. Solo agrega; las administradoras existentes quedan sin plan (sin límite, como antes).
+-- SUS-001: planes por administradora. Solo agrega; las administradoras existentes quedan sin plan (sin límite, como antes).
 
 -- AlterTable
 ALTER TABLE "Administradora" ADD COLUMN     "creaComunidades" BOOLEAN NOT NULL DEFAULT true,

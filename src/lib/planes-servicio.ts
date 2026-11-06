@@ -4,7 +4,7 @@ import { calcularCupo } from "@/lib/planes";
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
-/** PLA-002: cupo de comunidades de una administradora, leído de la base. */
+/** SUS-001: cupo de comunidades de una administradora, leído de la base. */
 export async function cupoDe(administradoraId: string, cliente: Pick<Tx, "administradora" | "condominio"> = db) {
   const [a, usadas] = await Promise.all([
     cliente.administradora.findUnique({

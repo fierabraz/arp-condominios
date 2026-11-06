@@ -1,5 +1,5 @@
 /**
- * PLA-002: cupo de comunidades según el plan que la plataforma asigna a cada administradora.
+ * SUS-001: cupo de comunidades según el plan que la plataforma asigna a cada administradora.
  * Lógica pura (sin base de datos) para poder probarla. Los planes no guardan precios:
  * se asignan a mano desde /plataforma.
  */

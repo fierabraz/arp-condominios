@@ -2,7 +2,7 @@ import { BotonLink } from "@/components/ui";
 import { textoCupo, type Cupo } from "@/lib/planes";
 
 /**
- * PLA-002: botón "Nueva comunidad" según el cupo del plan. Si ya no queda cupo, en vez del botón
+ * SUS-001: botón "Nueva comunidad" según el cupo del plan. Si ya no queda cupo, en vez del botón
  * se ve el motivo; si queda, una línea con lo usado ("2 de 3 comunidades del plan Esencial Pro").
  */
 export function BotonNuevaComunidad({ cupo }: { cupo: Cupo }) {

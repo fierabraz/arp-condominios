@@ -1,4 +1,4 @@
-// PLA-002 · Cupo de comunidades por plan, contra la base. Solo contra una base de PRUEBA: npm run test:bd
+// SUS-001 · Cupo de comunidades por plan, contra la base. Solo contra una base de PRUEBA: npm run test:bd
 import "dotenv/config";
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";

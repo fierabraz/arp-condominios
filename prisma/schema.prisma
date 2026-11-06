@@ -172,10 +172,10 @@ model Administradora {
   pais     String   @default("CL")
   moneda   String   @default("CLP")
   creadoEn DateTime @default(now())
-  /// PLA-002: plan que asigna la plataforma a mano (sin cobro). Sin plan = sin límite, como antes.
+  /// SUS-001: plan que asigna la plataforma a mano (sin cobro). Sin plan = sin límite, como antes.
   planId          String?
   plan            Plan?   @relation(fields: [planId], references: [id], onDelete: SetNull)
-  /// PLA-002: la plataforma puede quitar a la administradora la facultad de crear comunidades.
+  /// SUS-001: la plataforma puede quitar a la administradora la facultad de crear comunidades.
   creaComunidades Boolean @default(true)
 
   usuarios            Usuario[]
@@ -195,7 +195,7 @@ model Administradora {
   reservas            Reserva[]
 }
 
-/// PLA-002: plan comercial (nombres preliminares, editables por la plataforma). No guarda precios.
+/// SUS-001: plan comercial (nombres preliminares, editables por la plataforma). No guarda precios.
 model Plan {
   id             String   @id @default(cuid())
   nombre         String   @unique

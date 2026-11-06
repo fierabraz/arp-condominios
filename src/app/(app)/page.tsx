@@ -19,7 +19,7 @@ export default async function InicioPage() {
   const administradoraId = usuario.administradoraId!;
   const ahora = new Date();
   const principal = esPrincipal(usuario);
-  // PLA-002: cupo de comunidades del plan (solo lo necesita quien puede crear).
+  // SUS-001: cupo de comunidades del plan (solo lo necesita quien puede crear).
   const cupo = principal ? await cupoDe(administradoraId) : null;
   const [propiedades, condominios, unidades, personas, porCobrar, vencido] = await Promise.all([
     resumenPropiedades(administradoraId, condominiosPermitidos(usuario) ?? undefined),

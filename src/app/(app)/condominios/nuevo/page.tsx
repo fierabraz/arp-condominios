@@ -10,7 +10,7 @@ import { cupoDe } from "@/lib/planes-servicio";
 
 export default async function NuevoCondominioPage({ searchParams }: PageProps<"/condominios/nuevo">) {
   const { administradoraId } = await requireAdministradora("propiedades.crear");
-  // PLA-002: sin cupo en el plan no se muestra el formulario (la acción también lo revisa).
+  // SUS-001: sin cupo en el plan no se muestra el formulario (la acción también lo revisa).
   const cupo = await cupoDe(administradoraId);
   if (!cupo.puede) {
     return (

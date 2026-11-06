@@ -92,7 +92,7 @@ export async function crearCondominio(_: EstadoForm, formData: FormData): Promis
   if (!datos.success) return erroresDe(datos.error);
 
   // Nace "En configuración" (valor por defecto de la tabla): se completa en el configurador.
-  // PLA-002: solo dentro del cupo del plan que asignó la plataforma.
+  // SUS-001: solo dentro del cupo del plan que asignó la plataforma.
   let condominio;
   try {
     condominio = await crearDentroDelCupo(administradoraId, (tx) =>

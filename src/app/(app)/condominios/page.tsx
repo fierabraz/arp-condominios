@@ -10,7 +10,7 @@ export default async function CondominiosPage() {
   const { usuario, administradoraId } = await requireAdministradora();
   const propiedades = await resumenPropiedades(administradoraId, condominiosPermitidos(usuario) ?? undefined);
   const principal = esPrincipal(usuario);
-  // PLA-002: cupo de comunidades del plan (solo lo necesita quien puede crear).
+  // SUS-001: cupo de comunidades del plan (solo lo necesita quien puede crear).
   const cupo = principal ? await cupoDe(administradoraId) : null;
 
   return (

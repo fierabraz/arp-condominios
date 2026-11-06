@@ -1,6 +1,6 @@
 "use server";
 
-// PLA-002: planes (nombres y cupos editables) y plan de cada administradora. Solo la plataforma.
+// SUS-001: planes (nombres y cupos editables) y plan de cada administradora. Solo la plataforma.
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
