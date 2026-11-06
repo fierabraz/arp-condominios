@@ -58,7 +58,12 @@ export function filtroPersonas(a: Alcance) {
   const ids = condominiosPermitidos(a);
   if (ids === null) return {};
   return {
-    OR: [{ unidades: { none: {} } }, { unidades: { some: { unidad: { condominioId: { in: ids } } } } }],
+    OR: [
+      { unidades: { none: {} }, vinculos: { none: {} } },
+      { unidades: { some: { unidad: { condominioId: { in: ids } } } } },
+      // COM-001: también quien tuvo o tiene un vínculo (ocupante, o ya terminado) en sus propiedades.
+      { vinculos: { some: { unidad: { condominioId: { in: ids } } } } },
+    ],
   };
 }
 

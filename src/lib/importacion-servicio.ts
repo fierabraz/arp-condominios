@@ -123,7 +123,19 @@ export async function aplicarImportacion(
       for (const p of plan.personas.filter((p) => p.accion === "completar")) {
         await tx.persona.update({ where: { id: p.id }, data: p.completar! });
       }
-      if (vinculos.length) await tx.unidadPersona.createMany({ data: vinculos, skipDuplicates: true });
+      if (vinculos.length) {
+        await tx.unidadPersona.createMany({ data: vinculos, skipDuplicates: true });
+        // COM-001 · Entrega 3: también al historial, sin fecha de inicio (la planilla no la trae).
+        await tx.vinculoUnidad.createMany({
+          data: vinculos.map((v) => ({
+            administradoraId,
+            unidadId: v.unidadId,
+            personaId: v.personaId,
+            tipo: v.relacion,
+            creadoPor: `${autor.nombre} (carga desde planilla)`,
+          })),
+        });
+      }
     },
     { timeout: 30_000, maxWait: 10_000 },
   );

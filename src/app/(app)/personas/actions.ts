@@ -8,6 +8,7 @@ import { requireAdministradora } from "@/lib/auth";
 import { filtroPersonas } from "@/lib/permisos";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { registrar } from "@/lib/registro";
+import { buscarDuplicado } from "@/lib/vinculos";
 
 const PersonaSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
@@ -15,6 +16,32 @@ const PersonaSchema = z.object({
   correo: z.email({ error: "Correo no válido." }).optional(),
   telefono: z.string().optional(),
 });
+
+/**
+ * Revisa que no sea una persona ya registrada en la administradora (COM-001). Mismo RUT o correo:
+ * no se crea. Mismo nombre: se pide confirmar. El nombre de la otra solo se muestra si esta cuenta la puede ver.
+ */
+async function revisarDuplicado(
+  datos: { nombre: string; documento?: string; correo?: string },
+  formData: FormData,
+  administradoraId: string,
+  usuario: Parameters<typeof filtroPersonas>[0],
+  excluirId?: string,
+): Promise<EstadoForm | null> {
+  const personas = await db.persona.findMany({ where: { administradoraId }, select: { id: true, nombre: true, documento: true, correo: true } });
+  const dup = buscarDuplicado(datos, personas, excluirId);
+  if (!dup) return null;
+  const valores = Object.fromEntries(["nombre", "documento", "correo", "telefono"].map((k) => [k, String(formData.get(k) ?? "")]));
+  const visible = await db.persona.count({ where: { id: dup.persona.id, administradoraId, ...filtroPersonas(usuario) } });
+  const quien = visible ? dup.persona.nombre : "otra persona registrada en la administradora";
+  if (dup.tipo === "documento") return { valores, errores: { documento: [`Ese RUT ya es de ${quien}. No se crea otra ficha: vincula a la persona existente.`] } };
+  if (dup.tipo === "correo") return { valores, errores: { correo: [`Ese correo ya es de ${quien}.`] } };
+  if (formData.get("confirmarNombre") === "on") return null;
+  return {
+    valores,
+    errores: { confirmarNombre: [`Ya hay ${visible ? `una persona llamada ${dup.persona.nombre}` : "una persona con ese nombre"}. Si es otra persona, márcalo y vuelve a guardar.`] },
+  };
+}
 
 function leerPersona(formData: FormData) {
   return PersonaSchema.safeParse({
@@ -29,6 +56,8 @@ export async function crearPersona(_: EstadoForm, formData: FormData): Promise<E
   const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerPersona(formData);
   if (!datos.success) return erroresDe(datos.error);
+  const dup = await revisarDuplicado(datos.data, formData, administradoraId, usuario);
+  if (dup) return dup;
   await db.persona.create({ data: { ...datos.data, administradoraId } });
   await registrar(usuario, "Registró una persona", datos.data.nombre);
   revalidatePath("/personas");
@@ -39,6 +68,8 @@ export async function editarPersona(id: string, _: EstadoForm, formData: FormDat
   const { usuario, administradoraId } = await requireAdministradora();
   const datos = leerPersona(formData);
   if (!datos.success) return erroresDe(datos.error);
+  const dup = await revisarDuplicado(datos.data, formData, administradoraId, usuario, id);
+  if (dup) return dup;
   const { count } = await db.persona.updateMany({ where: { id, administradoraId, ...filtroPersonas(usuario) }, data: datos.data });
   if (count === 0) return { mensaje: "Persona no encontrada." };
   await registrar(usuario, "Editó los datos de una persona", datos.data.nombre);
@@ -48,7 +79,12 @@ export async function editarPersona(id: string, _: EstadoForm, formData: FormDat
 
 export async function eliminarPersona(id: string) {
   const { usuario, administradoraId } = await requireAdministradora();
-  const persona = await db.persona.findFirst({ where: { id, administradoraId, ...filtroPersonas(usuario) }, select: { nombre: true } });
+  const persona = await db.persona.findFirst({
+    where: { id, administradoraId, ...filtroPersonas(usuario) },
+    select: { nombre: true, _count: { select: { vinculos: true } } },
+  });
+  // Quien tiene o tuvo vínculos con unidades no se borra: se perdería el historial (COM-001).
+  if (persona && persona._count.vinculos > 0) redirect(`/personas/${id}`);
   const { count } = persona ? await db.persona.deleteMany({ where: { id, administradoraId } }) : { count: 0 };
   if (count > 0) await registrar(usuario, "Borró una persona", persona?.nombre ?? "");
   revalidatePath("/personas");

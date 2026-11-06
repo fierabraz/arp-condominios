@@ -3,14 +3,18 @@ import { notFound } from "next/navigation";
 import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { filtroPersonas } from "@/lib/permisos";
 import { db } from "@/lib/db";
-import { Boton, Card, PageHeader, Vacio } from "@/components/ui";
+import { Boton, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { UnidadForm } from "../../../unidad-form";
-import { desvincularPersona, editarUnidad, eliminarUnidad, vincularPersona } from "../../../actions";
+import { editarUnidad, eliminarUnidad, terminarVinculoPersona, vincularPersona } from "../../../actions";
+import { TerminarAsignacionForm } from "../../estructura/formularios";
+import { ORDEN_TIPOS, relacionDe, TIPOS_VINCULO } from "@/lib/vinculos";
+import { diaISO } from "@/lib/forms";
+import { formatoDia } from "@/lib/formato";
 import { VinculoForm } from "./vinculo-form";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { EstadoCuenta } from "@/components/estado-cuenta";
 import { historialUnidad } from "@/lib/unidades";
-import { asignacionVigente, CLASES, opcionesAgrupaciones } from "@/lib/estructura";
+import { asignacionVigente, CLASES, hoyDia, opcionesAgrupaciones } from "@/lib/estructura";
 
 export default async function UnidadPage({ params }: PageProps<"/condominios/[id]/unidades/[unidadId]">) {
   const { id, unidadId } = await params;
@@ -22,7 +26,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
       where: { id: unidadId, condominioId: id, administradoraId },
       include: {
         condominio: { select: { nombre: true } },
-        personas: { include: { persona: true }, orderBy: { relacion: "asc" } },
+        vinculos: { include: { persona: { select: { nombre: true } } }, orderBy: [{ hasta: { sort: "desc", nulls: "first" } }, { creadoEn: "asc" }] },
       },
     }),
     db.persona.findMany({
@@ -32,6 +36,8 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
     }),
   ]);
   if (!unidad) notFound();
+  const vigentes = unidad.vinculos.filter((v) => !v.hasta).sort((a, b) => ORDEN_TIPOS.indexOf(a.tipo) - ORDEN_TIPOS.indexOf(b.tipo));
+  const terminados = unidad.vinculos.filter((v) => v.hasta);
   const [estado, historial, agrupaciones, espacios] = await Promise.all([
     estadoCuenta(unidad.id, administradoraId),
     historialUnidad(unidad.id),
@@ -104,36 +110,73 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
       )}
 
       <Card className="mb-6">
-        <h2 className="mb-4 font-medium">Propietarios y residentes</h2>
-        {unidad.personas.length === 0 ? (
+        <h2 className="mb-1 font-medium">Personas de la unidad</h2>
+        <p className="mb-4 text-sm text-texto-suave">
+          Propietarios, copropietarios, arrendatarios, residentes y ocupantes, con sus fechas. Un vínculo que termina no se borra:
+          pasa al historial.
+        </p>
+        {vigentes.length === 0 ? (
           <Vacio>Nadie vinculado todavía.</Vacio>
         ) : (
-          <ul className="mb-4 divide-y divide-gray-100">
-            {unidad.personas.map((v) => (
-              <li key={`${v.personaId}-${v.relacion}`} className="flex items-center justify-between py-2 text-sm">
-                <span>
-                  <span className="font-medium">{v.persona.nombre}</span>
-                  <span className="ml-2 text-texto-suave">
-                    {v.relacion === "PROPIETARIO" ? "Propietario" : "Residente"}
-                  </span>
-                </span>
-                <form action={desvincularPersona.bind(null, unidad.id, v.personaId, v.relacion)}>
-                  <button className="text-sm text-peligro hover:underline">Quitar</button>
-                </form>
-              </li>
-            ))}
-          </ul>
+          <Tabla>
+            <thead>
+              <tr>
+                <th>Persona</th>
+                <th>Vínculo</th>
+                <th>Desde</th>
+                <th>Terminar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {vigentes.map((v) => (
+                <tr key={v.id}>
+                  <td>
+                    <Link href={`/personas/${v.personaId}`} className="font-semibold text-marca hover:underline">
+                      {v.persona.nombre}
+                    </Link>
+                    {v.respaldo && <span className="block text-xs text-texto-suave">Respaldo: {v.respaldo}</span>}
+                  </td>
+                  <td>
+                    {TIPOS_VINCULO[v.tipo].texto}
+                    {v.terminoPrevisto && <span className="block text-xs text-texto-suave">Término previsto: {formatoDia(v.terminoPrevisto)}</span>}
+                    {!relacionDe(v.tipo) && <span className="block text-xs text-texto-suave">Sin acceso a la app</span>}
+                  </td>
+                  <td>{v.desde ? formatoDia(v.desde) : "Sin fecha registrada"}</td>
+                  <td>
+                    <TerminarAsignacionForm accion={terminarVinculoPersona.bind(null, unidad.id, v.id)} hoy={diaISO(hoyDia())} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </Tabla>
         )}
-        {personas.length === 0 ? (
-          <p className="text-sm text-texto-suave">
-            Primero registra personas en{" "}
-            <Link href="/personas" className="text-marca hover:underline">
-              Personas
-            </Link>
-            .
-          </p>
-        ) : (
-          <VinculoForm accion={vincularPersona.bind(null, unidad.id)} personas={personas} />
+        <div className="mt-5 border-t border-borde pt-4">
+          <h3 className="mb-3 font-bold">Agregar vínculo</h3>
+          {personas.length === 0 ? (
+            <p className="text-sm text-texto-suave">
+              Primero registra personas en{" "}
+              <Link href="/personas" className="text-marca hover:underline">
+                Personas
+              </Link>
+              .
+            </p>
+          ) : (
+            <VinculoForm accion={vincularPersona.bind(null, unidad.id)} personas={personas} hoy={diaISO(hoyDia())} />
+          )}
+        </div>
+        {terminados.length > 0 && (
+          <div className="mt-5 border-t border-borde pt-4">
+            <h3 className="mb-2 font-bold">Historial</h3>
+            <ul className="grid gap-1 text-sm">
+              {terminados.map((v) => (
+                <li key={v.id}>
+                  <span className="font-semibold">{v.persona.nombre}</span>, {TIPOS_VINCULO[v.tipo].texto.toLowerCase()}:{" "}
+                  {v.desde ? formatoDia(v.desde) : "sin fecha"} → {formatoDia(v.hasta!)}
+                  <span className="text-texto-suave"> · terminó {v.terminadoPor}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </Card>
 
@@ -145,6 +188,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
             historial.pagos && `${historial.pagos} ${historial.pagos === 1 ? "pago" : "pagos"}`,
             historial.gastos && `${historial.gastos} ${historial.gastos === 1 ? "cargo" : "cargos"}`,
             historial.votos && `${historial.votos} ${historial.votos === 1 ? "voto" : "votos"}`,
+            historial.vinculos && `${historial.vinculos} ${historial.vinculos === 1 ? "vínculo terminado" : "vínculos terminados"}`,
           ]
             .filter(Boolean)
             .join(", ")}
