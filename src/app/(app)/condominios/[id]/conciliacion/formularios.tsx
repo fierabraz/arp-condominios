@@ -3,7 +3,7 @@
 // FIN-003.1 · Formularios de Conciliación bancaria: elegir comunidad y cuenta, registrar cuentas,
 // editar perfiles de cartola y marcar movimientos para revisión.
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Boton, Campo, Input, Mensaje, Select, Tabla } from "@/components/ui";
 import type { EstadoForm } from "@/lib/forms";
@@ -30,15 +30,11 @@ export function ElegirComunidad({ actual, comunidades }: { actual: string; comun
 }
 
 /** Registrar una cuenta bancaria: banco, tipo y solo los últimos 4 dígitos. */
-export function FormularioCuenta({ accion, base, sugerida }: { accion: Accion; base: string; sugerida?: { banco: string; tipo: string; numeroFinal: string } }) {
+export function FormularioCuenta({ accion, sugerida }: { accion: Accion; sugerida?: { banco: string; tipo: string; numeroFinal: string } }) {
   const [estado, enviar, pendiente] = useActionState(accion, {});
-  const router = useRouter();
   const v = estado.valores ?? {};
   const bancoInicial = v.banco ?? (sugerida ? (BANCOS.includes(sugerida.banco) ? sugerida.banco : "Otro") : "");
   const [banco, setBanco] = useState(bancoInicial);
-  useEffect(() => {
-    if (estado.ok && estado.mensaje) router.push(`${base}?cuenta=${estado.mensaje}`);
-  }, [estado, base, router]);
   return (
     <form action={enviar} className="grid gap-4 sm:grid-cols-2">
       <Campo etiqueta="Banco" error={estado.errores?.banco}>
@@ -78,7 +74,7 @@ export function FormularioCuenta({ accion, base, sugerida }: { accion: Accion; b
         <Boton type="submit" disabled={pendiente}>
           {pendiente ? "Guardando…" : "Registrar cuenta"}
         </Boton>
-        {!estado.ok && <Mensaje texto={estado.mensaje} />}
+        <Mensaje texto={estado.mensaje} />
       </div>
     </form>
   );

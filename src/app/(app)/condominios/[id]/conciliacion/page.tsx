@@ -62,7 +62,6 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
   const formularioCuenta = editable && (
     <FormularioCuenta
       accion={crearCuenta.bind(null, id)}
-      base={base}
       sugerida={sugeridas[0] ? { banco: sugeridas[0].banco, tipo: sugeridas[0].tipo, numeroFinal: sugeridas[0].numeroFinal! } : undefined}
     />
   );

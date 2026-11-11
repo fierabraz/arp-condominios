@@ -6,6 +6,7 @@
 // siempre junto con su administradora y comunidad.
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
@@ -62,7 +63,7 @@ export async function crearCuenta(condominioId: string, _: EstadoForm, formData:
   });
   await registrar(a.usuario, "Registró una cuenta bancaria", `${a.condominio.nombre}: ${cuenta.banco} ···${cuenta.numeroFinal}`, condominioId);
   revalidatePath(ruta(condominioId));
-  return { ok: true, mensaje: cuenta.id };
+  redirect(`${ruta(condominioId)}?cuenta=${cuenta.id}`);
 }
 
 /** Quita una cuenta registrada por error (solo si todavía no tiene cartolas importadas). */

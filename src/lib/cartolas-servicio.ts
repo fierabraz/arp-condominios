@@ -197,7 +197,10 @@ async function vistaPrevia(
   const avisos = i.lecturas.flatMap((l, k) => {
     const nombre = i.hojas.filter((h) => h.elegida)[k]?.nombre ?? "";
     const extra: string[] = [];
-    if (l.omitidas.length) extra.push(`Hoja «${nombre}»: se dejaron fuera ${l.omitidas.length} filas que no son movimientos (títulos repetidos, totales o saldos): ${filasTexto(l.omitidas)}.`);
+    if (l.omitidas.length) {
+      const una = l.omitidas.length === 1;
+      extra.push(`Hoja «${nombre}»: se ${una ? "dejó fuera 1 fila que no es movimiento" : `dejaron fuera ${l.omitidas.length} filas que no son movimientos`} (títulos repetidos, totales o saldos): ${una ? "fila " : "filas "}${filasTexto(l.omitidas)}.`);
+    }
     if (l.saldo) {
       extra.push(
         l.saldo.descuadres.length
@@ -205,7 +208,8 @@ async function vistaPrevia(
           : `Hoja «${nombre}»: los saldos del banco cuadran con los cargos y abonos en todas las filas: los montos se leyeron bien.`,
       );
     }
-    return [...l.avisos, ...extra];
+    // En un CSV no hay hojas: se habla de «la cartola».
+    return [...l.avisos, ...extra].map((a) => (info.formato === "CSV" ? a.replace(`Hoja «${nombre}»: `, "").replace(/^./, (c) => c.toUpperCase()) : a));
   });
   const fechas = movimientos.map((m) => m.fecha).sort();
   const periodo = fechas.length ? { desde: fechas[0], hasta: fechas[fechas.length - 1] } : null;

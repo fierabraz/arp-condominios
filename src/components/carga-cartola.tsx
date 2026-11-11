@@ -71,6 +71,7 @@ function Pasos({ revisar, confirmar, banco, base, moneda, otraVez }: { revisar: 
     setError(undefined);
     setEstado({ etapa: "inicio" });
     setOpciones({});
+    setArchivo(null);
     if (!f) return;
     const nombre = f.name.toLowerCase();
     if (nombre.endsWith(".pdf")) return setError("Todavía no se pueden leer cartolas en PDF. Descárgala del banco en Excel (.xlsx) o CSV.");
@@ -200,7 +201,7 @@ function ZonaArchivo({ archivo, elegir, quitar, deshabilitado }: { archivo: File
           </p>
         </div>
         <Boton type="button" variante="secundario" onClick={quitar} disabled={deshabilitado}>
-          <X size={16} aria-hidden="true" /> Quitar
+          <X size={16} aria-hidden="true" /> Quitar archivo
         </Boton>
       </div>
     );
@@ -248,7 +249,7 @@ function ZonaArchivo({ archivo, elegir, quitar, deshabilitado }: { archivo: File
         name="cartola"
         className="sr-only"
         tabIndex={-1}
-        aria-label="Seleccionar archivo de cartola"
+        aria-hidden="true"
         accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         onChange={(e) => {
           elegir(e.target.files?.[0]);
