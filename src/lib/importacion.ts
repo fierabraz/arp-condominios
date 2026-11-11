@@ -153,11 +153,13 @@ export const normalizarDocumento = normalizarRut;
 
 const CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const texto = (v: unknown) => {
+/** Valor de una celda como texto recortado; vacío → undefined. Lo usa también FIN-003.1 (cartolas). */
+export const celdaTexto = (v: unknown) => {
   if (v === null || v === undefined) return undefined;
   const s = (v instanceof Date ? v.toISOString().slice(0, 10) : String(v)).trim();
   return s === "" ? undefined : s;
 };
+const texto = celdaTexto;
 
 /** Una columna de la planilla y el dato de Convive al que corresponde. */
 export type ColumnaLeida = { indice: number; letra: string; titulo: string; clave?: ClaveColumna; ejemplos: string[] };
@@ -208,14 +210,28 @@ export function filaProbableDeTitulos(hoja: unknown[][]) {
 
 /** Columnas de una fila de títulos con hasta 3 valores de ejemplo. */
 export function columnasDe(hoja: unknown[][], iTitulos: number, mapeo?: Mapeo): ColumnaLeida[] {
+  return columnasReconocidas(hoja, iTitulos, (titulo) => claveDe(titulo, mapeo));
+}
+
+/**
+ * Columnas de una fila de títulos, cada una con el dato que `reconocer` le asigna (el primero gana
+ * si dos columnas dicen ser el mismo dato) y hasta 3 ejemplos. La comparten la carga de unidades
+ * (COM-001) y la de cartolas bancarias (FIN-003.1), cada una con sus propios nombres de columna.
+ */
+export function columnasReconocidas<K extends string>(
+  hoja: unknown[][],
+  iTitulos: number,
+  reconocer: (titulo: string) => K | undefined,
+  repetibles: readonly K[] = [],
+): { indice: number; letra: string; titulo: string; clave?: K; ejemplos: string[] }[] {
   const titulos = hoja[iTitulos] ?? [];
-  const usadas = new Set<ClaveColumna>();
-  const columnas: ColumnaLeida[] = [];
+  const usadas = new Set<K>();
+  const columnas: { indice: number; letra: string; titulo: string; clave?: K; ejemplos: string[] }[] = [];
   titulos.forEach((c, i) => {
     const titulo = texto(c);
     if (!titulo) return;
-    let clave = claveDe(titulo, mapeo);
-    if (clave && usadas.has(clave)) clave = undefined; // dos columnas para el mismo dato: vale la primera
+    let clave = reconocer(titulo);
+    if (clave && usadas.has(clave) && !repetibles.includes(clave)) clave = undefined; // dos columnas para el mismo dato: vale la primera
     if (clave) usadas.add(clave);
     const ejemplos = hoja
       .slice(iTitulos + 1)
@@ -337,11 +353,11 @@ export function leerPlanilla(hoja: unknown[][], opciones: OpcionesLectura = {}):
  * Perfil guardado que corresponde a esta planilla: el que tenga todos sus títulos en la fila de
  * títulos. Si hay varios, el que asigna más columnas.
  */
-export function perfilQueCalza<P extends { columnas: Mapeo }>(hoja: unknown[][], perfiles: P[]): P | null {
+export function perfilQueCalza<P extends { columnas: Record<string, string> }>(hoja: unknown[][], perfiles: P[], obligatorio = "numero"): P | null {
   const titulos = new Set(hoja.slice(0, 30).flatMap((f) => f.map((c) => normalizarTitulo(String(c ?? ""))).filter(Boolean)));
   const calzan = perfiles.filter((p) => {
     const claves = Object.keys(p.columnas);
-    return claves.length > 0 && claves.every((k) => titulos.has(k)) && Object.values(p.columnas).includes("numero");
+    return claves.length > 0 && claves.every((k) => titulos.has(k)) && Object.values(p.columnas).includes(obligatorio);
   });
   calzan.sort((a, b) => Object.keys(b.columnas).length - Object.keys(a.columnas).length);
   return calzan[0] ?? null;
@@ -359,10 +375,11 @@ export function revisarMapeo(mapeo: Mapeo): string | null {
 /** Lee un CSV (separado por punto y coma, coma o tabulación, como lo guarda Excel). */
 export function leerCsv(contenido: string): string[][] {
   const limpio = contenido.replace(/^﻿/, "");
-  const primera = limpio.split(/\r?\n/, 1)[0] ?? "";
-  const separador = [";", "\t", ","].reduce((mejor, s) =>
-    primera.split(s).length > primera.split(mejor).length ? s : mejor,
-  );
+  // El separador es el que más columnas arma en alguna de las primeras líneas (no solo la primera:
+  // las cartolas bancarias traen arriba un título como "Banco X - Movimientos, octubre").
+  const lineas = limpio.split(/\r?\n/, 30);
+  const columnas = (s: string) => Math.max(0, ...lineas.map((l) => l.split(s).length));
+  const separador = [";", "\t", ","].reduce((mejor, s) => (columnas(s) > columnas(mejor) ? s : mejor));
   const filas: string[][] = [];
   let fila: string[] = [];
   let campo = "";
