@@ -44,7 +44,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
       { clave: "egresos", texto: "Egresos", ruta: "/egresos", descripcion: "Todos los gastos registrados en la propiedad." },
       { clave: "fondos", texto: "Fondos", ruta: "/fondos", descripcion: "Fondo de reserva acumulado mes a mes." },
       { clave: "rendiciones", texto: "Rendiciones", ruta: "/rendiciones", descripcion: "Rendición mensual en PDF de cada mes cerrado." },
-      { clave: "conciliacion", texto: "Conciliación bancaria", descripcion: "Cruza la cartola del banco con los pagos y gastos registrados para cuadrar la cuenta." },
+      { clave: "conciliacion", texto: "Conciliación bancaria", ruta: "/conciliacion", descripcion: "Cuentas bancarias, carga de cartolas (Excel o CSV) y consulta de movimientos para cuadrar la cuenta." },
     ],
   },
   {

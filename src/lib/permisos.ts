@@ -99,6 +99,8 @@ export const PERMISOS = {
   "propiedad.ver": ["PRINCIPAL", "ADMINISTRADOR", "COMITE"],
   /** Cambiar datos, cobrar, registrar y anular pagos, personas, votaciones... (en sus propiedades). */
   "propiedad.administrar": ["PRINCIPAL", "ADMINISTRADOR"],
+  /** FIN-003.1: registrar cuentas bancarias, importar cartolas y manejar perfiles de cartola. */
+  "banco.importar": ["PRINCIPAL", "ADMINISTRADOR"],
   /** Crear propiedades nuevas. */
   "propiedades.crear": ["PRINCIPAL"],
   /** Habilitar o deshabilitar los cobros de una propiedad (COM-001). */
