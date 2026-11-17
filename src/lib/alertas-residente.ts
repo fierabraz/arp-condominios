@@ -62,7 +62,7 @@ export function construirAlertas({
         icono: "deuda",
         titulo: `Deuda vencida${sufijo}`,
         detalle: `Tienes ${moneda(c.vencida)} de gastos comunes vencidos.`,
-        href: enlace("/mi-cuenta/pagos"),
+        href: enlace("/mi-cuenta/pagar"),
       });
     }
     const porVencer = c.deuda - c.vencida;
@@ -78,7 +78,7 @@ export function construirAlertas({
         icono: "vencimiento",
         titulo: `Gasto común por vencer${sufijo}`,
         detalle: `${moneda(porVencer)} vence el ${fecha(c.proximoVencimiento)}.`,
-        href: enlace("/mi-cuenta/pagos"),
+        href: enlace("/mi-cuenta/pagar"),
       });
     }
   }

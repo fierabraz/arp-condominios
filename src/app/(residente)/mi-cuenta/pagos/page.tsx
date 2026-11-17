@@ -1,14 +1,14 @@
 import { requirePermiso } from "@/lib/auth";
-import { Insignia, PageHeader, Vacio } from "@/components/ui";
+import { BotonLink, Insignia, PageHeader, Vacio } from "@/components/ui";
 import { formatoPorcentaje } from "@/lib/formato";
 import { EstadoCuenta } from "@/components/estado-cuenta";
 import { db } from "@/lib/db";
-import { cuentasDe, unidadesVisibles } from "../../datos-residente";
+import { conUnidad, cuentasDe, unidadesVisibles } from "../../datos-residente";
 
 export default async function PagosPage({ searchParams }: PageProps<"/mi-cuenta/pagos">) {
   const usuario = await requirePermiso("portal.residente");
   const moneda = usuario.administradora?.moneda ?? "CLP";
-  const { visibles } = await unidadesVisibles(usuario, (await searchParams).unidad);
+  const { visibles, elegida } = await unidadesVisibles(usuario, (await searchParams).unidad);
   const cuentas = await cuentasDe(usuario, visibles);
   const alicuotas = new Map(
     (await db.unidad.findMany({ where: { id: { in: visibles.map((u) => u.id) } }, select: { id: true, alicuota: true } })).map(
@@ -20,7 +20,11 @@ export default async function PagosPage({ searchParams }: PageProps<"/mi-cuenta/
 
   return (
     <>
-      <PageHeader titulo="Mi cuenta" descripcion="Tus gastos comunes, avisos de cobro y pagos. Cada aviso se puede descargar en PDF." />
+      <PageHeader
+        titulo="Mi cuenta"
+        descripcion="Tus gastos comunes, avisos de cobro y pagos. Cada aviso se puede descargar en PDF."
+        acciones={<BotonLink href={conUnidad("/mi-cuenta/pagar", elegida?.id)}>Pagar gastos comunes</BotonLink>}
+      />
       {ordenadas.length === 0 ? (
         <Vacio>Tu cuenta aún no está vinculada a ninguna unidad. Contacta a tu administración.</Vacio>
       ) : (

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Building2, CalendarDays, ChevronDown, CreditCard, FileText, Home, Megaphone, UserRound, Vote } from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, CreditCard, FileText, Home, Landmark, Megaphone, UserRound, Vote } from "lucide-react";
 
 const ENLACES = [
   { texto: "Inicio", corto: "Inicio", href: "/mi-cuenta", icono: Home, inferior: true },
+  { texto: "Pagar gastos comunes", corto: "Pagar", href: "/mi-cuenta/pagar", icono: Landmark, inferior: true },
   { texto: "Mi cuenta", corto: "Cuenta", href: "/mi-cuenta/pagos", icono: CreditCard, inferior: true },
   { texto: "Comunidad", corto: "Comunidad", href: "/mi-cuenta/comunidad", icono: Megaphone, inferior: true },
   { texto: "Documentos", corto: "Documentos", href: "/mi-cuenta/documentos", icono: FileText, inferior: false },
@@ -28,7 +29,7 @@ export function NavegacionResidente({ variante }: { variante: "lateral" | "infer
     return (
       <nav aria-label="Menú del residente" className="sticky top-20 hidden w-48 shrink-0 flex-col gap-1 self-start lg:flex">
         {ENLACES.map((e) => {
-          const activo = e.href === ruta;
+          const activo = e.href === ruta || (e.href === "/mi-cuenta/pagar" && ruta.startsWith("/mi-cuenta/pagar/"));
           return (
             <Link
               key={e.href}
@@ -49,10 +50,10 @@ export function NavegacionResidente({ variante }: { variante: "lateral" | "infer
   return (
     <nav
       aria-label="Menú del residente"
-      className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-4 border-t border-borde bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 grid grid-cols-5 border-t border-borde bg-white px-2 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] lg:hidden"
     >
       {inferiores.map((e) => {
-        const activo = e.href === ruta;
+        const activo = e.href === ruta || (e.href === "/mi-cuenta/pagar" && ruta.startsWith("/mi-cuenta/pagar/"));
         return (
           <Link
             key={e.href}

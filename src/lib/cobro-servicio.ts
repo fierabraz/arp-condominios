@@ -80,7 +80,7 @@ type AnotarCon<T> = (resultado: T) => Auditoria;
  * ya actualizados. Se bloquean en orden de id para que dos operaciones nunca se esperen entre sí.
  * No cambia ningún cálculo.
  */
-async function bloquearUnidades(tx: Tx, unidadIds: string[]) {
+export async function bloquearUnidades(tx: Tx, unidadIds: string[]) {
   if (unidadIds.length === 0) return;
   const ids = [...new Set(unidadIds)].sort();
   await tx.$queryRaw`SELECT id FROM "Unidad" WHERE id = ANY(${ids}::text[]) ORDER BY id FOR UPDATE`;
@@ -207,13 +207,20 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string,
   });
 }
 
+type DatosPago = { unidadId: string; monto: number; fecha: Date; medio: MedioPago; referencia?: string };
+type OpcionesPago = { permitirDuplicado?: boolean; anotar?: AnotarCon<{ id: string }> };
+
 /** Registra un pago y lo aplica a la deuda más antigua de la unidad. */
-export async function registrarPago(
-  administradoraId: string,
-  datos: { unidadId: string; monto: number; fecha: Date; medio: MedioPago; referencia?: string },
-  opciones: { permitirDuplicado?: boolean; anotar?: AnotarCon<{ id: string }> } = {},
-) {
-  return db.$transaction(async (tx) => {
+export async function registrarPago(administradoraId: string, datos: DatosPago, opciones: OpcionesPago = {}) {
+  return db.$transaction((tx) => registrarPagoEn(tx, administradoraId, datos, opciones));
+}
+
+/**
+ * Lo mismo que registrarPago, dentro de una transacción ya abierta. PAG-001 la usa para que el
+ * pago, el movimiento de la cartola y la transferencia informada cambien juntos o nada.
+ */
+export async function registrarPagoEn(tx: Tx, administradoraId: string, datos: DatosPago, opciones: OpcionesPago = {}) {
+  {
     const unidad = await tx.unidad.findFirst({
       where: { id: datos.unidadId, administradoraId },
       include: { condominio: { select: { estado: true } } },
@@ -240,7 +247,7 @@ export async function registrarPago(
     await aplicarMonto(tx, pago.id, unidad.id, monto, dec);
     if (opciones.anotar) await registrarEn(tx, opciones.anotar(pago));
     return pago;
-  });
+  }
 }
 
 /**
@@ -272,6 +279,9 @@ export async function anularPago(
       await tx.avisoCobro.update({ where: { id: ap.avisoId }, data: { saldo: { increment: ap.monto } } });
     }
     await tx.aplicacionPago.deleteMany({ where: { pagoId: pago.id } });
+    // PAG-001: si el pago venía de una transferencia informada, el movimiento de la cartola vuelve
+    // a quedar disponible y la transferencia vuelve a revisión (no se borra nada).
+    await liberarTransferencia(tx, pago.id, anulacion);
     // Si la unidad tenía otros saldos a favor, ahora pueden cubrir lo que quedó pendiente.
     const dec = await monedaDe(tx, administradoraId);
     await aplicarSaldosAFavor(tx, pago.unidadId, dec);
@@ -280,6 +290,48 @@ export async function anularPago(
       await registrarEn(tx, anotar({ id: pago.id, devuelto: String(devuelto) }));
     }
     return pago;
+  });
+}
+
+async function liberarTransferencia(tx: Tx, pagoId: string, anulacion: { por: string; motivo: string }) {
+  const t = await tx.transferenciaInformada.findUnique({ where: { pagoId }, select: { id: true, movimientoId: true, administradoraId: true, condominioId: true } });
+  if (!t) return;
+  const pago = await tx.pago.findUniqueOrThrow({ where: { id: pagoId }, select: { monto: true } });
+  if (t.movimientoId) {
+    await tx.$queryRaw`SELECT id FROM "MovimientoBancario" WHERE id = ${t.movimientoId} FOR UPDATE`;
+    const m = await tx.movimientoBancario.update({
+      where: { id: t.movimientoId },
+      data: { montoConciliado: { decrement: pago.monto } },
+      select: { id: true, montoConciliado: true },
+    });
+    await tx.movimientoBancario.update({
+      where: { id: m.id },
+      data: { estado: Number(m.montoConciliado) <= 0 ? "PENDIENTE" : "REVISAR" },
+    });
+  }
+  await tx.registroCambio.create({
+    data: {
+      administradoraId: t.administradoraId,
+      condominioId: t.condominioId,
+      usuarioNombre: anulacion.por,
+      accion: "Volvió a revisión por anulación del pago",
+      detalle: `El pago de la transferencia se anuló en Recaudación: ${anulacion.motivo}`.slice(0, 1000),
+      entidad: "TransferenciaInformada",
+      entidadId: t.id,
+      antes: { estado: "CONCILIADA", pagoId, movimientoId: t.movimientoId },
+      despues: { estado: "EN_REVISION" },
+    },
+  });
+  await tx.transferenciaInformada.update({
+    where: { id: t.id },
+    data: {
+      estado: "EN_REVISION",
+      pagoId: null,
+      movimientoId: null,
+      nota: `El pago se anuló en Recaudación (${anulacion.por}): ${anulacion.motivo}`.slice(0, 500),
+      revisadoPor: anulacion.por,
+      revisadoEn: new Date(),
+    },
   });
 }
 

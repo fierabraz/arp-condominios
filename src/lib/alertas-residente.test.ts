@@ -82,7 +82,7 @@ test("los enlaces conservan la unidad elegida", () => {
     cuentas: [cuenta({ deuda: 1, vencida: 1 })],
     enlace: (h) => `${h}?unidad=u1`,
   });
-  assert.equal(a.href, "/mi-cuenta/pagos?unidad=u1");
+  assert.equal(a.href, "/mi-cuenta/pagar?unidad=u1");
 });
 
 test("la actividad va de lo más nuevo a lo más antiguo y omite fechas futuras", () => {

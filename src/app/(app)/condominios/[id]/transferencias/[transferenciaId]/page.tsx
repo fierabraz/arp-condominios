@@ -1,0 +1,210 @@
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, Paperclip } from "lucide-react";
+import { db } from "@/lib/db";
+import { Card, Insignia, PageHeader, Vacio } from "@/components/ui";
+import { formatoFecha, formatoFechaHora, formatoMoneda } from "@/lib/formato";
+import { nombrePeriodo } from "@/lib/cobro";
+import { estadoCuenta } from "@/lib/cobro-servicio";
+import { ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
+import { puede } from "@/lib/permisos";
+import { coincidenciasDe } from "@/lib/transferencias-servicio";
+import { condominioVisible } from "../../condominio-actual";
+import { cambiarEstadoAccion, confirmarTransferenciaAccion } from "../../../transferencias-actions";
+import { FormularioConfirmar, FormularioNota } from "./formularios";
+
+// PAG-001 · Revisar una transferencia informada.
+
+export default async function TransferenciaPage({ params }: PageProps<"/condominios/[id]/transferencias/[transferenciaId]">) {
+  const { id, transferenciaId } = await params;
+  const { condominio, usuario, administradoraId, moneda } = await condominioVisible(id);
+  if (!puede(usuario, "pagos.verificar", id)) notFound();
+  const t = await db.transferenciaInformada.findFirst({
+    where: { id: transferenciaId, condominioId: id, administradoraId },
+    include: {
+      unidad: { select: { id: true, numero: true } },
+      aviso: { select: { periodo: { select: { anio: true, mes: true } } } },
+      cuenta: { select: { banco: true, numeroFinal: true } },
+      comprobante: { select: { nombre: true, tipo: true, tamano: true } },
+      movimiento: { include: { cuenta: { select: { banco: true, numeroFinal: true } } } },
+      pago: { select: { id: true, monto: true, fecha: true, anuladoEn: true } },
+    },
+  });
+  if (!t) notFound();
+  const $ = (n: number | { toString(): string }) => formatoMoneda(n, moneda);
+  const abierta = ESTADOS_ABIERTOS.includes(t.estado);
+  const [estado, coincidencias, historial] = await Promise.all([
+    estadoCuenta(t.unidadId, administradoraId),
+    abierta ? coincidenciasDe(t) : null,
+    db.registroCambio.findMany({ where: { entidad: "TransferenciaInformada", entidadId: t.id }, orderBy: { creadoEn: "asc" } }),
+  ]);
+  const e = ESTADOS_TRANSFERENCIA[t.estado];
+  const base = `/condominios/${id}/transferencias`;
+
+  return (
+    <>
+      <Link href={base} className="mb-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-marca">
+        <ArrowLeft size={16} aria-hidden="true" /> Transferencias informadas
+      </Link>
+      <PageHeader titulo={`Transferencia de ${$(t.monto)} · Unidad ${t.unidad.numero}`} descripcion={condominio.nombre} acciones={<Insignia tono={e.tono}>{e.texto}</Insignia>} />
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
+        <div className="space-y-6">
+          <Card>
+            <h2 className="mb-3 font-bold">Lo que informó el residente</h2>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="text-texto-suave">Informó</dt>
+              <dd>{t.informante} · {formatoFechaHora(t.creadoEn)}</dd>
+              {t.pagadoPor && (
+                <>
+                  <dt className="text-texto-suave">Transfirió</dt>
+                  <dd>{t.pagadoPor} (otra persona)</dd>
+                </>
+              )}
+              <dt className="text-texto-suave">Fecha</dt>
+              <dd>{formatoFecha(t.fecha)}</dd>
+              <dt className="text-texto-suave">Monto</dt>
+              <dd className="font-semibold tabular-nums">{$(t.monto)}</dd>
+              <dt className="text-texto-suave">Banco de origen</dt>
+              <dd>{t.bancoOrigen ?? "—"}</dd>
+              <dt className="text-texto-suave">N° de operación</dt>
+              <dd>{t.operacion ?? "—"}</dd>
+              <dt className="text-texto-suave">Cuenta de destino</dt>
+              <dd>{t.cuenta ? `${t.cuenta.banco} ···${t.cuenta.numeroFinal}` : "No había cuenta publicada"}</dd>
+              {t.aviso && (
+                <>
+                  <dt className="text-texto-suave">Desde el aviso</dt>
+                  <dd>{nombrePeriodo(t.aviso.periodo.anio, t.aviso.periodo.mes)}</dd>
+                </>
+              )}
+              <dt className="text-texto-suave">Observaciones</dt>
+              <dd className="whitespace-pre-line">{t.observaciones ?? "—"}</dd>
+              <dt className="text-texto-suave">Comprobante</dt>
+              <dd>
+                {t.comprobante ? (
+                  <a href={`/comprobantes/${t.id}`} target="_blank" rel="noopener" className="inline-flex items-center gap-1 font-semibold text-marca">
+                    <Paperclip size={14} aria-hidden="true" /> {t.comprobante.nombre} ({Math.round(t.comprobante.tamano / 1024)} KB)
+                  </a>
+                ) : (
+                  "No adjuntó"
+                )}
+              </dd>
+            </dl>
+            {t.comprobante?.tipo.startsWith("image/") && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={`/comprobantes/${t.id}`} alt="Comprobante adjuntado por el residente" className="mt-4 max-h-96 rounded-xl border border-borde" />
+            )}
+            <p className="mt-3 text-xs text-texto-suave">El comprobante sirve de apoyo, pero el pago solo se confirma con el movimiento de la cartola.</p>
+          </Card>
+          <Card>
+            <h2 className="mb-3 font-bold">Cuenta de la unidad</h2>
+            <dl className="grid grid-cols-[1fr_auto] gap-y-1 text-sm">
+              <dt className="text-texto-suave">Deuda cuando informó</dt>
+              <dd className="text-right tabular-nums">{$(t.deudaAlInformar)}</dd>
+              <dt className="text-texto-suave">Deuda hoy</dt>
+              <dd className="text-right font-semibold tabular-nums">{$(estado?.deuda ?? 0)}</dd>
+              <dt className="text-texto-suave">Saldo a favor hoy</dt>
+              <dd className="text-right tabular-nums">{$(estado?.aFavor ?? 0)}</dd>
+            </dl>
+            <Link href={`/condominios/${id}/unidades/${t.unidad.id}`} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-marca">
+              Ver ficha de la unidad
+            </Link>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          {t.estado === "CONCILIADA" && t.movimiento && t.pago && (
+            <Card className="border-exito/30">
+              <h2 className="mb-2 font-bold text-exito">Verificada y conciliada</h2>
+              <p className="text-sm">
+                {t.revisadoPor} la confirmó el {formatoFechaHora(t.revisadoEn!)} con el movimiento del {formatoFecha(t.movimiento.fecha)} por{" "}
+                {$(t.movimiento.monto)} ({t.movimiento.cuenta.banco} ···{t.movimiento.cuenta.numeroFinal}).
+              </p>
+              <p className="mt-1 text-sm">
+                Se registró un pago de <strong>{$(t.pago.monto)}</strong> el {formatoFecha(t.pago.fecha)} en{" "}
+                <Link href={`/condominios/${id}/pagos`} className="font-semibold text-marca underline">Recaudación</Link>.
+              </p>
+              {t.nota && <p className="mt-1 text-sm text-texto-suave">{t.nota}</p>}
+            </Card>
+          )}
+          {t.estado === "RECHAZADA" && (
+            <Card className="border-peligro/30">
+              <h2 className="mb-2 font-bold text-peligro">Rechazada o con diferencias</h2>
+              <p className="text-sm">{t.nota}</p>
+              <p className="mt-1 text-xs text-texto-suave">{t.revisadoPor} · {t.revisadoEn && formatoFechaHora(t.revisadoEn)}. El residente ve este motivo.</p>
+              <div className="mt-4 border-t border-borde pt-4">
+                <FormularioNota accion={cambiarEstadoAccion.bind(null, id, t.id, "EN_REVISION")} boton="Volver a revisión" variante="secundario" ayuda="Por qué se vuelve a revisar" />
+              </div>
+            </Card>
+          )}
+          {abierta && coincidencias && (
+            <>
+              <Card>
+                <h2 className="mb-1 font-bold">Verificar con la cartola</h2>
+                {t.estado === "EN_REVISION" && t.nota && <p className="mb-3 rounded-xl bg-alerta-suave px-3 py-2 text-sm">En revisión: {t.nota}</p>}
+                {coincidencias.coincidencias.length === 0 ? (
+                  <Vacio>
+                    No hay abonos de fecha cercana sin conciliar en las cartolas cargadas. Carga la cartola del período en{" "}
+                    <Link href={`/condominios/${id}/conciliacion`} className="font-semibold text-marca underline">Conciliación bancaria</Link> y vuelve aquí.
+                    Mientras tanto la transferencia sigue pendiente y la deuda no cambia.
+                  </Vacio>
+                ) : (
+                  <FormularioConfirmar
+                    accion={confirmarTransferenciaAccion.bind(null, id, t.id)}
+                    montoInformado={Number(t.monto)}
+                    deudaActual={estado?.deuda ?? 0}
+                    ambigua={coincidencias.ambigua}
+                    opciones={coincidencias.coincidencias.slice(0, 8).map((c) => ({
+                      id: c.id,
+                      fecha: formatoFecha(c.fecha),
+                      restante: c.restante,
+                      monto: c.monto,
+                      cuenta: `${c.cuenta.banco} ···${c.cuenta.numeroFinal}`,
+                      descripcion: [c.descripcion, c.referencia, c.contraparte].filter(Boolean).join(" · "),
+                      motivos: c.motivos,
+                      nivel: c.nivel,
+                    }))}
+                  />
+                )}
+              </Card>
+              <Card>
+                <h2 className="mb-3 font-bold">Si no se puede confirmar</h2>
+                <div className="grid gap-6 md:grid-cols-2">
+                  {t.estado === "INFORMADA" && (
+                    <FormularioNota
+                      accion={cambiarEstadoAccion.bind(null, id, t.id, "EN_REVISION")}
+                      boton="Dejar pendiente de revisión"
+                      variante="secundario"
+                      ayuda="Qué falta revisar (ej. falta la cartola)"
+                    />
+                  )}
+                  <FormularioNota
+                    accion={cambiarEstadoAccion.bind(null, id, t.id, "RECHAZADA")}
+                    boton="Rechazar o marcar con diferencias"
+                    variante="peligro"
+                    ayuda="Motivo (el residente lo verá)"
+                  />
+                </div>
+              </Card>
+            </>
+          )}
+          <Card>
+            <h2 className="mb-3 font-bold">Historial</h2>
+            {historial.length === 0 ? (
+              <p className="text-sm text-texto-suave">Sin movimientos.</p>
+            ) : (
+              <ol className="space-y-2 text-sm">
+                {historial.map((h) => (
+                  <li key={h.id} className="border-l-2 border-convive/40 pl-3">
+                    <span className="font-semibold">{h.accion}</span> · {h.usuarioNombre}
+                    <span className="block text-xs text-texto-suave">{formatoFechaHora(h.creadoEn)} · {h.detalle}</span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}

@@ -8,6 +8,7 @@ import { createSession, deleteSession, LOGIN, tipoDeRol, type TipoSesion } from 
 import { getUsuarioActual } from "@/lib/auth";
 import { erroresDe, type EstadoForm } from "@/lib/forms";
 import { anotarIntento, bloqueoVigente, ipCliente } from "@/lib/intentos";
+import { volverPermitido } from "@/lib/pagos";
 
 const LoginSchema = z.object({
   correo: z.email({ error: "Ingresa un correo válido." }).trim().toLowerCase(),
@@ -56,7 +57,8 @@ export async function iniciarSesion(tipo: TipoSesion, _: EstadoForm, formData: F
     rol: usuario.rol,
     administradoraId: usuario.administradoraId,
   });
-  redirect(tipo === "RESIDENTE" ? "/mi-cuenta" : "/");
+  // PAG-001: si llegó desde el QR de un aviso, vuelve a ese enlace (solo enlaces de pago de Convive).
+  redirect(volverPermitido(formData.get("volver")) ?? (tipo === "RESIDENTE" ? "/mi-cuenta" : "/"));
 }
 
 export async function cerrarSesion() {
