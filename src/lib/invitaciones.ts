@@ -116,14 +116,64 @@ export async function invitarPersona(
   if (estado === "DESACTIVADA") return falla("Su cuenta está desactivada.");
   if (!puedeInvitar(estado)) return falla("No se puede invitar.");
 
-  const otra = await db.usuario.findUnique({ where: { correo: persona.correo }, select: { id: true } });
-  if (otra && otra.id !== persona.usuario?.id) {
+  const otra = await db.usuario.findUnique({
+    where: { correo: persona.correo },
+    select: { id: true, rol: true, personaId: true, administradoraId: true, correoVerificadoEn: true, activo: true },
+  });
+  // PILOTO-001: la persona ya creó su propia cuenta de residente con este correo y aún no está
+  // vinculada a nadie: se une a su ficha (sin duplicar la persona) en vez de crear otra cuenta.
+  const propia =
+    otra &&
+    otra.id !== persona.usuario?.id &&
+    !persona.usuario &&
+    otra.rol === "RESIDENTE" &&
+    otra.activo &&
+    !otra.personaId &&
+    (!otra.administradoraId || otra.administradoraId === administradoraId)
+      ? otra
+      : null;
+  if (otra && otra.id !== persona.usuario?.id && !propia) {
     return falla(`El correo ${persona.correo} ya lo usa otra cuenta. Usa un correo distinto para esta persona.`);
   }
 
   const ahora = new Date();
   let usuarioId = persona.usuario?.id;
-  if (!usuarioId) {
+  if (propia) {
+    if (propia.correoVerificadoEn) {
+      // Ya confirmó su correo: queda con acceso de inmediato y se le avisa.
+      await db.usuario.update({ where: { id: propia.id }, data: { personaId, administradoraId } });
+      const propiedadNombre =
+        persona.unidades.find((v) => v.unidad.condominioId === condominioId)?.unidad.condominio.nombre ??
+        persona.unidades[0].unidad.condominio.nombre;
+      const ingreso = `${await origenDelSitio()}/login/residentes`;
+      const envio = await enviarCorreo({
+        para: persona.correo,
+        asunto: `Ya tienes acceso a ${propiedadNombre}`,
+        texto: `Hola, ${persona.nombre.split(" ")[0]}:\n\nLa administración unió tu cuenta de ${MARCA.nombre} con tu unidad en ${propiedadNombre}. Ingresa con tu correo y tu contraseña: ${ingreso}`,
+        html: `<p>Hola, ${escaparHtml(persona.nombre.split(" ")[0])}:</p><p>La administración unió tu cuenta de ${escaparHtml(MARCA.nombre)} con tu unidad en <strong>${escaparHtml(propiedadNombre)}</strong>. Ingresa con tu correo y tu contraseña.</p><p><a href="${ingreso}">${ingreso}</a></p>`,
+      });
+      await registrar(autor, "Unió una cuenta creada por la persona con su ficha", `${persona.nombre} (${persona.correo})`, condominioId);
+      const mensaje = `Hola, ${persona.nombre.split(" ")[0]}. Ya tienes acceso a ${propiedadNombre} en ${MARCA.nombre}. Ingresa con tu correo y tu contraseña: ${ingreso}`;
+      return {
+        ok: true,
+        personaId,
+        nombre: persona.nombre,
+        correo: persona.correo,
+        enlace: ingreso,
+        mensaje,
+        whatsapp: enlaceWhatsapp(persona.telefono, mensaje),
+        correoEstado: envio.estado,
+      };
+    }
+    // Sin confirmar: nadie ha probado que el correo sea suyo. La contraseña que se puso deja de
+    // servir y solo la invitación (que llega a ese correo) permite crear una.
+    await db.usuario.update({
+      where: { id: propia.id },
+      data: { personaId, administradoraId, claveHash: await bcrypt.hash(randomBytes(24).toString("base64url"), 10) },
+    });
+    await db.tokenRecuperacion.updateMany({ where: { usuarioId: propia.id, usadoEn: null }, data: { usadoEn: ahora } });
+    usuarioId = propia.id;
+  } else if (!usuarioId) {
     // Contraseña aleatoria que nadie conoce: la cuenta no sirve hasta que la persona cree la suya.
     const claveHash = await bcrypt.hash(randomBytes(24).toString("base64url"), 10);
     const creado = await db.usuario.create({

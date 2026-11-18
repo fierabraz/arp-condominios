@@ -4,7 +4,7 @@ import { PantallaIngreso } from "../pantalla-ingreso";
 import { volverPermitido } from "@/lib/pagos";
 
 export default async function LoginResidentesPage({ searchParams }: PageProps<"/login/residentes">) {
-  const { listo, volver } = await searchParams;
+  const { listo, volver, verificado } = await searchParams;
   const destino = volverPermitido(volver);
   return (
     <PantallaIngreso
@@ -12,13 +12,16 @@ export default async function LoginResidentesPage({ searchParams }: PageProps<"/
       titulo="Ingreso de residentes"
       descripcion="Revisa tus cobros, tus pagos, los avisos y las votaciones de tu comunidad."
       aviso={
-        listo
+        verificado
+          ? "¡Listo! Tu correo quedó confirmado. Ya puedes ingresar."
+          : listo
           ? "Tu contraseña quedó actualizada. Ya puedes ingresar."
           : destino
             ? "Ingresa para ver el saldo de tu aviso y los datos para transferir."
             : undefined
       }
       pie={[
+        { texto: "¿No tienes cuenta?", enlace: "Crea tu cuenta", href: "/crear-cuenta/residente" },
         { texto: "¿Olvidaste tu contraseña?", enlace: "Recupérala aquí", href: "/recuperar?residente=1" },
         { texto: "¿Administras un edificio?", enlace: "Ingreso de administración", href: "/login" },
       ]}

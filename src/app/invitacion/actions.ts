@@ -6,10 +6,10 @@ import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
 import { anotarIntento, ipCliente } from "@/lib/intentos";
 import { canjearToken } from "@/lib/recuperacion";
 import { registrar } from "@/lib/registro";
-import { createSession } from "@/lib/session";
+import { createSession, tipoDeRol } from "@/lib/session";
 import { ClaveNuevaSchema } from "@/lib/usuarios";
 
-/** El residente invitado crea su contraseña y entra directo a su cuenta. */
+/** La persona invitada (residente o, desde PILOTO-001, alguien del equipo) crea su contraseña y entra. */
 export async function aceptarInvitacion(token: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const datos = ClaveNuevaSchema.safeParse({ nueva: aTexto(formData.get("nueva")), repetir: aTexto(formData.get("repetir")) });
   if (!datos.success) return erroresDe(datos.error);
@@ -20,5 +20,5 @@ export async function aceptarInvitacion(token: string, _: EstadoForm, formData: 
   await db.usuario.update({ where: { id: usuario.id }, data: { ultimoIngresoEn: new Date() } });
   await registrar(usuario, "Aceptó la invitación y creó su contraseña", usuario.correo);
   await createSession({ usuarioId: usuario.id, rol: usuario.rol, administradoraId: usuario.administradoraId });
-  redirect("/mi-cuenta");
+  redirect(tipoDeRol(usuario.rol) === "RESIDENTE" ? "/mi-cuenta" : "/");
 }

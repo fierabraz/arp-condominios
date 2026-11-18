@@ -40,3 +40,22 @@ export async function cambiarClave(_: EstadoForm, formData: FormData): Promise<E
   await registrar(usuario, "Cambió su contraseña", usuario.correo);
   return { ok: true, mensaje: "Contraseña actualizada. Se cerró la sesión en tus otros equipos." };
 }
+
+const DatosSchema = z.object({
+  nombre: z.string({ error: "Ingresa tu nombre." }).min(3, { error: "Ingresa tu nombre y apellido." }).max(120),
+  telefono: z
+    .string()
+    .max(30)
+    .regex(/^[+\d\s()-]{8,}$/, { error: "Escribe un teléfono válido, ej. +56 9 1234 5678." })
+    .optional(),
+});
+
+/** PILOTO-001: cada cuenta de administración cambia su nombre y teléfono. El correo y el rol no. */
+export async function guardarDatos(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+  const usuario = await requireUsuario();
+  const d = DatosSchema.safeParse({ nombre: aTexto(formData.get("nombre")), telefono: aTexto(formData.get("telefono")) });
+  if (!d.success) return erroresDe(d.error);
+  await db.usuario.update({ where: { id: usuario.id }, data: { nombre: d.data.nombre, telefono: d.data.telefono ?? null } });
+  await registrar(usuario, "Actualizó sus datos personales", d.data.nombre);
+  return { ok: true, mensaje: "Datos guardados." };
+}

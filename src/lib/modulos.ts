@@ -58,6 +58,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
       { clave: "residentes", texto: "Residentes", ruta: "/unidades", descripcion: "Unidades, alícuotas, propietarios y residentes." },
       { clave: "estructura", texto: "Estructura física", ruta: "/estructura", descripcion: "Torres, sectores y pisos; estacionamientos y bodegas con su condición y uso; inventario de instalaciones." },
       { clave: "invitaciones", texto: "Invitar residentes", ruta: "/invitaciones", soloAdmin: true, descripcion: "Enlace para que cada residente cree su contraseña, por correo o WhatsApp." },
+      { clave: "solicitudes", texto: "Solicitudes de residentes", ruta: "/solicitudes", soloAdmin: true, descripcion: "Código de la comunidad para que los residentes creen su cuenta, y aprobación de quién accede a cada unidad." },
       { clave: "importar", texto: "Cargar desde Excel", ruta: "/importar", soloAdmin: true, descripcion: "Carga de una vez las unidades, alícuotas y personas desde una planilla." },
       { clave: "votaciones", texto: "Votaciones", ruta: "/votaciones", descripcion: "Consultas y votaciones en línea para asambleas, ponderadas por alícuota." },
     ],

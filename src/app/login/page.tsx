@@ -3,13 +3,20 @@ import { LoginForm } from "./login-form";
 import { PantallaIngreso } from "./pantalla-ingreso";
 
 export default async function LoginAdministracionPage({ searchParams }: PageProps<"/login">) {
-  const { listo } = await searchParams;
+  const { listo, verificado } = await searchParams;
   return (
     <PantallaIngreso
       titulo="Ingreso de administración"
       descripcion="Para administradores y miembros del comité."
-      aviso={listo ? "Tu contraseña quedó actualizada. Ya puedes ingresar." : undefined}
+      aviso={
+        verificado
+          ? "¡Listo! Tu correo quedó confirmado. Ya puedes ingresar."
+          : listo
+            ? "Tu contraseña quedó actualizada. Ya puedes ingresar."
+            : undefined
+      }
       pie={[
+        { texto: "¿No tienes cuenta?", enlace: "Crear cuenta", href: "/crear-cuenta" },
         { texto: "¿Olvidaste tu contraseña?", enlace: "Recupérala aquí", href: "/recuperar" },
         { texto: "¿Eres residente o propietario?", enlace: "Ingreso de residentes", href: "/login/residentes" },
       ]}

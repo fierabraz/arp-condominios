@@ -6,7 +6,8 @@ import { decrypt, LOGIN, SESSION_COOKIE } from "@/lib/session";
 // acción mediante src/lib/auth.ts.
 
 // /pagar: enlace del QR del aviso. Sin sesión muestra solo el nombre de la comunidad y el mes.
-const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir", "/pagar"];
+// PILOTO-001: /crear-cuenta (registro) y /verificar (confirmar correo) también son públicas.
+const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir", "/pagar", "/crear-cuenta", "/verificar"];
 // Lo único que ve una sesión de residente: su cuenta y los documentos que se abren desde ella.
 const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones", "/pagar", "/comprobantes"];
 
@@ -14,7 +15,7 @@ const empieza = (ruta: string, prefijos: string[]) => prefijos.some((p) => ruta 
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (empieza(pathname, ["/salir", "/recuperar", "/invitacion"])) return NextResponse.next();
+  if (empieza(pathname, ["/salir", "/recuperar", "/invitacion", "/crear-cuenta", "/verificar"])) return NextResponse.next();
   const esLogin = empieza(pathname, ["/login"]);
   const sesion = await decrypt(request.cookies.get(SESSION_COOKIE)?.value);
   const ir = (ruta: string) => NextResponse.redirect(new URL(ruta, request.nextUrl));

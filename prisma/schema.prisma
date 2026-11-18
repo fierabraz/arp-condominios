@@ -72,6 +72,31 @@ enum PonderacionVoto {
 enum TipoToken {
   RECUPERACION // olvidó su contraseña (vence en 1 hora)
   INVITACION // la administración lo invitó a crear su cuenta (vence en 7 días)
+  VERIFICACION // PILOTO-001: confirma el correo de una cuenta creada por la propia persona (vence en 2 días)
+}
+
+// PILOTO-001: cargo de una cuenta del equipo de la administración. null = administrador
+// (principal si ve todas las comunidades, o asignado a algunas).
+enum CargoEquipo {
+  SUBADMINISTRADOR // administra las comunidades asignadas
+  ASISTENTE // trabajo administrativo en las comunidades asignadas, sin verificar pagos ni banco (salvo permiso)
+  CONSERJE // solo consulta las comunidades asignadas
+  PERSONAL // personal autorizado: solo consulta las comunidades asignadas
+}
+
+// PILOTO-001: relación con la unidad que declara quien pide vincularse. La administración la confirma.
+enum RelacionDeclarada {
+  PROPIETARIO_RESIDENTE
+  PROPIETARIO_NO_RESIDENTE
+  ARRENDATARIO
+  OCUPANTE_AUTORIZADO
+}
+
+enum EstadoSolicitud {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
 }
 
 // COM-001: en qué etapa está la comunidad. Las operaciones de dinero (emitir cobros,
@@ -190,6 +215,7 @@ model Administradora {
   reservas            Reserva[]
   cuentasBancarias    CuentaBancaria[]
   perfilesCartola     PerfilCartola[]
+  solicitudesVinculo  SolicitudVinculo[]
 }
 
 model Usuario {
@@ -214,9 +240,21 @@ model Usuario {
   // Una cuenta desactivada no puede ingresar y sus sesiones abiertas dejan de servir.
   activo             Boolean         @default(true)
   ultimoIngresoEn    DateTime?
+  // PILOTO-001: las cuentas que crea la propia persona (registro público) nacen con null y no
+  // entran hasta confirmar su correo. Las que crea la plataforma o la administración nacen
+  // verificadas (y si son invitaciones, solo sirven con el enlace que llega al correo).
+  correoVerificadoEn DateTime?       @default(now())
+  telefono           String?
+  cargo              CargoEquipo?
+  // Permisos adicionales que el administrador principal da a un subadministrador o asistente.
+  permisosExtra      String[]        @default([])
+  // Código de acceso con que se registró (administradores del piloto).
+  codigoRegistroId   String?
+  codigoRegistro     CodigoRegistro? @relation(fields: [codigoRegistroId], references: [id], onDelete: SetNull)
 
   tokensRecuperacion TokenRecuperacion[]
   asignaciones       AsignacionCondominio[]
+  solicitudesVinculo SolicitudVinculo[]
 
   @@index([administradoraId])
 }
@@ -265,21 +303,24 @@ model Condominio {
   demo               Boolean                 @default(false)
   creadoEn           DateTime                @default(now())
 
-  unidades       Unidad[]
-  periodos       Periodo[]
-  usuarios       Usuario[]
-  asignaciones   AsignacionCondominio[]
-  publicaciones  Publicacion[]
-  votaciones     Votacion[]
-  agrupaciones   Agrupacion[]
-  espacios       Espacio[]
-  instalaciones  Instalacion[]
-  apertura       Apertura?
-  reservables    EspacioReservable[]
-  reservas       Reserva[]
-  plano          PlanoComunidad?
-  elementosPlano ElementoPlano[]
-  cuentasBanco   CuentaBancaria[]
+  // PILOTO-001: código que la administración comparte para que los residentes pidan unirse.
+  codigoIncorporacion String?                @unique
+  unidades            Unidad[]
+  periodos            Periodo[]
+  usuarios            Usuario[]
+  asignaciones        AsignacionCondominio[]
+  publicaciones       Publicacion[]
+  votaciones          Votacion[]
+  agrupaciones        Agrupacion[]
+  espacios            Espacio[]
+  instalaciones       Instalacion[]
+  apertura            Apertura?
+  reservables         EspacioReservable[]
+  reservas            Reserva[]
+  plano               PlanoComunidad?
+  elementosPlano      ElementoPlano[]
+  cuentasBanco        CuentaBancaria[]
+  solicitudesVinculo  SolicitudVinculo[]
 
   @@index([administradoraId])
 }
@@ -401,6 +442,7 @@ model Persona {
   vinculos            VinculoUnidad[]
   usuario             Usuario?
   asignacionesEspacio AsignacionEspacio[]
+  solicitudesVinculo  SolicitudVinculo[]
 
   @@index([administradoraId])
 }
@@ -436,6 +478,7 @@ model Unidad {
   creditosApertura   CreditoApertura[]
   reservas           Reserva[]
   transferencias     TransferenciaInformada[]
+  solicitudesVinculo SolicitudVinculo[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -1287,4 +1330,53 @@ model ConciliacionMovimiento {
   @@index([movimientoId])
   @@index([pagoId])
   @@index([condominioId, creadoEn])
+}
+
+// ---------------------------------------------------------------------------
+// PILOTO-001: registro de cuentas.
+
+// Código de acceso que la plataforma (Óscar) entrega para que un administrador cree su cuenta.
+// Solo se guarda el resumen (hash); el código en claro se muestra una vez al crearlo.
+model CodigoRegistro {
+  id          String    @id @default(cuid())
+  etiqueta    String // para quién es, ej. "Leyla, piloto"
+  correo      String? // si se indica, solo ese correo puede usarlo
+  tokenHash   String    @unique
+  usosMaximos Int       @default(1)
+  usos        Int       @default(0)
+  expiraEn    DateTime
+  anuladoEn   DateTime?
+  creadoPor   String
+  creadoEn    DateTime  @default(now())
+
+  usuarios Usuario[]
+}
+
+// Solicitud de una cuenta de residente para vincularse con una unidad. No da acceso a nada
+// hasta que la administración de esa comunidad la aprueba y elige la ficha y la relación.
+model SolicitudVinculo {
+  id                String            @id @default(cuid())
+  usuarioId         String
+  usuario           Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  administradoraId  String
+  administradora    Administradora    @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId      String
+  condominio        Condominio        @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  unidadTexto       String // lo que escribió la persona, ej. "Depto 302"
+  relacion          RelacionDeclarada
+  mensaje           String?
+  estado            EstadoSolicitud   @default(PENDIENTE)
+  // Al aprobar: la unidad y la ficha con que quedó vinculada.
+  unidadId          String?
+  unidad            Unidad?           @relation(fields: [unidadId], references: [id], onDelete: SetNull)
+  personaId         String?
+  persona           Persona?          @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  motivo            String? // motivo del rechazo, lo ve la persona
+  revisadoPorNombre String?
+  revisadoEn        DateTime?
+  creadoEn          DateTime          @default(now())
+
+  @@index([condominioId, estado])
+  @@index([usuarioId])
+  @@index([administradoraId])
 }

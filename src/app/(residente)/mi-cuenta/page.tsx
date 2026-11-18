@@ -9,6 +9,7 @@ import { datosInicio } from "../datos-residente";
 import { SelectorUnidad } from "../navegacion-residente";
 import { PanelImportante } from "./panel-importante";
 import { TarjetaAccesos, type Acceso } from "./tarjeta-accesos";
+import { MisSolicitudes } from "./solicitudes/lista";
 
 export default async function InicioResidentePage({ searchParams }: PageProps<"/mi-cuenta">) {
   const usuario = await requirePermiso("portal.residente");
@@ -64,7 +65,14 @@ export default async function InicioResidentePage({ searchParams }: PageProps<"/
       </header>
 
       {datos.todas.length === 0 ? (
-        <Vacio>Tu cuenta aún no está vinculada a ninguna unidad. Contacta a tu administración.</Vacio>
+        // PILOTO-001: la cuenta existe aunque todavía no tenga unidad; aquí ve y envía sus solicitudes.
+        <section aria-label="Tu cuenta aún no tiene unidad" className="space-y-4">
+          <Vacio>
+            Tu cuenta aún no está vinculada a ninguna unidad. Cuando la administración apruebe tu solicitud, aquí verás tu estado
+            de cuenta, tus pagos y la información de tu comunidad.
+          </Vacio>
+          <MisSolicitudes usuarioId={usuario.id} />
+        </section>
       ) : (
         <>
           {/* En el teléfono, lo urgente se ve arriba sin tener que bajar hasta el panel. */}
