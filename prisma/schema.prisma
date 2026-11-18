@@ -1228,6 +1228,7 @@ model TransferenciaInformada {
 
   comprobante    ComprobanteTransferencia?
   conciliaciones ConciliacionMovimiento[]
+  constancia     ConstanciaPago?
 
   @@index([condominioId, estado, creadoEn])
   @@index([unidadId, creadoEn])
@@ -1287,4 +1288,38 @@ model ConciliacionMovimiento {
   @@index([movimientoId])
   @@index([pagoId])
   @@index([condominioId, creadoEn])
+}
+
+// PILOTO-001 · Constancia de pago informado (sección 6). Un folio por transferencia informada; cada
+// cambio de estado agrega una VERSIÓN nueva. Las versiones nunca se modifican ni se borran (lo
+// impide la base de datos). El `codigo` va en el QR y permite consultar el estado vigente sin sesión
+// y sin datos personales.
+model ConstanciaPago {
+  id               String                 @id @default(cuid())
+  folio            Int                    @unique @default(autoincrement())
+  administradoraId String
+  condominioId     String
+  transferenciaId  String                 @unique
+  transferencia    TransferenciaInformada @relation(fields: [transferenciaId], references: [id], onDelete: Restrict)
+  codigo           String                 @unique
+  creadoEn         DateTime               @default(now())
+  versiones        ConstanciaVersion[]
+
+  @@index([condominioId])
+}
+
+model ConstanciaVersion {
+  id           String              @id @default(cuid())
+  constanciaId String
+  constancia   ConstanciaPago      @relation(fields: [constanciaId], references: [id], onDelete: Restrict)
+  version      Int
+  estado       EstadoTransferencia
+  // Contenido exacto del documento de esta versión (el PDF se dibuja siempre desde aquí).
+  datos        Json
+  // SHA-256 de `datos`: «código del documento» impreso en el PDF y mostrado en la consulta.
+  huella       String
+  generadaPor  String
+  generadaEn   DateTime            @default(now())
+
+  @@unique([constanciaId, version])
 }

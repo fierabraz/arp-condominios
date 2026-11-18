@@ -47,12 +47,13 @@ export async function informarTransferenciaAccion(formData: FormData): Promise<E
   const comprobante = revisarComprobante(file, file ? Buffer.from(await file.arrayBuffer()) : null);
   if (!comprobante.ok) return { errores: { comprobante: [comprobante.mensaje] } };
 
+  let informadaId: string;
   try {
-    await informarTransferencia(usuario, datos.data, comprobante.valor, formData.get("confirmar") === "1");
+    ({ id: informadaId } = await informarTransferencia(usuario, datos.data, comprobante.valor, formData.get("confirmar") === "1"));
   } catch (e) {
     if (e instanceof TransferenciaRepetida) return { repetida: e.motivos };
     if (e instanceof ErrorTransferencia) return { mensaje: e.message };
     throw e;
   }
-  redirect(`/mi-cuenta/pagar?unidad=${encodeURIComponent(datos.data.unidadId)}&informada=1`);
+  redirect(`/mi-cuenta/pagar?unidad=${encodeURIComponent(datos.data.unidadId)}&informada=${encodeURIComponent(informadaId)}`);
 }

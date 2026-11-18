@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { Card, Insignia, PageHeader, Vacio } from "@/components/ui";
 import { formatoFecha, formatoFechaHora, formatoMoneda } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
+import { formatoFolio } from "@/lib/constancias";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
 import { puede } from "@/lib/permisos";
@@ -28,6 +29,7 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
       comprobante: { select: { nombre: true, tipo: true, tamano: true } },
       movimiento: { include: { cuenta: { select: { banco: true, numeroFinal: true } } } },
       pago: { select: { id: true, monto: true, fecha: true, anuladoEn: true } },
+      constancia: { select: { folio: true, versiones: { orderBy: { version: "asc" }, select: { version: true, estado: true, generadaEn: true } } } },
     },
   });
   if (!t) notFound();
@@ -111,6 +113,29 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
               <img src={`/comprobantes/${t.id}`} alt="Comprobante adjuntado por el residente" className="mt-4 max-h-96 rounded-xl border border-borde" />
             )}
             <p className="mt-3 text-xs text-texto-suave">El comprobante sirve de apoyo, pero el pago solo se confirma con el movimiento de la cartola.</p>
+          </Card>
+          <Card>
+            <h2 className="mb-2 font-bold">Constancia de pago {t.constancia ? formatoFolio(t.constancia.folio) : ""}</h2>
+            <p className="mb-3 text-sm text-texto-suave">
+              Cada cambio de estado agrega una versión con el mismo folio. Las versiones anteriores no se borran. El residente ve las mismas.
+            </p>
+            <ul className="space-y-1 text-sm">
+              {(t.constancia?.versiones ?? []).map((v, i, todas) => (
+                <li key={v.version}>
+                  <a href={`/comprobantes/${t.id}/constancia?v=${v.version}`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                    Versión {v.version}: {ESTADOS_TRANSFERENCIA[v.estado].texto}
+                  </a>{" "}
+                  <span className="text-texto-suave">· {formatoFechaHora(v.generadaEn)}{i === todas.length - 1 ? " · vigente" : ""}</span>
+                </li>
+              ))}
+              {!t.constancia && (
+                <li>
+                  <a href={`/comprobantes/${t.id}/constancia`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                    Generar constancia (PDF)
+                  </a>
+                </li>
+              )}
+            </ul>
           </Card>
           <Card>
             <h2 className="mb-3 font-bold">Cuenta de la unidad</h2>
