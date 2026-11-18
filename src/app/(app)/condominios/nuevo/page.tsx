@@ -48,7 +48,7 @@ export default async function NuevoCondominioPage({ searchParams }: PageProps<"/
         <Card className="mt-6 border-dashed">
           <h2 className="font-bold">¿Solo quieres probar el módulo financiero?</h2>
           <p className="mb-3 mt-1 text-sm text-texto-suave">
-            Crea una comunidad FICTICIA lista para probar pagos y conciliación: 8 unidades, un mes emitido, cuenta bancaria inventada y un residente de prueba.
+            Crea «Edificio Los Aromos», una comunidad FICTICIA lista para probar todo el ciclo: 8 unidades, un mes emitido con pagos y una transferencia por verificar, el mes actual abierto, fondos, egresos, personal y cuenta bancaria inventada, y un residente de prueba.
             Esta opción solo aparece en la vista previa, nunca en el sitio real.
           </p>
           <form action={crearComunidadDemoAccion}>

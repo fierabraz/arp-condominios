@@ -21,19 +21,19 @@ export default async function ImportarPage({ params }: PageProps<"/condominios/[
     <>
       <PageHeader
         titulo="Cargar desde Excel"
-        descripcion={`${condominio.nombre} · Unidades, alícuotas, propietarios y residentes de una sola vez.`}
+        descripcion={`${condominio.nombre} · Unidades, porcentajes de prorrateo, propietarios y residentes de una sola vez.`}
       />
 
       <ol className="mb-6 grid gap-3 md:grid-cols-3 md:gap-4">
         <li>
           <Card className="h-full">
             <p className="text-sm font-bold text-marca">Paso 1</p>
-            <p className="mt-1 font-semibold">Descarga la planilla</p>
+            <p className="mt-1 font-semibold">Descarga la planilla oficial</p>
             <p className="mt-1 mb-3 text-sm text-texto-suave">
               Viene con las columnas listas y con lo que la propiedad ya tiene cargado.
             </p>
             <BotonDocumento href={`/condominios/${id}/importar/plantilla`} target="_self">
-              <Download size={16} aria-hidden="true" /> Descargar planilla
+              <Download size={16} aria-hidden="true" /> Descargar planilla oficial
             </BotonDocumento>
           </Card>
         </li>

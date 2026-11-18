@@ -12,6 +12,7 @@ import {
   resumenPlan,
   revisarMapeo,
   type Mapeo,
+  cargaParcial,
 } from "./importacion";
 
 const TITULOS = ["Unidad", "Tipo", "Alícuota (%)", "Nombre", "RUT", "Correo", "Teléfono", "Relación"];
@@ -57,7 +58,7 @@ test("leerPlanilla informa errores por fila", () => {
   assert.equal(r.errores.length, 4);
   assert.match(r.errores[0].mensaje, /número de la unidad/);
   assert.match(r.errores[1].mensaje, /tipo "Castillo"/);
-  assert.match(r.errores[2].mensaje, /alícuota.*correo.*relación/);
+  assert.match(r.errores[2].mensaje, /porcentaje de prorrateo.*correo.*relación/);
   assert.match(r.errores[3].mensaje, /falta su nombre/);
 });
 
@@ -130,8 +131,8 @@ test("planificar rechaza unidades nuevas sin alícuota y repetidas con otra alí
   const { filas } = leerPlanilla([TITULOS, ["301"], ["302", "", 10], ["302", "", 20, "Ana"]]);
   const plan = planificar(filas, vacio);
   assert.equal(plan.errores.length, 2);
-  assert.match(plan.errores[0].mensaje, /falta la alícuota/);
-  assert.match(plan.errores[1].mensaje, /distinto tipo o alícuota/);
+  assert.match(plan.errores[0].mensaje, /falta el porcentaje de prorrateo/);
+  assert.match(plan.errores[1].mensaje, /distinto tipo o porcentaje de prorrateo/);
 });
 
 test("al volver a subir, una persona sin RUT ni correo se reconoce por su nombre en la misma unidad", () => {
@@ -258,4 +259,15 @@ test("la carga aplica las reglas de vínculos de la Entrega 3", () => {
     plan.vinculos.filter((v) => v.nuevo).map((v) => v.relacion),
     ["PROPIETARIO", "OCUPANTE"],
   );
+});
+
+test("carga parcial: deja fuera la unidad con problemas completa y carga el resto", () => {
+  const { filas } = leerPlanilla([TITULOS, ["301", "", 10, "Ana"], ["302", "", 10], ["302", "", 20, "Luis"], ["303"], ["304", "", 5, "Rosa"]]);
+  const r = cargaParcial(filas, vacio)!;
+  assert.deepEqual(r.plan.errores, []);
+  assert.deepEqual(r.unidadesOmitidas, ["302", "303"]);
+  assert.deepEqual(r.plan.unidades.map((u) => u.numero), ["301", "304"]);
+  assert.equal(r.filasOmitidas.length, 3);
+  // Sin nada que cargar no hay carga parcial.
+  assert.equal(cargaParcial(leerPlanilla([TITULOS, ["303"]]).filas, vacio), null);
 });

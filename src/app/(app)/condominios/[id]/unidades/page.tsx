@@ -90,7 +90,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
           )}
         </Card>
         <Card>
-          <p className="text-sm text-texto-suave">Suma de alícuotas</p>
+          <p className="text-sm text-texto-suave">Suma de porcentajes de prorrateo</p>
           <p className={`mt-1 text-2xl font-bold ${estado.tipo === "error" ? "text-peligro" : ""}`}>
             {formatoPorcentaje(sumaAlicuotas)}
           </p>

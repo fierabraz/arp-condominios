@@ -114,7 +114,7 @@ export async function generar(condominioId: string, respuestas: unknown, posicio
         if (comp.errores.length) throw new ErrorUsuario(comp.errores.join(" "));
         if (comp.crear.unidades.length && condominio.estado === "HABILITADA_FINANCIERA") {
           throw new ErrorUsuario(
-            "Esta comunidad ya emite cobros: las unidades nuevas se agregan desde Unidades, con su alícuota. El generador solo puede ubicar y ordenar las que ya existen.",
+            "Esta comunidad ya emite cobros: las unidades nuevas se agregan desde Unidades, con su porcentaje de prorrateo. El generador solo puede ubicar y ordenar las que ya existen.",
           );
         }
         const ids: Registros = { ...comp.ids };

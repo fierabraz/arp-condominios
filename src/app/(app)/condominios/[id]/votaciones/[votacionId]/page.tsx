@@ -43,7 +43,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
           <span className="flex flex-wrap items-center gap-2">
             <span className={`rounded px-2 py-0.5 text-xs font-medium ${COLOR[estado]}`}>{ETIQUETA[estado]}</span>
             {condominio.nombre} · Termina el {formatoFechaHora(v.cierraEn)} ·{" "}
-            {ponderada ? "Votos ponderados por alícuota" : "Una unidad, un voto"}
+            {ponderada ? "Votos ponderados por porcentaje de prorrateo" : "Una unidad, un voto"}
           </span>
         }
         acciones={
@@ -91,7 +91,7 @@ export default async function VotacionPage({ params }: PageProps<"/condominios/[
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-texto-suave">Participación{ponderada && " (por alícuota)"}</p>
+          <p className="text-sm text-texto-suave">Participación{ponderada && " (por porcentaje de prorrateo)"}</p>
           <p className="mt-1 text-2xl font-semibold">{formatoPorcentaje(r.participacion, 1)}</p>
         </Card>
         <Card>

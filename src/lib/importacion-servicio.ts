@@ -179,6 +179,7 @@ export async function aplicarImportacion(
   administradoraId: string,
   condominioId: string,
   filas: FilaImportada[],
+  nota = "",
 ) {
   const plan = await planDe(filas, condominioId, administradoraId);
   if (plan.errores.length) return { ok: false as const, plan };
@@ -242,7 +243,7 @@ export async function aplicarImportacion(
   await registrar(
     autor,
     "Cargó unidades y personas desde una planilla",
-    `${r.unidadesNuevas} unidades nuevas, ${r.unidadesActualizadas} actualizadas, ${r.personasNuevas} personas nuevas, ${r.personasCompletadas} con datos completados, ${r.vinculosNuevos} vínculos nuevos. Suma de alícuotas: ${plan.sumaAlicuotas} %.`,
+    `${r.unidadesNuevas} unidades nuevas, ${r.unidadesActualizadas} actualizadas, ${r.personasNuevas} personas nuevas, ${r.personasCompletadas} con datos completados, ${r.vinculosNuevos} vínculos nuevos. Suma de porcentajes de prorrateo: ${plan.sumaAlicuotas} %.${nota}`,
     condominioId,
   );
   return { ok: true as const, plan, resumen: r };

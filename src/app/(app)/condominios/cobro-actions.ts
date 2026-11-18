@@ -32,6 +32,11 @@ export async function abrirPeriodo(condominioId: string, _: EstadoForm, formData
     where: { condominioId_anio_mes: { condominioId, ...datos.data } },
   });
   if (existe) return { mensaje: "Ese período ya existe." };
+  // FIN-COMP D: los meses hasta la apertura incorporada pertenecen al sistema anterior.
+  const apertura = await db.periodo.findFirst({ where: { condominioId, deApertura: true }, select: { anio: true, mes: true } });
+  if (apertura && apertura.anio * 12 + apertura.mes >= datos.data.anio * 12 + datos.data.mes) {
+    return { mensaje: `Los meses hasta ${nombrePeriodo(apertura.anio, apertura.mes)} vienen del sistema anterior (apertura). Abre un mes posterior.` };
+  }
 
   const periodo = await db.periodo.create({ data: { ...datos.data, condominioId, administradoraId } });
   await registrar(usuario, "Abrió un mes", `${nombrePeriodo(periodo.anio, periodo.mes)} en ${condominio.nombre}`, condominioId);

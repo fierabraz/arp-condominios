@@ -22,7 +22,7 @@ export function ResultadosVotacion({
             </span>
             <span className="tabular-nums text-texto-suave">
               {formatoPorcentaje(o.porcentaje, 1)} · {o.votos} {o.votos === 1 ? "unidad" : "unidades"}
-              {ponderada && ` · ${formatoPorcentaje(o.peso, 2)} de alícuota`}
+              {ponderada && ` · ${formatoPorcentaje(o.peso, 2)} de porcentaje de prorrateo`}
             </span>
           </div>
           <div className="h-3 overflow-hidden rounded-full bg-gray-100">
