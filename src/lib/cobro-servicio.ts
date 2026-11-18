@@ -3,6 +3,7 @@ import { MENSAJE_SIN_FINANZAS, operaFinanzas } from "./configuracion";
 import { db } from "@/lib/db";
 import { registrarEn, type Auditoria } from "@/lib/registro";
 import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
+import { exigirMesAbierto, MesCerrado } from "@/lib/mes-cerrado";
 import type { MedioPago } from "@/generated/prisma/enums";
 import {
   aMinimo,
@@ -19,6 +20,16 @@ import { DistribucionInvalida, validarDistribucion, estadoSegunConciliado, type 
 // y filtran por él, para que un cliente nunca toque datos de otro.
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/** El bloqueo de mes cerrado llega como ErrorCobro (las pantallas ya muestran su mensaje). */
+async function enCobro<T>(p: Promise<T>) {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof MesCerrado) throw new ErrorCobro(e.message);
+    throw e;
+  }
+}
 
 async function monedaDe(tx: Pick<Tx, "administradora">, administradoraId: string) {
   const adm = await tx.administradora.findUniqueOrThrow({ where: { id: administradoraId } });
@@ -120,6 +131,13 @@ async function calcularPeriodo(
 ) {
   const { condominio } = periodo;
   if (condominio.unidades.length === 0) throw new ErrorCobro("El condominio no tiene unidades.");
+  // FIN-COMP C: no se cobra con porcentajes de prorrateo provisionales (los del generador visual).
+  const provisionales = condominio.unidades.filter((u) => u.prorrateoProvisional).length;
+  if (provisionales) {
+    throw new ErrorCobro(
+      `${provisionales} unidad(es) tienen un porcentaje de prorrateo provisional (puesto por el generador). Confírmalos o corrígelos en Unidades o con la planilla Excel antes de emitir.`,
+    );
+  }
 
   const dec = await monedaDe(tx, administradoraId);
   const totalComun = periodo.gastos
@@ -250,6 +268,7 @@ export async function registrarPagoEn(tx: Tx, administradoraId: string, datos: D
     if (!unidad) throw new ErrorCobro("Unidad no encontrada.");
     if (!operaFinanzas(unidad.condominio.estado)) throw new ErrorCobro(MENSAJE_SIN_FINANZAS);
     await bloquearUnidades(tx, [unidad.id]);
+    await enCobro(exigirMesAbierto(tx, unidad.condominioId, datos.fecha, "registrar un pago"));
     const dec = await monedaDe(tx, administradoraId);
     const monto = aMinimo(datos.monto, dec);
     if (!opciones.permitirDuplicado) {
@@ -314,6 +333,8 @@ export async function anularPagoEn(
     });
     if (!pago) throw new ErrorCobro("Pago no encontrado.");
     await bloquearUnidades(tx, [pago.unidadId]);
+    const { condominioId } = await tx.unidad.findUniqueOrThrow({ where: { id: pago.unidadId }, select: { condominioId: true } });
+    await enCobro(exigirMesAbierto(tx, condominioId, pago.fecha, "anular un pago"));
     // Marcar primero y solo si sigue vigente: dos anulaciones a la vez no devuelven el monto dos veces.
     const { count } = await tx.pago.updateMany({
       where: { id: pago.id, anuladoEn: null },
@@ -360,6 +381,8 @@ export async function anularConciliacionEn(tx: Tx, conciliacionId: string, anula
   if (count === 0) throw new ErrorCobro("Esa conciliación ya estaba deshecha.");
   const c = await tx.conciliacionMovimiento.findUniqueOrThrow({ where: { id: conciliacionId } });
   await tx.$queryRaw`SELECT id FROM "MovimientoBancario" WHERE id = ${c.movimientoId} FOR UPDATE`;
+  const mov = await tx.movimientoBancario.findUniqueOrThrow({ where: { id: c.movimientoId }, select: { fecha: true } });
+  await enCobro(exigirMesAbierto(tx, c.condominioId, mov.fecha, "deshacer una conciliación"));
   // `montoConciliado` lleva el signo del movimiento: en un cargo se devuelve sumando.
   const esCargo = c.tipo === "EGRESO" || c.tipo === "OTRO_EGRESO";
   const m = await tx.movimientoBancario.update({

@@ -221,7 +221,7 @@ export async function aplicarImportacion(
     async (tx) => {
       if (nuevasUnidades.length) await tx.unidad.createMany({ data: nuevasUnidades });
       for (const u of plan.unidades.filter((u) => u.accion === "actualizar")) {
-        await tx.unidad.update({ where: { id: u.id }, data: { tipo: u.tipo, alicuota: u.alicuota } });
+        await tx.unidad.update({ where: { id: u.id }, data: { tipo: u.tipo, alicuota: u.alicuota, prorrateoProvisional: false } });
       }
       if (nuevasPersonas.length) await tx.persona.createMany({ data: nuevasPersonas });
       for (const p of plan.personas.filter((p) => p.accion === "completar")) {

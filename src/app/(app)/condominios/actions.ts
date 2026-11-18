@@ -230,7 +230,7 @@ export async function editarUnidad(
   const agrupacionId = await leerAgrupacion(formData, unidad.condominioId);
   if (agrupacionId === false) return { errores: { agrupacionId: ["Elige una agrupación de esta propiedad."] } };
 
-  await db.unidad.update({ where: { id: unidadId }, data: { ...datos.data, agrupacionId } });
+  await db.unidad.update({ where: { id: unidadId }, data: { ...datos.data, agrupacionId, prorrateoProvisional: false } });
   await registrar(
     usuario,
     "Editó una unidad",

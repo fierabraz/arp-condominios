@@ -19,6 +19,7 @@ import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { estadoSegunConciliado, sugerirParaAbono } from "@/lib/conciliacion";
 import { ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
 import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
+import { exigirMesAbierto, MesCerrado } from "@/lib/mes-cerrado";
 
 type Autor = Pick<UsuarioActual, "id" | "nombre" | "administradoraId">;
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
@@ -70,6 +71,12 @@ export async function conciliarEn(
   if (esIngreso && conSigno <= 0) throw new ErrorConciliacion("Ese movimiento es un cargo, no un abono.");
   if (!esIngreso && conSigno >= 0) throw new ErrorConciliacion("Ese movimiento es un abono, no un cargo.");
   const total = Math.abs(conSigno);
+  try {
+    await exigirMesAbierto(tx, m.condominioId, m.fecha, "conciliar un movimiento");
+  } catch (e) {
+    if (e instanceof MesCerrado) throw new ErrorConciliacion(e.message);
+    throw e;
+  }
   if (datos.montoMin <= 0) throw new ErrorConciliacion("El monto debe ser mayor que cero.");
   const yaConciliado = Math.abs(aMinimo(m.montoConciliado.toString(), dec));
   const restante = total - yaConciliado;

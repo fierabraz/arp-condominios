@@ -33,6 +33,9 @@ export function PagoForm({
     if (estado.ok) {
       setUnidadId("");
       setMonto("");
+    } else if (estado.valores) {
+      setUnidadId(estado.valores.unidadId ?? "");
+      setMonto(estado.valores.monto ?? "");
     }
   }
   const elegida = unidades.find((u) => u.id === unidadId);

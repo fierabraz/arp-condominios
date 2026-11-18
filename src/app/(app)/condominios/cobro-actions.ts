@@ -264,7 +264,19 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
         },
       };
     }
-    if (e instanceof ErrorCobro) return { mensaje: e.message };
+    // FIN-COMP C: si se rechaza (por ejemplo, fecha de un mes cerrado), el formulario conserva lo escrito.
+    if (e instanceof ErrorCobro) {
+      return {
+        mensaje: e.message,
+        valores: {
+          unidadId: datos.data.unidadId,
+          monto: aTexto(formData.get("monto")) ?? "",
+          fecha: aTexto(formData.get("fecha")) ?? "",
+          medio: datos.data.medio,
+          referencia: datos.data.referencia ?? "",
+        },
+      };
+    }
     throw e;
   }
   revalidatePath(`/condominios/${condominioId}`, "layout");

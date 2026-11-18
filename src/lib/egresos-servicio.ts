@@ -18,6 +18,16 @@ import { aMinimo, decimalesMoneda } from "@/lib/cobro";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { COMPROBANTE_TAMANO_MAXIMO, tipoComprobante } from "@/lib/pagos";
 import { bloquearMovimiento, conciliarEn, ErrorConciliacion } from "@/lib/conciliacion-servicio";
+import { exigirMesAbierto, MesCerrado } from "@/lib/mes-cerrado";
+
+async function enEgreso<T>(p: Promise<T>) {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof MesCerrado) throw new ErrorEgreso(e.message);
+    throw e;
+  }
+}
 
 type Autor = Pick<UsuarioActual, "id" | "nombre" | "administradoraId">;
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
@@ -50,6 +60,7 @@ export async function registrarPagoEgreso(
   return db.$transaction(async (tx) => {
     const g = await gastoDe(tx, datos.gastoId, datos.condominioId, administradoraId);
     if (g.estadoPago === "PAGADO") throw new ErrorEgreso("Ese egreso ya está pagado.");
+    await enEgreso(exigirMesAbierto(tx, datos.condominioId, datos.fechaPago, "registrar un pago a proveedor"));
     await tx.gasto.update({
       where: { id: g.id },
       data: { estadoPago: "PAGADO", fechaPago: datos.fechaPago, medioPago: datos.medioPago, pagadoPor: autor.nombre },
@@ -74,6 +85,7 @@ export async function anularPagoEgreso(autor: Autor, datos: { condominioId: stri
     const g = await gastoDe(tx, datos.gastoId, datos.condominioId, administradoraId);
     if (g.estadoPago !== "PAGADO") throw new ErrorEgreso("Ese egreso no está pagado.");
     if (g.conciliaciones.length) throw new ErrorEgreso("Está conciliado con un cargo de la cartola. Deshaz primero esa conciliación.");
+    if (g.fechaPago) await enEgreso(exigirMesAbierto(tx, datos.condominioId, g.fechaPago, "anular un pago a proveedor"));
     await tx.gasto.update({ where: { id: g.id }, data: { estadoPago: "POR_PAGAR", fechaPago: null, medioPago: null, pagadoPor: null } });
     await registrarEn(tx, {
       autor,
@@ -234,11 +246,14 @@ export async function asegurarFondoReserva(condominioId: string, administradoraI
 }
 
 /** Saldo de cada fondo de la comunidad, con su detalle. Misma fuente para pantallas e informes. */
+/** Períodos hasta el mes de la fecha (incluido): el aporte de reserva de un mes cuenta en ese mes aunque se emita después. */
+const hastaMes = (d: Date) => ({ OR: [{ anio: { lt: d.getUTCFullYear() } }, { anio: d.getUTCFullYear(), mes: { lte: d.getUTCMonth() + 1 } }] });
+
 export async function saldosFondos(condominioId: string, administradoraId: string, hasta?: Date) {
   await asegurarFondoReserva(condominioId, administradoraId);
   const fondos = await db.fondo.findMany({ where: { condominioId, administradoraId }, orderBy: [{ tipo: "asc" }, { nombre: "asc" }] });
   const [aporteReserva, recaudadoReserva] = await Promise.all([
-    db.avisoCobro.aggregate({ where: { unidad: { condominioId }, ...(hasta ? { emitidoEn: { lte: hasta } } : {}) }, _sum: { fondoReserva: true } }),
+    db.avisoCobro.aggregate({ where: { unidad: { condominioId }, ...(hasta ? { periodo: hastaMes(hasta) } : {}) }, _sum: { fondoReserva: true } }),
     // Lo efectivamente recaudado del fondo: proporción pagada de cada aviso.
     db.avisoCobro.findMany({ where: { unidad: { condominioId } }, select: { fondoReserva: true, total: true, saldo: true } }),
   ]);
@@ -295,6 +310,7 @@ export async function registrarMovimientoFondo(
   if (!fondo) throw new ErrorEgreso("Fondo no encontrado.");
   return db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM "Fondo" WHERE id = ${fondo.id} FOR UPDATE`;
+    await enEgreso(exigirMesAbierto(tx, datos.condominioId, datos.fecha, "registrar un movimiento de fondo"));
     if (datos.tipo === "RETIRO") {
       const s = (await saldosFondos(datos.condominioId, administradoraId)).find((x) => x.fondo.id === fondo.id)!;
       if (datos.monto > s.saldo) throw new ErrorEgreso(`El fondo tiene ${s.saldo.toLocaleString("es-CL")} disponibles.`);
