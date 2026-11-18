@@ -165,7 +165,7 @@ export default async function MovimientosPage({ params, searchParams }: PageProp
                     <Insignia tono={est.tono}>{est.texto}</Insignia>
                     {m.nota && <span className="mt-1 block text-xs text-texto-suave">{m.nota}</span>}
                     <Link href={`${base}/movimientos/${m.id}`} className="mt-1 block text-sm font-semibold text-marca hover:underline">
-                      {monto > 0 && m.estado !== "CONCILIADO" && verifica ? "Conciliar →" : "Ver detalle →"}
+                      {m.estado !== "CONCILIADO" && verifica ? "Conciliar →" : "Ver detalle →"}
                     </Link>
                     <Link href={`${base}/importaciones/${m.importacion.id}`} className="mt-1 block text-xs text-texto-suave hover:underline">
                       {m.importacion.archivoNombre}

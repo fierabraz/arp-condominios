@@ -37,7 +37,7 @@ export async function datosAviso(avisoId: string, administradoraId: string) {
     pagos.reduce((s, p) => s + n(p.monto) - p.aplicaciones.reduce((t, a) => t + n(a.monto), 0), 0),
   );
 
-  const comunes = aviso.periodo.gastos.filter((g) => g.tipo === "COMUN");
+  const comunes = aviso.periodo.gastos.filter((g) => g.tipo === "COMUN" && !g.fondoId);
   const porCategoria = agrupar(comunes);
   const cargos = aviso.periodo.gastos.filter((g) => g.tipo === "INDIVIDUAL" && g.unidadId === aviso.unidadId);
 
@@ -79,7 +79,9 @@ export async function datosRendicion(periodoId: string, administradoraId: string
   });
   if (!periodo) return null;
 
-  const comunes = periodo.gastos.filter((g) => g.tipo === "COMUN");
+  const comunes = periodo.gastos.filter((g) => g.tipo === "COMUN" && !g.fondoId);
+  // FIN-COMP B: egresos pagados con un fondo (no se prorratearon).
+  const conFondo = periodo.gastos.filter((g) => g.tipo === "COMUN" && g.fondoId);
   const individuales = periodo.gastos.filter((g) => g.tipo === "INDIVIDUAL");
   const emitido = periodo.avisos.reduce((s, a) => s + n(a.total), 0);
   const recaudado = periodo.avisos.reduce((s, a) => s + a.aplicaciones.reduce((t, x) => t + n(x.monto), 0), 0);
@@ -106,6 +108,8 @@ export async function datosRendicion(periodoId: string, administradoraId: string
     periodo,
     porCategoria: agrupar(comunes),
     comunes,
+    conFondo,
+    totalConFondo: redondear(conFondo.reduce((s, g) => s + n(g.monto), 0)),
     individuales,
     totalComun: redondear(comunes.reduce((s, g) => s + n(g.monto), 0)),
     totalIndividual: redondear(individuales.reduce((s, g) => s + n(g.monto), 0)),
