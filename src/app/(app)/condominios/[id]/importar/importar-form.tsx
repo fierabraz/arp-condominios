@@ -158,7 +158,7 @@ function Pasos({
             <p className="mb-2 flex items-center gap-2 font-bold">
               <AlertTriangle size={18} aria-hidden="true" />
               {errores.length} {errores.length === 1 ? "fila tiene" : "filas tienen"} problemas. Corrígelas en Excel y vuelve a subir
-              la planilla:
+              la planilla{revision.parcial ? ", o carga ahora solo lo que está bien (más abajo)" : ""}:
             </p>
             <ul className="max-h-64 list-inside list-disc space-y-1 overflow-y-auto">
               {errores.map((e, i) => (
@@ -192,7 +192,7 @@ function Pasos({
                 <tr>
                   <th>Unidad</th>
                   <th>Tipo</th>
-                  <th>Alícuota</th>
+                  <th>Porcentaje de prorrateo</th>
                   <th></th>
                 </tr>
               </thead>
@@ -274,6 +274,29 @@ function Pasos({
         )}
         {errorFinal?.map((e, i) => <Mensaje key={i} texto={e.mensaje} />)}
 
+        {revision.parcial && (
+          <form action={enviarConfirmacion} className="space-y-3 rounded-xl border border-borde p-4" data-testid="carga-parcial">
+            <h3 className="font-semibold">O carga ahora solo lo que está bien</h3>
+            <p className="text-sm text-texto-suave">
+              Se cargan {revision.parcial.unidades} {revision.parcial.unidades === 1 ? "unidad" : "unidades"} y sus personas. Quedan fuera las filas{" "}
+              {revision.parcial.filasOmitidas.join(", ")}
+              {revision.parcial.unidadesOmitidas.length > 0 && <> y todas las filas de {revision.parcial.unidadesOmitidas.length === 1 ? "la unidad" : "las unidades"} {revision.parcial.unidadesOmitidas.join(", ")}</>}
+              , para no cargar una unidad a medias. Después corriges esas filas y vuelves a subir la planilla: lo ya cargado no se duplica.
+            </p>
+            <input type="hidden" name="filas" value={revision.parcial.filas} />
+            <input type="hidden" name="parcial" value="1" />
+            <input type="hidden" name="omitidas" value={revision.parcial.filasOmitidas.join(", ")} />
+            {revision.totalNuevo && <input type="hidden" name="totalUnidades" value={revision.totalPropiedad ?? ""} />}
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" required className="mt-0.5 h-5 w-5" />
+              Entiendo que las filas con problemas no se cargan.
+            </label>
+            <Boton type="submit" variante="secundario" disabled={guardando}>
+              {guardando ? "Cargando…" : "Cargar solo las filas sin problemas"}
+            </Boton>
+          </form>
+        )}
+
         <form action={enviarConfirmacion} className="flex flex-wrap gap-2">
           <input type="hidden" name="filas" value={revision.filas} />
           {revision.totalNuevo && <input type="hidden" name="totalUnidades" value={revision.totalPropiedad ?? ""} />}
@@ -329,8 +352,8 @@ function Pasos({
           <span className="mb-1 block text-sm font-semibold">¿Cuántas unidades tiene la propiedad en total?</span>
           <Input type="number" name="totalUnidades" min={1} max={10000} placeholder="Ej. 100" />
           <span className="mt-1 block text-xs text-texto-suave">
-            Cuenta todas las que tienen alícuota (departamentos, estacionamientos, bodegas…). Así, si cargas por partes, te
-            mostramos el avance en vez de un aviso de alícuotas que no suman 100 %.
+            Cuenta todas las que tienen porcentaje de prorrateo (departamentos, estacionamientos, bodegas…). Así, si cargas por partes, te
+            mostramos el avance en vez de un aviso de porcentajes de prorrateo que no suman 100 %.
           </span>
         </label>
       )}
@@ -444,7 +467,7 @@ function AsignarColumnas({
           <Mensaje
             texto={
               estado.hoja
-                ? "No encontré títulos de columnas en la planilla. Agrega una fila de títulos (Unidad, Alícuota, Nombre…) y súbela otra vez."
+                ? "No encontré títulos de columnas en la planilla. Agrega una fila de títulos (Unidad, Porcentaje de prorrateo, Nombre…) y súbela otra vez."
                 : "Esta planilla es muy grande para elegir las columnas aquí. Cambia el título de la columna de la unidad a «Unidad» o usa la planilla de Convive."
             }
           />

@@ -218,7 +218,7 @@ export function EspacioForm({
           </Campo>
         )}
         {regimen === "UNIDAD_PRIVADA" && (
-          <Campo etiqueta="Unidad con alícuota que lo representa" error={e.unidadPropiaId}>
+          <Campo etiqueta="Unidad con porcentaje de prorrateo que lo representa" error={e.unidadPropiaId}>
             <Select name="unidadPropiaId" defaultValue={valores.unidadPropiaId ?? ""} aria-describedby="ayuda-propia">
               <Opciones opciones={unidades} vacio="Sin vincular todavía" />
             </Select>

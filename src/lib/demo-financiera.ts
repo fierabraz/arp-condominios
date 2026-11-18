@@ -11,7 +11,9 @@ import { randomBytes } from "node:crypto";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
 import type { UsuarioActual } from "@/lib/auth";
-import { emitirPeriodo } from "@/lib/cobro-servicio";
+import { emitirPeriodo, registrarPago } from "@/lib/cobro-servicio";
+import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
+import { cargarRemuneraciones } from "@/lib/remuneraciones-servicio";
 import { registrarEn } from "@/lib/registro";
 
 /** true en la vista previa o en local; false en producción. */
@@ -46,11 +48,12 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
   const anio = mesAnterior.getUTCFullYear();
   const mes = mesAnterior.getUTCMonth() + 1;
 
+  let datosDemo = { residenteId: "" };
   const c = await db.$transaction(async (tx) => {
     const c = await tx.condominio.create({
       data: {
         administradoraId,
-        nombre: `Comunidad Ficticia Los Aromos (prueba ${sufijo})`,
+        nombre: `Edificio Los Aromos (demo ${sufijo})`,
         direccion: "Calle Inventada 123",
         comuna: "Comuna Ficticia",
         estado: "HABILITADA_FINANCIERA",
@@ -60,16 +63,17 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
         diaVencimiento: 10,
         totalUnidades: UNIDADES.length,
         demo: true,
-        observaciones: "Comunidad FICTICIA creada para probar el ciclo financiero. No contiene datos reales.",
+        observaciones: "Comunidad FICTICIA (PILOTO-001) creada para probar el ciclo financiero. No contiene datos reales.",
       },
     });
     if (!usuario.accesoTodas) await tx.asignacionCondominio.create({ data: { usuarioId: usuario.id, condominioId: c.id } });
+    let residenteId = "";
     for (let i = 0; i < UNIDADES.length; i++) {
       const u = await tx.unidad.create({ data: { administradoraId, condominioId: c.id, numero: UNIDADES[i], alicuota: 12.5 } });
       const p = await tx.persona.create({ data: { administradoraId, nombre: NOMBRES[i], documento: RUTS[i] } });
       await tx.unidadPersona.create({ data: { unidadId: u.id, personaId: p.id, relacion: "PROPIETARIO" } });
       if (i === 0) {
-        await tx.usuario.create({
+        residenteId = (await tx.usuario.create({
           data: {
             administradoraId,
             nombre: NOMBRES[0],
@@ -78,7 +82,7 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
             rol: "RESIDENTE",
             personaId: p.id,
           },
-        });
+        })).id;
       }
     }
     const periodo = await tx.periodo.create({ data: { administradoraId, condominioId: c.id, anio, mes } });
@@ -90,6 +94,22 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
     ] as const) {
       await tx.gasto.create({ data: { administradoraId, periodoId: periodo.id, tipo: "COMUN", categoria, descripcion, proveedor, documento: `F-${sufijo}`, monto, fecha } });
     }
+    // FIN-COMP B/D: fondos con saldo traído, un egreso pagado con el fondo de reserva y el personal.
+    const reserva = await tx.fondo.create({ data: { administradoraId, condominioId: c.id, nombre: "Fondo de reserva", tipo: "RESERVA", saldoInicial: 1_500_000, creadoPor: usuario.nombre } });
+    await tx.fondo.create({ data: { administradoraId, condominioId: c.id, nombre: "Fondo de proyectos", tipo: "OTRO", saldoInicial: 600_000, creadoPor: usuario.nombre } });
+    await tx.gasto.create({
+      data: {
+        administradoraId, periodoId: periodo.id, tipo: "COMUN", categoria: "Reparaciones", descripcion: "Reparación bomba de agua", proveedor: "Gasfitería Imaginaria",
+        documento: `F-${sufijo}-B`, monto: 180_000, fecha, fondoId: reserva.id, estadoPago: "PAGADO", fechaPago: fecha, medioPago: "TRANSFERENCIA", pagadoPor: usuario.nombre,
+      },
+    });
+    for (const [nombre, cargo, liquido, imposiciones] of [
+      ["Conserje Ficticio Uno", "Conserje", 650_000, 180_000],
+      ["Auxiliar Ficticia de Aseo", "Aseo", 520_000, 140_000],
+    ] as const) {
+      await tx.trabajador.create({ data: { administradoraId, condominioId: c.id, nombre, cargo, liquido, imposiciones, creadoPor: usuario.nombre } });
+    }
+    datosDemo = { residenteId };
     await tx.cuentaBancaria.create({
       data: {
         administradoraId,
@@ -98,7 +118,7 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
         tipo: "CORRIENTE",
         numeroFinal: "6789",
         numeroCuenta: "000123456789",
-        titular: "Comunidad Ficticia Los Aromos",
+        titular: "Edificio Los Aromos (ficticio)",
         rutTitular: "76.086.428-5",
         correoPagos: "pagos@example.com",
         recibePagos: true,
@@ -119,6 +139,28 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
   });
   // Emitir con la función de siempre (la misma que usa la administración).
   await emitirPeriodo(c.periodoId, administradoraId);
+
+  // Dos pagos en efectivo del mes emitido y una transferencia informada pendiente de verificación
+  // (con su constancia versión 1), para recorrer Recaudación, Conciliación y el cierre del mes.
+  const unidades = await db.unidad.findMany({ where: { condominioId: c.id }, select: { id: true, numero: true } });
+  const de = (numero: string) => unidades.find((u) => u.numero === numero)!.id;
+  for (const numero of ["104", "201"]) {
+    await registrarPago(administradoraId, { unidadId: de(numero), monto: 105_000, fecha: new Date(Date.UTC(anio, mes - 1, 20)), medio: "EFECTIVO", referencia: "Pago ficticio en efectivo" });
+  }
+  const aviso101 = await db.avisoCobro.findFirst({ where: { periodoId: c.periodoId, unidadId: de("101") }, select: { id: true } });
+  await db.$transaction(async (tx) => {
+    const t = await tx.transferenciaInformada.create({
+      data: {
+        administradoraId, condominioId: c.id, unidadId: de("101"), avisoId: aviso101?.id ?? null, usuarioId: datosDemo.residenteId || null, informante: NOMBRES[0],
+        fecha: new Date(Date.UTC(ahora.getUTCFullYear(), ahora.getUTCMonth(), ahora.getUTCDate() - 2)), monto: 30_000, bancoOrigen: "Banco Ficticio", operacion: `DEMO-${sufijo}`,
+        observaciones: "Transferencia ficticia de la comunidad demo.", deudaAlInformar: 105_000,
+      },
+    });
+    await sincronizarConstanciaEn(tx, t.id, NOMBRES[0]);
+  });
+  // Mes actual abierto, con las remuneraciones cargadas como egresos por pagar.
+  const actual = await db.periodo.create({ data: { administradoraId, condominioId: c.id, anio: ahora.getUTCFullYear(), mes: ahora.getUTCMonth() + 1 } });
+  await cargarRemuneraciones(usuario, actual.id);
   return c;
 }
 

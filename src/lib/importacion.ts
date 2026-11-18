@@ -30,7 +30,7 @@ export type ErrorFila = { fila: number; mensaje: string; hoja?: string };
 export const COLUMNAS = [
   { clave: "numero", titulo: "Unidad", ayuda: "Número o nombre de la unidad (101, Casa 4, B-12). Obligatorio." },
   { clave: "tipo", titulo: "Tipo", ayuda: "Departamento, Casa, Oficina, Local, Estacionamiento o Bodega. Vacío = Departamento." },
-  { clave: "alicuota", titulo: "Alícuota (%)", ayuda: "Porcentaje de participación (1,25 = 1,25 %). Obligatoria para unidades nuevas." },
+  { clave: "alicuota", titulo: "Porcentaje de prorrateo (%)", ayuda: "Porcentaje de participación (1,25 = 1,25 %). Obligatoria para unidades nuevas." },
   { clave: "nombre", titulo: "Nombre", ayuda: "Nombre completo del propietario o residente. Vacío = solo se carga la unidad." },
   { clave: "documento", titulo: "RUT", ayuda: "RUT o documento. Sirve para reconocer a la misma persona en varias unidades." },
   { clave: "correo", titulo: "Correo", ayuda: "Necesario para invitarlo a la app." },
@@ -306,7 +306,7 @@ export function leerPlanilla(hoja: unknown[][], opciones: OpcionesLectura = {}):
     const alicuota = celda("alicuota");
     if (texto(alicuota) !== undefined) {
       const a = leerNumero(alicuota);
-      if (a === null || a <= 0 || a > 100) problemas.push(`la alícuota "${texto(alicuota)}" debe ser un número mayor que 0 y hasta 100${col("alicuota")}`);
+      if (a === null || a <= 0 || a > 100) problemas.push(`el porcentaje de prorrateo "${texto(alicuota)}" debe ser un número mayor que 0 y hasta 100${col("alicuota")}`);
       else fila.alicuota = a;
     }
     fila.nombre = texto(celda("nombre"));
@@ -344,7 +344,7 @@ export function leerPlanilla(hoja: unknown[][], opciones: OpcionesLectura = {}):
   const suma = [...unicas.values()].reduce((s, a) => s + a, 0);
   if (unicas.size >= 2 && [...unicas.values()].every((a) => a <= 1) && Math.abs(suma - 1) < 0.01) {
     for (const f of conAlicuota) f.alicuota = Math.round(f.alicuota! * 100 * 1e6) / 1e6;
-    avisos.push("Las alícuotas venían como fracción (por ejemplo 0,0125); las convertí a porcentaje (1,25 %).");
+    avisos.push("Los porcentajes de prorrateo venían como fracción (por ejemplo 0,0125); las convertí a porcentaje (1,25 %).");
   }
   return { filas, errores, avisos, columnas };
 }
@@ -473,7 +473,7 @@ export function planificar(
     const ya = unidades.get(llave);
     if (ya) {
       if ((f.alicuota !== undefined && !iguales(f.alicuota, ya.alicuota)) || (f.tipo && f.tipo !== ya.tipo)) {
-        errores.push({ fila: f.fila, mensaje: `Unidad ${f.numero}: aparece otra vez con distinto tipo o alícuota.` });
+        errores.push({ fila: f.fila, mensaje: `Unidad ${f.numero}: aparece otra vez con distinto tipo o porcentaje de prorrateo.` });
         continue;
       }
       filasValidas.push(f);
@@ -481,7 +481,7 @@ export function planificar(
     }
     const existe = porNumero.get(llave);
     if (!existe && f.alicuota === undefined) {
-      errores.push({ fila: f.fila, mensaje: `Unidad ${f.numero}: es nueva y le falta la alícuota.` });
+      errores.push({ fila: f.fila, mensaje: `Unidad ${f.numero}: es nueva y le falta el porcentaje de prorrateo.` });
       continue;
     }
     const tipo = f.tipo ?? existe?.tipo ?? "DEPARTAMENTO";
@@ -623,3 +623,39 @@ export function resumenPlan(plan: Plan) {
 }
 
 export const hayCambios = (plan: Plan) => Object.values(resumenPlan(plan)).some((n) => n > 0);
+
+/**
+ * PILOTO-001 · Carga parcial segura: deja fuera las filas con problemas y TODAS las filas de las
+ * unidades afectadas (una unidad no se carga a medias), y vuelve a planificar hasta que no queden
+ * errores. Las filas que ya no se leyeron (error de lectura) tampoco entran.
+ */
+export function cargaParcial(
+  filas: FilaImportada[],
+  existentes: Parameters<typeof planificar>[1],
+): { filas: FilaImportada[]; plan: Plan; filasOmitidas: number[]; unidadesOmitidas: string[] } | null {
+  let quedan = filas;
+  const omitidas = new Set<string>();
+  const original = new Map<string, string>();
+  for (let vuelta = 0; vuelta < 5; vuelta++) {
+    const plan = planificar(quedan, existentes);
+    if (plan.errores.length === 0) {
+      if (quedan.length === 0 || !hayCambios(plan)) return null;
+      const quedanFilas = new Set(quedan.map((f) => f.fila));
+      return {
+        filas: quedan,
+        plan,
+        filasOmitidas: filas.filter((f) => !quedanFilas.has(f.fila)).map((f) => f.fila),
+        unidadesOmitidas: [...omitidas].map((u) => original.get(u) ?? u).sort((a, b) => a.localeCompare(b, "es", { numeric: true })),
+      };
+    }
+    const conError = new Set(plan.errores.map((e) => e.fila));
+    for (const f of quedan) {
+      if (conError.has(f.fila) && f.numero) {
+        omitidas.add(f.numero.toLowerCase());
+        original.set(f.numero.toLowerCase(), f.numero);
+      }
+    }
+    quedan = quedan.filter((f) => !conError.has(f.fila) && !(f.numero && omitidas.has(f.numero.toLowerCase())));
+  }
+  return null;
+}

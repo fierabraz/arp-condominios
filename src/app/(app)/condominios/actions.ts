@@ -162,7 +162,7 @@ const UnidadSchema = z.object({
   numero: z.string({ error: "Ingresa el número." }).min(1, { error: "Ingresa el número." }),
   tipo: z.enum(TipoUnidad, { error: "Elige un tipo." }),
   alicuota: z
-    .number({ error: "Ingresa la alícuota." })
+    .number({ error: "Ingresa el porcentaje de prorrateo." })
     .gt(0, { error: "Debe ser mayor que 0." })
     .max(100, { error: "Máximo 100." }),
 });
@@ -206,7 +206,7 @@ export async function crearUnidad(
   if (agrupacionId === false) return { errores: { agrupacionId: ["Elige una agrupación de esta propiedad."] } };
 
   await db.unidad.create({ data: { ...datos.data, agrupacionId, condominioId, administradoraId } });
-  await registrar(usuario, "Agregó una unidad", `Unidad ${datos.data.numero}, alícuota ${datos.data.alicuota} %`, condominioId);
+  await registrar(usuario, "Agregó una unidad", `Unidad ${datos.data.numero}, porcentaje de prorrateo ${datos.data.alicuota} %`, condominioId);
   revalidatePath(`/condominios/${condominioId}`, "layout");
   return { ok: true, mensaje: `Unidad ${datos.data.numero} agregada.` };
 }
@@ -234,7 +234,7 @@ export async function editarUnidad(
   await registrar(
     usuario,
     "Editó una unidad",
-    `Unidad ${unidad.numero}${unidad.numero !== datos.data.numero ? ` (ahora ${datos.data.numero})` : ""}: alícuota ${unidad.alicuota.toString()} % → ${datos.data.alicuota} %`,
+    `Unidad ${unidad.numero}${unidad.numero !== datos.data.numero ? ` (ahora ${datos.data.numero})` : ""}: porcentaje de prorrateo ${unidad.alicuota.toString()} % → ${datos.data.alicuota} %`,
     unidad.condominioId,
   );
   revalidatePath(`/condominios/${unidad.condominioId}`, "layout");

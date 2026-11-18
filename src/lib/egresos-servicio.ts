@@ -245,10 +245,10 @@ export async function asegurarFondoReserva(condominioId: string, administradoraI
   });
 }
 
-/** Saldo de cada fondo de la comunidad, con su detalle. Misma fuente para pantallas e informes. */
 /** Períodos hasta el mes de la fecha (incluido): el aporte de reserva de un mes cuenta en ese mes aunque se emita después. */
 const hastaMes = (d: Date) => ({ OR: [{ anio: { lt: d.getUTCFullYear() } }, { anio: d.getUTCFullYear(), mes: { lte: d.getUTCMonth() + 1 } }] });
 
+/** Saldo de cada fondo de la comunidad, con su detalle. Misma fuente para pantallas e informes. */
 export async function saldosFondos(condominioId: string, administradoraId: string, hasta?: Date) {
   await asegurarFondoReserva(condominioId, administradoraId);
   const fondos = await db.fondo.findMany({ where: { condominioId, administradoraId }, orderBy: [{ tipo: "asc" }, { nombre: "asc" }] });

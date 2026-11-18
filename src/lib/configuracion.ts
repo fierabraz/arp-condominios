@@ -75,7 +75,7 @@ export type DatosConfiguracion = {
   /** Estructura física registrada (COM-001 · Entrega 2). Es opcional: no todas las propiedades la necesitan. */
   estructura?: { agrupaciones: number; espacios: number; instalaciones: number };
   /** Apertura financiera de una comunidad existente (COM-001 · Entrega 5), si se empezó. */
-  apertura?: { estado: "BORRADOR" | "EN_REVISION"; fechaCorte: Date; deudas: number; fondos: number; cuentas: number } | null;
+  apertura?: { estado: "BORRADOR" | "EN_REVISION" | "INCORPORADA"; fechaCorte: Date; deudas: number; fondos: number; cuentas: number } | null;
 };
 
 export type EstadoPaso = "completo" | "observacion" | "pendiente" | "disponible" | "proximamente";
@@ -154,10 +154,10 @@ export function pasosConfiguracion(d: DatosConfiguracion): Paso[] {
       ? {
           numero: "04",
           titulo: "Finanzas y apertura",
-          estado: !ap ? "pendiente" : ap.estado === "EN_REVISION" ? "completo" : "observacion",
+          estado: !ap ? "pendiente" : ap.estado !== "BORRADOR" ? "completo" : "observacion",
           detalle: !ap
             ? "Registra la fecha de corte y lo que trae del sistema anterior: deudas por unidad, fondos, bancos y cuentas por pagar."
-            : `Corte ${corte}: ${ap.deudas} ${ap.deudas === 1 ? "deuda" : "deudas"}, ${ap.fondos} ${ap.fondos === 1 ? "fondo" : "fondos"}, ${ap.cuentas} ${ap.cuentas === 1 ? "cuenta" : "cuentas"}. ${ap.estado === "EN_REVISION" ? "Lista para revisión." : "En borrador."} Aprobarla queda restringido hasta aprobar las reglas.`,
+            : `Corte ${corte}: ${ap.deudas} ${ap.deudas === 1 ? "deuda" : "deudas"}, ${ap.fondos} ${ap.fondos === 1 ? "fondo" : "fondos"}, ${ap.cuentas} ${ap.cuentas === 1 ? "cuenta" : "cuentas"}. ${ap.estado === "INCORPORADA" ? "Incorporada a las finanzas." : ap.estado === "EN_REVISION" ? "Lista para revisión; se incorpora a las finanzas desde Apertura." : "En borrador."}`,
           ruta: "/apertura",
           accion: ap ? "Ver apertura" : "Comenzar apertura",
           otra: { ruta: "/editar", accion: "Reglas de cobro" },
@@ -257,10 +257,10 @@ export function requisitosActivacion(d: DatosConfiguracion, revisionApertura?: R
     {
       clave: "alicuotas",
       nivel: FIN,
-      texto: "Unidades y alícuotas completas (100 %)",
+      texto: "Unidades y porcentajes de prorrateo completos (100 %)",
       tipo: "bloqueo",
       cumple: d.unidades > 0 && alic.tipo === "ok",
-      mensaje: d.unidades === 0 ? "Todavía no hay unidades con alícuota." : alic.texto,
+      mensaje: d.unidades === 0 ? "Todavía no hay unidades con porcentaje de prorrateo." : alic.texto,
       ruta: "/unidades",
     },
   ];
@@ -282,7 +282,7 @@ export function requisitosActivacion(d: DatosConfiguracion, revisionApertura?: R
       nivel: FIN,
       texto: "Apertura marcada lista para revisión",
       tipo: "bloqueo",
-      cumple: ap?.estado === "EN_REVISION",
+      cumple: !!ap && ap.estado !== "BORRADOR",
       mensaje: ap ? "La apertura está en borrador: márcala lista para revisión." : "Primero registra la apertura.",
       ruta: "/apertura",
     },

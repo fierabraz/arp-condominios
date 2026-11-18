@@ -41,7 +41,7 @@ export function UnidadForm({
           ))}
         </Select>
       </Campo>
-      <Campo etiqueta="Alícuota (%)" error={e.alicuota}>
+      <Campo etiqueta="Porcentaje de prorrateo (%)" error={e.alicuota}>
         <Input name="alicuota" inputMode="decimal" defaultValue={valores.alicuota} placeholder="1,25" required />
       </Campo>
       {agrupaciones.length > 0 && (

@@ -542,6 +542,9 @@ model Periodo {
   reabiertoEn      DateTime?
   reabiertoPor     String?
   motivoReapertura String?
+  // FIN-COMP D: mes de la fecha de corte de una apertura. Sus avisos son las deudas traídas del
+  // sistema anterior; nace emitido y cerrado.
+  deApertura       Boolean        @default(false)
 
   gastos Gasto[]
   avisos AvisoCobro[]
@@ -583,6 +586,9 @@ model Gasto {
   fondo          Fondo?                   @relation(fields: [fondoId], references: [id], onDelete: Restrict)
   respaldos      RespaldoGasto[]
   conciliaciones ConciliacionMovimiento[]
+  // FIN-COMP D · Remuneraciones básicas: sueldo o imposiciones de un trabajador de la comunidad.
+  trabajadorId   String?
+  trabajador     Trabajador?              @relation(fields: [trabajadorId], references: [id], onDelete: Restrict)
 
   @@index([administradoraId])
   @@index([periodoId])
@@ -825,6 +831,9 @@ model PerfilImportacion {
 enum EstadoApertura {
   BORRADOR
   EN_REVISION
+  // FIN-COMP D: sus saldos ya pasaron a las finanzas de Convive (avisos, saldos a favor, fondos,
+  // cuentas y cuentas por pagar). Desde aquí la apertura no se cambia.
+  INCORPORADA
 }
 
 enum EstadoDeudaApertura {
@@ -868,6 +877,8 @@ model Apertura {
   preparadoPor     String
   creadoEn         DateTime       @default(now())
   actualizadoEn    DateTime       @updatedAt
+  incorporadaEn    DateTime?
+  incorporadaPor   String?
 
   deudas       DeudaApertura[]
   creditos     CreditoApertura[]
@@ -1536,4 +1547,25 @@ model MovimientoFondo {
   anuladoPor  String?
 
   @@index([fondoId, fecha])
+}
+
+// ── FIN-COMP D · Remuneraciones básicas ──
+// Personal de la comunidad (conserjería, aseo, mantención). Convive NO calcula liquidaciones,
+// imposiciones ni impuestos: registra los montos que informa el contador y los carga cada mes
+// como egresos por pagar del gasto común.
+model Trabajador {
+  id               String   @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  nombre           String
+  cargo            String
+  // Montos mensuales informados por el contador (referencia para cargar el mes).
+  liquido          Decimal  @db.Decimal(14, 2)
+  imposiciones     Decimal  @default(0) @db.Decimal(14, 2)
+  activo           Boolean  @default(true)
+  creadoPor        String
+  creadoEn         DateTime @default(now())
+  gastos           Gasto[]
+
+  @@index([condominioId])
 }

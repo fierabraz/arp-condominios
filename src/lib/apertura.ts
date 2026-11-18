@@ -5,7 +5,7 @@
 
 import { leerFecha, normalizarTitulo } from "./importacion";
 
-export type EstadoApertura = "BORRADOR" | "EN_REVISION";
+export type EstadoApertura = "BORRADOR" | "EN_REVISION" | "INCORPORADA";
 export type EstadoDeuda = "CONFIRMADA" | "DISCUTIDA" | "EN_CONVENIO" | "POR_VERIFICAR";
 export type TipoFondo = "ORDINARIO" | "RESERVA" | "PROYECTO" | "OTRO";
 export type TipoCuenta = "CORRIENTE" | "VISTA" | "AHORRO" | "CAJA";
@@ -14,6 +14,7 @@ export type TipoObligacion = "PROVEEDOR" | "REMUNERACION" | "IMPUESTO" | "OTRO";
 export const ESTADOS_APERTURA: Record<EstadoApertura, { texto: string; ayuda: string }> = {
   BORRADOR: { texto: "Borrador", ayuda: "Se están registrando los saldos. Se puede cambiar todo." },
   EN_REVISION: { texto: "Lista para revisión", ayuda: "Quedó cerrada para revisarla. Para corregir algo, vuelve a borrador." },
+  INCORPORADA: { texto: "Incorporada", ayuda: "Sus saldos ya están en las finanzas de Convive. No se puede cambiar." },
 };
 
 export const ESTADOS_DEUDA: Record<EstadoDeuda, { texto: string; ayuda: string; tono: "exito" | "alerta" | "marca" | "neutro" }> = {
