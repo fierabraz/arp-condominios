@@ -406,22 +406,24 @@ model Persona {
 }
 
 model Unidad {
-  id               String         @id @default(cuid())
-  administradoraId String
-  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
-  condominioId     String
-  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
-  numero           String
-  tipo             TipoUnidad     @default(DEPARTAMENTO)
+  id                   String         @id @default(cuid())
+  administradoraId     String
+  administradora       Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId         String
+  condominio           Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  numero               String
+  tipo                 TipoUnidad     @default(DEPARTAMENTO)
   // Porcentaje de participación en el gasto común (ej. 1.25 = 1,25 %)
-  alicuota         Decimal        @db.Decimal(9, 6)
+  alicuota             Decimal        @db.Decimal(9, 6)
+  // FIN-COMP C: prorrateo puesto por el generador visual (igual para todas). No se emite hasta confirmarlo.
+  prorrateoProvisional Boolean        @default(false)
   // COM-001: dónde está (torre, piso, sector...). Opcional.
-  agrupacionId     String?
-  agrupacion       Agrupacion?    @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  agrupacionId         String?
+  agrupacion           Agrupacion?    @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
   // Día del mes en que vence el cobro de esta unidad (1 a 31; si el mes es más corto, el último día).
   // null: usa el día de vencimiento de la propiedad. Lo define la administración.
-  diaPago          Int?
-  creadoEn         DateTime       @default(now())
+  diaPago              Int?
+  creadoEn             DateTime       @default(now())
 
   espaciosPropios    Espacio[]                @relation("EspacioUnidadPropia")
   espaciosVinculados Espacio[]                @relation("EspacioUnidadPrincipal")
@@ -485,7 +487,18 @@ model Periodo {
   mes              Int
   estado           EstadoPeriodo  @default(ABIERTO)
   vencimiento      DateTime?
+  // Cuándo se emitieron los avisos (estado CERRADO = «Avisos emitidos»).
   cerradoEn        DateTime?
+  // FIN-COMP C · Cierre del mes (tercer estado, «Mes cerrado»): revisado y bloqueado. Los pagos
+  // posteriores se registran con su fecha real (D-FIN-08) y no alteran el cierre.
+  mesCerradoEn     DateTime?
+  mesCerradoPor    String?
+  // Resumen fijo al cerrar: lo que dice el informe de cierre.
+  resumenCierre    Json?
+  // Si se reabrió (solo el principal, con motivo): queda el historial en el registro de cambios.
+  reabiertoEn      DateTime?
+  reabiertoPor     String?
+  motivoReapertura String?
 
   gastos Gasto[]
   avisos AvisoCobro[]

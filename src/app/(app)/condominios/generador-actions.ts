@@ -149,6 +149,7 @@ export async function generar(condominioId: string, respuestas: unknown, posicio
               numero: u.numero,
               tipo: u.tipo,
               alicuota,
+              prorrateoProvisional: true,
               agrupacionId: u.agrupacion ? ids[u.agrupacion] : null,
             })),
             select: { id: true, numero: true },
