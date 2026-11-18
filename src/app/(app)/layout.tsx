@@ -6,6 +6,7 @@ import { ETIQUETAS_ROL } from "@/lib/formato";
 import { MenuLateral, type EnlaceMenu } from "@/components/menu-lateral";
 import type { Rol } from "@/generated/prisma/enums";
 import { esPrincipal, filtroCondominios } from "@/lib/permisos";
+import { AsistenteFlotante } from "@/components/asistente/asistente-flotante";
 
 function enlaces(rol: Rol, condominioId: string | null, principal: boolean): EnlaceMenu[] {
   switch (rol) {
@@ -14,6 +15,7 @@ function enlaces(rol: Rol, condominioId: string | null, principal: boolean): Enl
         { href: "/plataforma", texto: "Administradoras", icono: "edificios" },
         { href: "/plataforma/usuarios", texto: "Usuarios", icono: "personas" },
         { href: "/plataforma/correo", texto: "Correo", icono: "correo" },
+        { href: "/plataforma/asistente", texto: "Asistente IA", icono: "asistente" },
       ];
     case "ADMINISTRADOR":
       // Permisos y Crear propiedad son solo del administrador principal.
@@ -60,6 +62,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <main className="min-w-0 flex-1 p-4 md:p-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
+      <AsistenteFlotante usuario={usuario} />
     </div>
   );
 }

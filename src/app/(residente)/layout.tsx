@@ -6,6 +6,7 @@ import { cerrarSesion } from "@/app/login/actions";
 import { LogoResidente } from "@/components/logo";
 import { datosInicio } from "./datos-residente";
 import { NavegacionResidente, SelectorUnidad } from "./navegacion-residente";
+import { AsistenteFlotante } from "@/components/asistente/asistente-flotante";
 
 const iniciales = (nombre: string) =>
   nombre
@@ -81,6 +82,7 @@ export default async function ResidenteLayout({ children }: LayoutProps<"/">) {
       <Suspense>
         <NavegacionResidente variante="inferior" />
       </Suspense>
+      <AsistenteFlotante usuario={usuario} />
     </div>
   );
 }

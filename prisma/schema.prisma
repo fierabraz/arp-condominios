@@ -677,6 +677,26 @@ model IntentoIngreso {
   @@index([ip, creadoEn])
 }
 
+// IA-002 · Cada pregunta al asistente de ayuda. NO guarda la pregunta ni la respuesta (pueden traer
+// datos personales): solo quién, cuándo y cuántos tokens usó, para el límite diario y el costo.
+model ConsultaAsistente {
+  id                   String   @id @default(cuid())
+  usuarioId            String
+  administradoraId     String?
+  rol                  Rol
+  modelo               String
+  tokensEntrada        Int      @default(0)
+  tokensSalida         Int      @default(0)
+  tokensCacheLectura   Int      @default(0)
+  tokensCacheEscritura Int      @default(0)
+  // false mientras se responde, o si el servicio de IA falló.
+  exitosa              Boolean  @default(false)
+  creadoEn             DateTime @default(now())
+
+  @@index([usuarioId, creadoEn])
+  @@index([creadoEn])
+}
+
 // Enlaces de un solo uso para crear una contraseña (recuperación o invitación).
 // Se guarda solo el hash del token.
 model TokenRecuperacion {
