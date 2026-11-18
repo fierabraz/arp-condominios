@@ -2,6 +2,7 @@ import "server-only";
 import { MENSAJE_SIN_FINANZAS, operaFinanzas } from "./configuracion";
 import { db } from "@/lib/db";
 import { registrarEn, type Auditoria } from "@/lib/registro";
+import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
 import type { MedioPago } from "@/generated/prisma/enums";
 import {
   aMinimo,
@@ -398,6 +399,7 @@ async function liberarTransferencia(tx: Tx, pagoId: string, anulacion: { por: st
       revisadoEn: new Date(),
     },
   });
+  await sincronizarConstanciaEn(tx, t.id, anulacion.por);
 }
 
 /**

@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import type { UsuarioActual } from "@/lib/auth";
 import { registrarEn } from "@/lib/registro";
 import { bloquearUnidades } from "@/lib/cobro-servicio";
+import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
 import { ErrorConciliacion, registrarIngresoDesdeMovimiento } from "@/lib/conciliacion-servicio";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import {
@@ -171,6 +172,8 @@ export async function informarTransferencia(
       entidadId: t.id,
       despues: { estado: t.estado, monto: datos.monto, fecha: datos.fecha.toISOString().slice(0, 10) },
     });
+    // Constancia con folio, versión 1 «Pendiente de verificación», en la misma transacción.
+    await sincronizarConstanciaEn(tx, t.id, usuario.nombre);
     return t;
   });
 }
@@ -278,5 +281,6 @@ export async function cambiarEstadoTransferencia(
       antes: { estado: t.estado, nota: t.nota },
       despues: { estado: actualizada.estado, nota: actualizada.nota },
     });
+    await sincronizarConstanciaEn(tx, t.id, autor.nombre);
   });
 }

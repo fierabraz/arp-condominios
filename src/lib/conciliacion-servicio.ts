@@ -18,6 +18,7 @@ import { aMinimo, decimalesMoneda, deMinimo } from "@/lib/cobro";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { estadoSegunConciliado, sugerirParaAbono } from "@/lib/conciliacion";
 import { ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
+import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
 
 type Autor = Pick<UsuarioActual, "id" | "nombre" | "administradoraId">;
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
@@ -94,6 +95,7 @@ async function completarTransferenciaDelPago(tx: Tx, pagoId: string, movimientoI
     where: { id: t.id },
     data: { estado: "CONCILIADA", movimientoId, revisadoPor: autor.nombre, revisadoEn: new Date() },
   });
+  await sincronizarConstanciaEn(tx, t.id, autor.nombre);
   await registrarEn(tx, {
     autor,
     accion: "Verificó una transferencia con la cartola",
@@ -170,6 +172,7 @@ export async function registrarIngresoDesdeMovimiento(autor: Autor, datos: Datos
           nota: diferencia ? `Se registró ${formatoMoneda(monto, moneda)} (el residente informó ${formatoMoneda(Number(t.monto), moneda)}).` : t.nota,
         },
       });
+      await sincronizarConstanciaEn(tx, t.id, autor.nombre);
       await registrarEn(tx, {
         autor,
         accion: "Verificó y concilió una transferencia",
@@ -262,6 +265,7 @@ export async function vincularTransferenciaConPago(autor: Autor, datos: { condom
       where: { id: t.id },
       data: { estado, pagoId: pago.id, movimientoId: conciliacion?.movimientoId ?? null, nota, revisadoPor: autor.nombre, revisadoEn: new Date() },
     });
+    await sincronizarConstanciaEn(tx, t.id, autor.nombre);
     if (conciliacion) await tx.conciliacionMovimiento.update({ where: { id: conciliacion.id }, data: { transferenciaId: t.id } });
     await registrarEn(tx, {
       autor,
@@ -327,6 +331,7 @@ export async function deshacerConciliacion(autor: Autor, datos: { condominioId: 
           where: { id: t.id },
           data: { estado: "EN_REVISION", movimientoId: null, nota: `Se deshizo su conciliación con la cartola: ${datos.motivo}`.slice(0, 500), revisadoPor: autor.nombre, revisadoEn: new Date() },
         });
+        await sincronizarConstanciaEn(tx, t.id, autor.nombre);
         await registrarEn(tx, {
           autor,
           accion: "Volvió a revisión al deshacer la conciliación",

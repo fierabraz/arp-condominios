@@ -118,6 +118,8 @@ export const PERMISOS = {
   "banco.importar": ["PRINCIPAL", "ADMINISTRADOR"],
   /** PAG-001: datos para transferir de la comunidad y verificar las transferencias informadas por residentes. */
   "pagos.verificar": ["PRINCIPAL", "ADMINISTRADOR"],
+  /** PILOTO-001: emitir certificados de unidad al día (con validación de deuda vencida). */
+  "certificados.emitir": ["PRINCIPAL", "ADMINISTRADOR"],
   /** Crear propiedades nuevas. */
   "propiedades.crear": ["PRINCIPAL"],
   /** Habilitar o deshabilitar los cobros de una propiedad (COM-001). */

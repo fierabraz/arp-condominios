@@ -60,7 +60,7 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
   const { estado, pendientes, transferencias, enVerificacion } = cuenta;
   const ahora = new Date();
   const conAviso = (href: string) => conUnidad(escaneado ? `${href}?aviso=${escaneado.id}` : href, unidad.id);
-  const informada = sp.informada === "1";
+  const informada = typeof sp.informada === "string" && /^[\w-]{1,40}$/.test(sp.informada) ? sp.informada : null;
 
   return (
     <>
@@ -72,6 +72,11 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
           <p>
             <strong className="block">Transferencia informada: pendiente de verificación.</strong>
             <span className="text-sm text-texto">{MENSAJE_PAGO_PENDIENTE}</span>
+            {informada !== "1" && (
+              <a href={`/comprobantes/${informada}/constancia`} target="_blank" rel="noopener" className="mt-2 block text-sm font-semibold text-marca underline">
+                Descargar constancia de pago informado (PDF)
+              </a>
+            )}
           </p>
         </div>
       )}
@@ -235,6 +240,10 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
                         </a>
                       </>
                     )}
+                    {" · "}
+                    <a href={`/comprobantes/${t.id}/constancia`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                      constancia de pago (PDF)
+                    </a>
                   </p>
                 </li>
               );

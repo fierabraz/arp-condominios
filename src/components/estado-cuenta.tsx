@@ -63,6 +63,9 @@ export function EstadoCuenta({ estado, moneda, administracion = false }: { estad
                     comprobante
                   </a>
                 )}
+                <a href={`/comprobantes/${t.id}/constancia`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                  constancia
+                </a>
               </li>
             ))}
           </ul>

@@ -7,6 +7,7 @@ import "dotenv/config";
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../src/lib/db";
+import { borrarConstancias } from "./limpieza";
 import { emitirPeriodo, ErrorCobro, estadoCuenta, PagoDuplicado, registrarPago } from "../src/lib/cobro-servicio";
 import { confirmarTransferencia, informarTransferencia } from "../src/lib/transferencias-servicio";
 import {
@@ -19,6 +20,13 @@ import {
   vincularTransferenciaConPago,
 } from "../src/lib/conciliacion-servicio";
 import type { UsuarioActual } from "../src/lib/auth";
+import { cambiarEstadoTransferencia } from "../src/lib/transferencias-servicio";
+import { consultaPublicaConstancia } from "../src/lib/constancias-servicio";
+import { pdfConstancia } from "../src/lib/documento-constancia";
+import type { DatosConstancia } from "../src/lib/constancias";
+import { emitirCertificadoAlDia, NoEstaAlDia } from "../src/lib/certificados-servicio";
+import { pdfCertificadoAlDia, pdfEstadoCuenta } from "../src/lib/documento-cuenta";
+import type { DatosCertificado } from "../src/lib/certificados";
 
 if (/neon\.tech|vercel/i.test(process.env.DATABASE_URL ?? "")) {
   throw new Error("Estas pruebas crean y borran datos: no se ejecutan contra una base de Neon o Vercel.");
@@ -30,6 +38,7 @@ before(async () => {
 });
 after(async () => {
   for (const id of creadas) {
+    await borrarConstancias(id);
     await db.conciliacionMovimiento.deleteMany({ where: { administradoraId: id } });
     await db.transferenciaInformada.deleteMany({ where: { administradoraId: id } });
     await db.movimientoBancario.deleteMany({ where: { administradoraId: id } });
@@ -295,5 +304,101 @@ describe("FIN-COMP A · pagos pendientes y conciliación de ingresos", () => {
     const fila = (movimientoId: string) => ({ administradoraId: e.adm.id, condominioId: e.c.id, movimientoId, tipo: "PAGO" as const, monto: 10000, pagoId: pago.id, creadoPor: "x" });
     await db.conciliacionMovimiento.create({ data: fila(m1.id) });
     await assert.rejects(db.conciliacionMovimiento.create({ data: fila(m2.id) }));
+  });
+
+  test("constancia: folio fijo, versión 1 pendiente, versión 2 verificada y las anteriores no se modifican", async () => {
+    const e = await escenario();
+    const t = await e.informar(e.r1, e.u1.id, 50000, "2026-11-05", "OP-777");
+    const versiones = () =>
+      db.constanciaVersion.findMany({ where: { constancia: { transferenciaId: t.id } }, orderBy: { version: "asc" } });
+    const c = await db.constanciaPago.findUniqueOrThrow({ where: { transferenciaId: t.id } });
+    let v = await versiones();
+    assert.equal(v.length, 1, "la constancia nace al informar");
+    assert.equal(v[0].estado, "INFORMADA");
+    const d1 = v[0].datos as unknown as DatosConstancia;
+    assert.equal(d1.montoInformado, 50000);
+    assert.equal(d1.montoConfirmado, null);
+    assert.equal(d1.referencia, "OP-777");
+
+    // Se confirma por un monto distinto (diferencia): versión 2 con ambos montos y las obligaciones.
+    const mov = await e.movimiento("2026-11-05", 45000);
+    await confirmarTransferencia(e.admin, { transferenciaId: t.id, movimientoId: mov.id, monto: 45000 });
+    v = await versiones();
+    assert.equal(v.length, 2);
+    assert.equal(v[1].estado, "CONCILIADA");
+    const d2 = v[1].datos as unknown as DatosConstancia;
+    assert.equal(d2.folio, c.folio, "mismo folio");
+    assert.equal(d2.montoInformado, 50000);
+    assert.equal(d2.montoConfirmado, 45000);
+    assert.deepEqual(d2.aplicaciones, [{ detalle: "Gastos comunes de Octubre 2026", monto: 45000 }]);
+    assert.ok(d2.verificadaEn);
+    assert.equal(d2.historial.length, 1);
+    assert.deepEqual(v[0].datos, d1, "la versión 1 no cambió");
+
+    // La base no permite modificar ni borrar versiones ni el folio.
+    await assert.rejects(db.constanciaVersion.update({ where: { id: v[0].id }, data: { estado: "CONCILIADA" } }));
+    await assert.rejects(db.constanciaVersion.delete({ where: { id: v[0].id } }));
+    await assert.rejects(db.constanciaPago.update({ where: { id: c.id }, data: { codigo: "otro-codigo-cualquiera-123" } }));
+
+    // Reverso: versión 3 «Anulado o reversado», sin borrar las anteriores.
+    await reversarTransferencia(e.admin, { condominioId: e.c.id, transferenciaId: t.id, motivo: "El banco devolvió la transferencia" });
+    v = await versiones();
+    assert.deepEqual(v.map((x) => x.estado), ["INFORMADA", "CONCILIADA", "ANULADA"]);
+    assert.match((v[2].datos as unknown as DatosConstancia).nota ?? "", /devolvió/);
+
+    // La consulta pública (QR) muestra el estado vigente y ningún dato personal.
+    const pub = await consultaPublicaConstancia(c.codigo);
+    assert.equal(pub?.estado, "ANULADA");
+    assert.equal(pub?.versiones.length, 3);
+    const texto = JSON.stringify(pub);
+    for (const privado of ["Residente Ficticia", "11.111.111-1", "OP-777", "101"]) assert.ok(!texto.includes(privado), `no expone ${privado}`);
+    assert.equal(await consultaPublicaConstancia("codigo-que-no-existe-0000"), null);
+
+    // El PDF de cada versión se genera.
+    for (const x of v) {
+      const pdf = await pdfConstancia(x.datos as unknown as DatosConstancia, x.huella, "https://ejemplo.invalid/verificar-pago/x", x.version === 3);
+      assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+    }
+  });
+
+  test("constancia: rechazo y vuelta a revisión agregan versiones; sin cambios no se repite", async () => {
+    const e = await escenario();
+    const t = await e.informar(e.r1, e.u1.id, 20000);
+    await cambiarEstadoTransferencia(e.admin, { transferenciaId: t.id, estado: "EN_REVISION", nota: "Buscando en la cartola" });
+    await cambiarEstadoTransferencia(e.admin, { transferenciaId: t.id, estado: "RECHAZADA", nota: "No aparece en la cartola" });
+    const v = await db.constanciaVersion.findMany({ where: { constancia: { transferenciaId: t.id } }, orderBy: { version: "asc" } });
+    assert.deepEqual(v.map((x) => x.estado), ["INFORMADA", "EN_REVISION", "RECHAZADA"]);
+    assert.equal((v[2].datos as unknown as DatosConstancia).nota, "No aparece en la cartola");
+    // Folios distintos para transferencias distintas.
+    const t2 = await e.informar(e.r2, e.u2.id, 20000);
+    const [c1, c2] = await Promise.all([t, t2].map((x) => db.constanciaPago.findUniqueOrThrow({ where: { transferenciaId: x.id } })));
+    assert.notEqual(c1.folio, c2.folio);
+    assert.notEqual(c1.codigo, c2.codigo);
+  });
+
+  test("certificado al día: no con deuda vencida ni con pagos solo informados; sí una vez verificado", async () => {
+    const e = await escenario();
+    // Octubre ya venció: con deuda no se puede.
+    await assert.rejects(emitirCertificadoAlDia(e.admin, e.u1.id), NoEstaAlDia);
+    // Informar el pago no basta: sigue pendiente de verificación.
+    const t = await e.informar(e.r1, e.u1.id, 100000);
+    await assert.rejects(emitirCertificadoAlDia(e.admin, e.u1.id), /pendientes de verificación/);
+    assert.equal(await db.certificadoAlDia.count({ where: { unidadId: e.u1.id } }), 0);
+    // Verificado con la cartola: ahora sí.
+    const mov = await e.movimiento("2026-11-05", 100000);
+    await confirmarTransferencia(e.admin, { transferenciaId: t.id, movimientoId: mov.id, monto: 100000 });
+    const c = await emitirCertificadoAlDia(e.admin, e.u1.id);
+    const d = c.datos as unknown as DatosCertificado;
+    assert.equal(d.unidad, "101");
+    assert.equal(d.porVencer, 0);
+    assert.ok(!JSON.stringify(d).includes("Residente Ficticia"), "sin nombres de residentes");
+    assert.ok(await db.registroCambio.findFirst({ where: { entidad: "CertificadoAlDia", entidadId: c.id } }), "queda en el registro");
+    await assert.rejects(db.certificadoAlDia.update({ where: { id: c.id }, data: { emitidoPor: "otro" } }), "no se modifica");
+    const pdf = await pdfCertificadoAlDia(d, "https://ejemplo.invalid/verificar-certificado/x");
+    assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+    // Estado de cuenta en PDF con la misma fuente.
+    const est = (await estadoCuenta(e.u2.id, e.adm.id))!;
+    const pdf2 = await pdfEstadoCuenta(est, { comunidad: "Comunidad Ficticia", direccion: "Calle 1", unidad: "102", moneda: "CLP", emitidoPor: "Prueba" });
+    assert.equal(pdf2.subarray(0, 4).toString(), "%PDF");
   });
 });

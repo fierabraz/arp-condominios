@@ -78,8 +78,8 @@ test("SEG-17: catálogo de permisos por perfil (si cambia, esta tabla debe cambi
     Object.entries(cuentas).map(([nombre, a]) => [nombre, Object.keys(PERMISOS).filter((p) => puede(a, p as keyof typeof PERMISOS))]),
   );
   assert.deepEqual(tabla, {
-    principal: ["propiedad.ver", "propiedad.administrar", "solicitudes.revisar", "banco.importar", "pagos.verificar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
-    asignado: ["propiedad.ver", "propiedad.administrar", "solicitudes.revisar", "banco.importar", "pagos.verificar"],
+    principal: ["propiedad.ver", "propiedad.administrar", "solicitudes.revisar", "banco.importar", "pagos.verificar", "certificados.emitir", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
+    asignado: ["propiedad.ver", "propiedad.administrar", "solicitudes.revisar", "banco.importar", "pagos.verificar", "certificados.emitir"],
     comite: ["propiedad.ver"],
     residente: ["portal.residente"],
     plataforma: ["plataforma"],

@@ -7,9 +7,10 @@ import { decrypt, LOGIN, SESSION_COOKIE } from "@/lib/session";
 
 // /pagar: enlace del QR del aviso. Sin sesión muestra solo el nombre de la comunidad y el mes.
 // PILOTO-001: /crear-cuenta (registro) y /verificar (confirmar correo) también son públicas.
-const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir", "/pagar", "/crear-cuenta", "/verificar"];
+// /verificar-pago y /verificar-certificado: QR de constancias y certificados. Sin datos personales.
+const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir", "/pagar", "/crear-cuenta", "/verificar", "/verificar-pago", "/verificar-certificado"];
 // Lo único que ve una sesión de residente: su cuenta y los documentos que se abren desde ella.
-const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones", "/pagar", "/comprobantes"];
+const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones", "/pagar", "/comprobantes", "/verificar-pago", "/verificar-certificado", "/documentos"];
 
 const empieza = (ruta: string, prefijos: string[]) => prefijos.some((p) => ruta === p || ruta.startsWith(`${p}/`));
 
