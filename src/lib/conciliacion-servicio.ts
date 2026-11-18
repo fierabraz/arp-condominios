@@ -33,7 +33,7 @@ async function monedaDe(administradoraId: string) {
 const dia = (d: Date) => formatoFecha(d);
 
 /** Bloquea el movimiento y lo devuelve (siempre DESPUÉS de bloquear las unidades). */
-async function bloquearMovimiento(tx: Tx, movimientoId: string, condominioId: string, administradoraId: string) {
+export async function bloquearMovimiento(tx: Tx, movimientoId: string, condominioId: string, administradoraId: string) {
   await tx.$queryRaw`SELECT id FROM "MovimientoBancario" WHERE id = ${movimientoId} FOR UPDATE`;
   const m = await tx.movimientoBancario.findFirst({
     where: { id: movimientoId, condominioId, administradoraId },
@@ -47,17 +47,32 @@ async function bloquearMovimiento(tx: Tx, movimientoId: string, condominioId: st
  * Asigna `montoMin` del movimiento (ya bloqueado) a un pago u otro ingreso. Revisa que quede
  * saldo sin conciliar y actualiza el estado del movimiento. Devuelve la conciliación creada.
  */
-async function conciliarEn(
+export async function conciliarEn(
   tx: Tx,
   m: Awaited<ReturnType<typeof bloquearMovimiento>>,
   dec: number,
   moneda: string,
-  datos: { montoMin: number; tipo: "PAGO" | "OTRO_INGRESO"; pagoId?: string; transferenciaId?: string; concepto?: string; autor: Autor },
+  datos: {
+    montoMin: number;
+    tipo: "PAGO" | "OTRO_INGRESO" | "EGRESO" | "OTRO_EGRESO";
+    pagoId?: string;
+    transferenciaId?: string;
+    gastoId?: string;
+    concepto?: string;
+    autor: Autor;
+  },
 ) {
-  const total = aMinimo(m.monto.toString(), dec);
-  if (total <= 0) throw new ErrorConciliacion("Ese movimiento es un cargo, no un abono.");
+  // FIN-COMP B: los cargos también se concilian. En la base `montoConciliado` lleva el signo del
+  // movimiento (CHECK de FIN-003.1); aquí se trabaja con magnitudes y se guarda con su signo.
+  // La conciliación (`monto`) es siempre positiva.
+  const conSigno = aMinimo(m.monto.toString(), dec);
+  const esIngreso = datos.tipo === "PAGO" || datos.tipo === "OTRO_INGRESO";
+  if (esIngreso && conSigno <= 0) throw new ErrorConciliacion("Ese movimiento es un cargo, no un abono.");
+  if (!esIngreso && conSigno >= 0) throw new ErrorConciliacion("Ese movimiento es un abono, no un cargo.");
+  const total = Math.abs(conSigno);
   if (datos.montoMin <= 0) throw new ErrorConciliacion("El monto debe ser mayor que cero.");
-  const restante = total - aMinimo(m.montoConciliado.toString(), dec);
+  const yaConciliado = Math.abs(aMinimo(m.montoConciliado.toString(), dec));
+  const restante = total - yaConciliado;
   if (datos.montoMin > restante) {
     throw new ErrorConciliacion(`El movimiento solo tiene ${formatoMoneda(deMinimo(Math.max(restante, 0), dec), moneda)} sin conciliar.`);
   }
@@ -70,16 +85,17 @@ async function conciliarEn(
       monto: deMinimo(datos.montoMin, dec),
       pagoId: datos.pagoId ?? null,
       transferenciaId: datos.transferenciaId ?? null,
+      gastoId: datos.gastoId ?? null,
       concepto: datos.concepto ?? null,
       creadoPor: datos.autor.nombre,
     },
   });
-  const conciliado = aMinimo(m.montoConciliado.toString(), dec) + datos.montoMin;
+  const conciliado = yaConciliado + datos.montoMin;
   const estado = estadoSegunConciliado(total, conciliado);
   await tx.movimientoBancario.update({
     where: { id: m.id },
     data: {
-      montoConciliado: deMinimo(conciliado, dec),
+      montoConciliado: deMinimo(Math.sign(conSigno) * conciliado, dec),
       estado,
       nota: estado === "CONCILIADO" ? null : `Conciliado en parte (${formatoMoneda(deMinimo(conciliado, dec), moneda)}). Falta identificar el resto.`,
     },
@@ -144,6 +160,7 @@ export async function registrarIngresoDesdeMovimiento(autor: Autor, datos: Datos
     }
     const m = await bloquearMovimiento(tx, datos.movimientoId, datos.condominioId, administradoraId);
     const montoMin = aMinimo(datos.monto, dec);
+    if (Number(m.monto) <= 0) throw new ErrorConciliacion("Ese movimiento es un cargo, no un abono.");
     // Revisar el saldo del movimiento antes de crear el pago (conciliarEn lo vuelve a revisar).
     const restante = aMinimo(m.monto.toString(), dec) - aMinimo(m.montoConciliado.toString(), dec);
     if (montoMin > restante) throw new ErrorConciliacion(`El movimiento solo tiene ${formatoMoneda(deMinimo(Math.max(restante, 0), dec), moneda)} sin conciliar.`);
@@ -347,7 +364,9 @@ export async function deshacerConciliacion(autor: Autor, datos: { condominioId: 
     await registrarEn(tx, {
       autor,
       accion: "Deshizo una conciliación bancaria",
-      detalle: `${c.tipo === "PAGO" ? "Pago" : `Otro ingreso (${c.concepto})`} por ${Number(c.monto).toLocaleString("es-CL")}. El pago no se anuló. Motivo: ${datos.motivo}`,
+      detalle: `${
+        c.tipo === "PAGO" ? "Pago" : c.tipo === "EGRESO" ? "Egreso" : c.tipo === "OTRO_EGRESO" ? `Otro egreso (${c.concepto})` : `Otro ingreso (${c.concepto})`
+      } por ${Number(c.monto).toLocaleString("es-CL")}. ${c.tipo === "EGRESO" ? "El egreso sigue pagado" : c.tipo === "PAGO" ? "El pago no se anuló" : "Queda por identificar"}. Motivo: ${datos.motivo}`,
       condominioId: datos.condominioId,
       entidad: "ConciliacionMovimiento",
       entidadId: c.id,

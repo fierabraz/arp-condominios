@@ -123,7 +123,8 @@ async function calcularPeriodo(
 
   const dec = await monedaDe(tx, administradoraId);
   const totalComun = periodo.gastos
-    .filter((g) => g.tipo === "COMUN")
+    // FIN-COMP B: lo que se paga con un fondo no se reparte otra vez entre las unidades.
+    .filter((g) => g.tipo === "COMUN" && !g.fondoId)
     .reduce((s, g) => s + aMinimo(g.monto.toString(), dec), 0);
 
   const unidades = await Promise.all(
@@ -359,9 +360,11 @@ export async function anularConciliacionEn(tx: Tx, conciliacionId: string, anula
   if (count === 0) throw new ErrorCobro("Esa conciliación ya estaba deshecha.");
   const c = await tx.conciliacionMovimiento.findUniqueOrThrow({ where: { id: conciliacionId } });
   await tx.$queryRaw`SELECT id FROM "MovimientoBancario" WHERE id = ${c.movimientoId} FOR UPDATE`;
+  // `montoConciliado` lleva el signo del movimiento: en un cargo se devuelve sumando.
+  const esCargo = c.tipo === "EGRESO" || c.tipo === "OTRO_EGRESO";
   const m = await tx.movimientoBancario.update({
     where: { id: c.movimientoId },
-    data: { montoConciliado: { decrement: c.monto } },
+    data: { montoConciliado: esCargo ? { increment: c.monto } : { decrement: c.monto } },
     select: { id: true, monto: true, montoConciliado: true },
   });
   await tx.movimientoBancario.update({

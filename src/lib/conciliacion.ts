@@ -226,7 +226,9 @@ const orden = (t: Sugerencia["tipo"]) => (t === "TRANSFERENCIA" ? 0 : t === "PAG
 
 /** Estado del movimiento según cuánto se ha conciliado. Montos en unidades mínimas. */
 export function estadoSegunConciliado(monto: number, conciliado: number): "PENDIENTE" | "REVISAR" | "CONCILIADO" {
+  // Abonos y cargos: se compara la magnitud (en la base, `montoConciliado` lleva el signo del movimiento).
   const total = Math.abs(monto);
-  if (conciliado <= 0) return "PENDIENTE";
-  return conciliado >= total ? "CONCILIADO" : "REVISAR";
+  const hecho = Math.abs(conciliado);
+  if (hecho <= 0) return "PENDIENTE";
+  return hecho >= total ? "CONCILIADO" : "REVISAR";
 }

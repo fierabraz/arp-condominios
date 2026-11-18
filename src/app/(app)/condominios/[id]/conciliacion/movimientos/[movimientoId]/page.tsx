@@ -12,6 +12,10 @@ import { condominioVisible } from "../../../condominio-actual";
 import { deshacerConciliacionAccion, otroIngresoAccion, registrarPagoDesdeMovimientoAccion, vincularPagoAccion } from "../../../../ingresos-actions";
 import { BotonAccion, FormularioNota } from "../../../transferencias/[transferenciaId]/formularios";
 import { FormularioOtroIngreso, FormularioPagoUnidad } from "./formularios";
+import { FormularioSimple } from "@/components/formulario-simple";
+import { Campo, Input, Select } from "@/components/ui";
+import { sugerenciasDeCargo } from "@/lib/egresos-servicio";
+import { conciliarCargoAccion, otroEgresoAccion } from "../../../../egresos-actions";
 
 // FIN-COMP A · Conciliar un movimiento de la cartola: a qué corresponde, sugerencias y su historial.
 
@@ -31,6 +35,7 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
         include: {
           pago: { select: { id: true, fecha: true, anuladoEn: true, unidad: { select: { id: true, numero: true } } } },
           transferencia: { select: { id: true } },
+          gasto: { select: { id: true, descripcion: true, proveedor: true } },
         },
       },
     },
@@ -38,7 +43,7 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
   if (!m) notFound();
   const $ = (n: number | { toString(): string }) => formatoMoneda(n, moneda);
   const monto = Number(m.monto);
-  const restante = Math.round((monto - Number(m.montoConciliado)) * 100) / 100;
+  const restante = Math.round((Math.abs(monto) - Math.abs(Number(m.montoConciliado))) * 100) / 100;
   const abono = monto > 0;
   const est = ESTADOS_CONCILIACION[m.estado];
   const ahora = new Date();
@@ -64,6 +69,18 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
       take: 50,
     }),
   ]);
+  const [sugCargo, egresosLibres] =
+    !abono && restante > 0 && concilia
+      ? await Promise.all([
+          sugerenciasDeCargo(m),
+          db.gasto.findMany({
+            where: { administradoraId, tipo: "COMUN", periodo: { condominioId: id }, monto: { lte: restante }, conciliaciones: { none: { anuladaEn: null } } },
+            include: { periodo: { select: { anio: true, mes: true } } },
+            orderBy: [{ fecha: "desc" }],
+            take: 200,
+          }),
+        ])
+      : [[], []];
   const sugeridas = new Set((sug?.sugerencias ?? []).filter((s) => s.tipo === "UNIDAD").map((s) => s.unidadId));
   const opcionesUnidad = unidades
     .map((u) => ({
@@ -116,7 +133,7 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
             <h2 className="mb-3 font-bold">A qué corresponde</h2>
             <dl className="mb-3 grid grid-cols-[1fr_auto] gap-y-1 text-sm">
               <dt className="text-texto-suave">Conciliado</dt>
-              <dd className="text-right font-semibold tabular-nums">{$(Number(m.montoConciliado))}</dd>
+              <dd className="text-right font-semibold tabular-nums">{$(Math.abs(Number(m.montoConciliado)))}</dd>
               <dt className="text-texto-suave">Por identificar</dt>
               <dd className="text-right font-semibold tabular-nums">{$(restante)}</dd>
             </dl>
@@ -144,6 +161,16 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
                             </>
                           )}
                         </>
+                      ) : c.tipo === "EGRESO" && c.gasto ? (
+                        <>
+                          egreso{" "}
+                          <Link href={`/condominios/${id}/egresos/${c.gasto.id}`} className="text-marca hover:underline">
+                            {c.gasto.descripcion}
+                          </Link>
+                          {c.gasto.proveedor && ` (${c.gasto.proveedor})`}
+                        </>
+                      ) : c.tipo === "OTRO_EGRESO" ? (
+                        <>otro egreso: {c.concepto}</>
                       ) : (
                         <>otro ingreso: {c.concepto}</>
                       )}
@@ -157,6 +184,7 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
                         <summary className="cursor-pointer text-xs font-semibold text-peligro">Deshacer (se eligió mal)</summary>
                         <p className="my-2 text-xs text-texto-suave">
                           {c.tipo === "PAGO" ? "El pago NO se anula: sigue en Recaudación, pero queda sin movimiento bancario. " : ""}
+                          {c.tipo === "EGRESO" ? "El egreso sigue pagado, pero queda sin movimiento bancario. " : ""}
                           Queda en el historial con el motivo.
                         </p>
                         <FormularioNota accion={deshacerConciliacionAccion.bind(null, id, m.id, c.id)} boton="Deshacer conciliación" variante="peligro" ayuda="Motivo" />
@@ -186,10 +214,82 @@ export default async function MovimientoPage({ params }: PageProps<"/condominios
         </div>
 
         <div className="space-y-6">
-          {!abono && (
-            <Card>
-              <p className="text-sm text-texto-suave">Los cargos (egresos) se asocian a gastos y proveedores en la Entrega B.</p>
+          {!abono && restante <= 0 && (
+            <Card className="border-exito/30">
+              <p className="text-sm">Este cargo ya está conciliado completo.</p>
             </Card>
+          )}
+          {!abono && restante > 0 && !concilia && (
+            <Card>
+              <p className="text-sm text-texto-suave">Tu perfil puede consultar la conciliación, pero no conciliar.</p>
+            </Card>
+          )}
+          {!abono && restante > 0 && concilia && (
+            <>
+              <Card>
+                <h2 className="mb-1 font-bold">Egresos que podrían corresponder</h2>
+                {sugCargo.length === 0 ? (
+                  <p className="text-sm text-texto-suave">No hay egresos con el mismo monto o el proveedor en la glosa. Elige uno de la lista o regístralo como otro egreso.</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {sugCargo.map((s) => (
+                      <li key={s.gasto.id} className="rounded-xl border border-borde p-3">
+                        <p className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                          {s.gasto.descripcion} · {$(s.gasto.monto)}
+                          {s.puntos >= 70 ? <Insignia tono="marca">Coincidencia fuerte</Insignia> : <Insignia>Posible</Insignia>}
+                        </p>
+                        <p className="mb-2 text-xs text-texto-suave">
+                          {[s.gasto.proveedor, nombrePeriodo(s.gasto.periodo.anio, s.gasto.periodo.mes), ...s.motivos].filter(Boolean).join(" · ")}
+                        </p>
+                        <FormularioSimple accion={conciliarCargoAccion.bind(null, id, m.id)} boton="Conciliar con este egreso">
+                          <input type="hidden" name="gastoId" value={s.gasto.id} />
+                        </FormularioSimple>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+              <Card>
+                <h2 className="mb-1 font-bold">Conciliar con un egreso</h2>
+                <p className="mb-3 text-sm text-texto-suave">
+                  Si un cargo paga varias facturas, concilia una por una. Si el egreso estaba «por pagar», queda pagado con fecha {formatoFecha(m.fecha)}.
+                </p>
+                {egresosLibres.length === 0 ? (
+                  <p className="text-sm text-texto-suave">No hay egresos sin conciliar por {$(restante)} o menos.</p>
+                ) : (
+                  <FormularioSimple accion={conciliarCargoAccion.bind(null, id, m.id)} boton="Conciliar">
+                    <Campo etiqueta="Egreso">
+                      <Select name="gastoId" defaultValue="" required>
+                        <option value="" disabled>
+                          Elige…
+                        </option>
+                        {egresosLibres.map((g) => (
+                          <option key={g.id} value={g.id}>
+                            {nombrePeriodo(g.periodo.anio, g.periodo.mes)} · {g.descripcion}
+                            {g.proveedor ? ` (${g.proveedor})` : ""} · {$(g.monto)}
+                            {g.estadoPago === "POR_PAGAR" ? " · por pagar" : ""}
+                          </option>
+                        ))}
+                      </Select>
+                    </Campo>
+                  </FormularioSimple>
+                )}
+              </Card>
+              <Card>
+                <h2 className="mb-1 font-bold">Otro egreso de la comunidad</h2>
+                <p className="mb-3 text-sm text-texto-suave">Para cargos que no son un gasto del mes: comisiones del banco, impuestos, devoluciones.</p>
+                <FormularioSimple accion={otroEgresoAccion.bind(null, id, m.id)} boton="Registrar otro egreso">
+                  <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+                    <Campo etiqueta="Concepto">
+                      <Input name="concepto" maxLength={200} placeholder="Ej: comisión mantención cuenta" required />
+                    </Campo>
+                    <Campo etiqueta="Monto">
+                      <Input name="monto" inputMode="numeric" defaultValue={String(Math.round(restante))} />
+                    </Campo>
+                  </div>
+                </FormularioSimple>
+              </Card>
+            </>
           )}
           {abono && restante <= 0 && (
             <Card className="border-exito/30">

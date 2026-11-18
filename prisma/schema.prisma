@@ -515,6 +515,19 @@ model Gasto {
   // Si el cargo viene de una reserva de espacio común.
   reserva Reserva?
 
+  // FIN-COMP B · Egreso: proveedor del catálogo, pago al proveedor, respaldos y fondo.
+  proveedorId    String?
+  proveedorRef   Proveedor?               @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  estadoPago     EstadoPagoGasto          @default(POR_PAGAR)
+  fechaPago      DateTime?                @db.Date
+  medioPago      MedioPago?
+  pagadoPor      String?
+  // Si se paga con un fondo (p. ej. el de reserva), NO se prorratea en el gasto común: sale del fondo.
+  fondoId        String?
+  fondo          Fondo?                   @relation(fields: [fondoId], references: [id], onDelete: Restrict)
+  respaldos      RespaldoGasto[]
+  conciliaciones ConciliacionMovimiento[]
+
   @@index([administradoraId])
   @@index([periodoId])
 }
@@ -611,6 +624,7 @@ model Proveedor {
 
   instalaciones        Instalacion[]
   obligacionesApertura ObligacionApertura[]
+  gastos               Gasto[]
 
   @@unique([administradoraId, nombre])
 }
@@ -1265,6 +1279,8 @@ model ComprobanteTransferencia {
 enum TipoConciliacion {
   PAGO // pago de una unidad (registrado a mano, desde una transferencia informada o desde la cartola)
   OTRO_INGRESO // ingreso de la comunidad que no es pago de una unidad (arriendo, intereses, devolución...)
+  EGRESO // FIN-COMP B: cargo de la cartola que corresponde al pago de un gasto (egreso) registrado
+  OTRO_EGRESO // FIN-COMP B: cargo que no es un gasto del mes (comisión bancaria, impuesto, devolución...)
 }
 
 model ConciliacionMovimiento {
@@ -1279,6 +1295,8 @@ model ConciliacionMovimiento {
   pago             Pago?                   @relation(fields: [pagoId], references: [id], onDelete: Restrict)
   transferenciaId  String?
   transferencia    TransferenciaInformada? @relation(fields: [transferenciaId], references: [id], onDelete: Restrict)
+  gastoId          String?
+  gasto            Gasto?                  @relation(fields: [gastoId], references: [id], onDelete: Restrict)
   concepto         String?
   creadoPor        String
   creadoEn         DateTime                @default(now())
@@ -1288,6 +1306,7 @@ model ConciliacionMovimiento {
 
   @@index([movimientoId])
   @@index([pagoId])
+  @@index([gastoId])
   @@index([condominioId, creadoEn])
 }
 
@@ -1343,4 +1362,73 @@ model CertificadoAlDia {
 
   @@index([unidadId, emitidoEn])
   @@index([condominioId])
+}
+
+// FIN-COMP B · Estado de pago de un egreso al proveedor.
+enum EstadoPagoGasto {
+  POR_PAGAR
+  PAGADO
+}
+
+// FIN-COMP B · Documento de respaldo de un egreso (factura, boleta, comprobante). PDF o imagen.
+model RespaldoGasto {
+  id        String   @id @default(cuid())
+  gastoId   String
+  gasto     Gasto    @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  nombre    String
+  tipo      String
+  tamano    Int
+  huella    String
+  datos     Bytes
+  subidoPor String
+  creadoEn  DateTime @default(now())
+
+  @@index([gastoId])
+}
+
+enum TipoFondo {
+  RESERVA // se alimenta del % de fondo de reserva de cada aviso emitido
+  OTRO // fondos especiales (obras, contingencia...) con aportes registrados a mano
+}
+
+enum TipoMovimientoFondo {
+  APORTE
+  RETIRO
+}
+
+// FIN-COMP B · Fondos de la comunidad. El saldo se calcula: aportes (los del fondo de reserva salen
+// de los avisos emitidos) + aportes manuales − retiros manuales − egresos pagados con el fondo.
+model Fondo {
+  id               String            @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  nombre           String
+  tipo             TipoFondo
+  // Saldo con que se abrió el fondo en Convive (p. ej. el que traía de la administración anterior).
+  saldoInicial     Decimal           @default(0) @db.Decimal(14, 2)
+  activo           Boolean           @default(true)
+  creadoPor        String
+  creadoEn         DateTime          @default(now())
+  movimientos      MovimientoFondo[]
+  gastos           Gasto[]
+
+  @@unique([condominioId, nombre])
+  @@index([administradoraId])
+}
+
+model MovimientoFondo {
+  id          String              @id @default(cuid())
+  fondoId     String
+  fondo       Fondo               @relation(fields: [fondoId], references: [id], onDelete: Restrict)
+  tipo        TipoMovimientoFondo
+  fecha       DateTime            @db.Date
+  monto       Decimal             @db.Decimal(14, 2)
+  descripcion String
+  creadoPor   String
+  creadoEn    DateTime            @default(now())
+  // Anulado, no borrado.
+  anuladoEn   DateTime?
+  anuladoPor  String?
+
+  @@index([fondoId, fecha])
 }

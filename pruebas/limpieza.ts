@@ -8,5 +8,6 @@ export async function borrarConstancias(administradoraId: string) {
     await tx.constanciaVersion.deleteMany({ where: { constancia: { administradoraId } } });
     await tx.constanciaPago.deleteMany({ where: { administradoraId } });
     await tx.certificadoAlDia.deleteMany({ where: { administradoraId } });
+    await tx.respaldoGasto.deleteMany({ where: { gasto: { administradoraId } } });
   });
 }

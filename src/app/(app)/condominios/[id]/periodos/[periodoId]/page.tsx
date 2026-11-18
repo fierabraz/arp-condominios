@@ -11,6 +11,7 @@ import { GastoForm } from "./gasto-form";
 import { CerrarForm } from "./cerrar-form";
 import { EnviarForm } from "./enviar-form";
 import { correoConfigurado } from "@/lib/correo";
+import { saldosFondos } from "@/lib/egresos-servicio";
 
 const ETIQUETAS_ENVIO = { ENVIADO: "Enviado", SIMULADO: "Prueba", ERROR: "Error" } as const;
 
@@ -37,12 +38,14 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
   const proveedores = editable
     ? await db.proveedor.findMany({ where: { administradoraId }, orderBy: { nombre: "asc" }, select: { nombre: true } })
     : [];
+  const fondos = editable && periodo.estado === "ABIERTO" ? await saldosFondos(id, administradoraId) : [];
+  const nombreFondo = new Map(fondos.map((f) => [f.fondo.id, f.fondo.nombre]));
   const numeroDe = new Map(unidades.map((u) => [u.id, u.numero]));
   const abierto = periodo.estado === "ABIERTO";
   const nombre = nombrePeriodo(periodo.anio, periodo.mes);
   const $ = (n: number | { toString(): string }) => formatoMoneda(n, moneda);
 
-  const totalComun = periodo.gastos.filter((g) => g.tipo === "COMUN").reduce((s, g) => s + Number(g.monto), 0);
+  const totalComun = periodo.gastos.filter((g) => g.tipo === "COMUN" && !g.fondoId).reduce((s, g) => s + Number(g.monto), 0);
   const totalIndividual = periodo.gastos.filter((g) => g.tipo === "INDIVIDUAL").reduce((s, g) => s + Number(g.monto), 0);
 
   let lineas: Linea[] = [];
@@ -127,6 +130,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
             unidades={unidades}
             fecha={fechaGasto}
             proveedores={proveedores.map((p) => p.nombre)}
+            fondos={fondos.filter((f) => f.fondo.activo).map((f) => ({ id: f.fondo.id, nombre: f.fondo.nombre, saldo: $(f.saldo) }))}
           />
         </Card>
       )}
@@ -152,7 +156,12 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 <td className="whitespace-nowrap">{formatoFecha(g.fecha)}</td>
                 <td>{g.categoria}</td>
                 <td>
-                  {g.descripcion}
+                  <Link href={`/condominios/${id}/egresos/${g.id}`} className="text-marca hover:underline">
+                    {g.descripcion}
+                  </Link>
+                  {g.fondoId && (
+                    <span className="ml-2 rounded bg-fondo px-1.5 py-0.5 text-xs text-texto-suave">pagado con {nombreFondo.get(g.fondoId) ?? "un fondo"}, no se reparte</span>
+                  )}
                   {(g.proveedor || g.documento) && (
                     <span className="block text-xs text-texto-suave">
                       {[g.proveedor, g.documento && `doc. ${g.documento}`].filter(Boolean).join(" · ")}
