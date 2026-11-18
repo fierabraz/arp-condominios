@@ -158,7 +158,7 @@ export default async function SolicitudesPage({ params }: PageProps<"/condominio
                     <Insignia tono={verificado ? "exito" : "alerta"}>{verificado ? "Correo confirmado" : "Correo sin confirmar"}</Insignia>
                   </div>
                   {verificado ? (
-                    <div className="grid gap-6 lg:grid-cols-[1fr_auto]">
+                    <div className="grid items-start gap-6 lg:grid-cols-[1fr_auto]">
                       <AprobarForm
                         accion={aprobar.bind(null, id, s.id)}
                         unidades={opcionesUnidad}
