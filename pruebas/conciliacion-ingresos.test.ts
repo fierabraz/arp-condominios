@@ -24,6 +24,9 @@ import { cambiarEstadoTransferencia } from "../src/lib/transferencias-servicio";
 import { consultaPublicaConstancia } from "../src/lib/constancias-servicio";
 import { pdfConstancia } from "../src/lib/documento-constancia";
 import type { DatosConstancia } from "../src/lib/constancias";
+import { emitirCertificadoAlDia, NoEstaAlDia } from "../src/lib/certificados-servicio";
+import { pdfCertificadoAlDia, pdfEstadoCuenta } from "../src/lib/documento-cuenta";
+import type { DatosCertificado } from "../src/lib/certificados";
 
 if (/neon\.tech|vercel/i.test(process.env.DATABASE_URL ?? "")) {
   throw new Error("Estas pruebas crean y borran datos: no se ejecutan contra una base de Neon o Vercel.");
@@ -371,5 +374,31 @@ describe("FIN-COMP A · pagos pendientes y conciliación de ingresos", () => {
     const [c1, c2] = await Promise.all([t, t2].map((x) => db.constanciaPago.findUniqueOrThrow({ where: { transferenciaId: x.id } })));
     assert.notEqual(c1.folio, c2.folio);
     assert.notEqual(c1.codigo, c2.codigo);
+  });
+
+  test("certificado al día: no con deuda vencida ni con pagos solo informados; sí una vez verificado", async () => {
+    const e = await escenario();
+    // Octubre ya venció: con deuda no se puede.
+    await assert.rejects(emitirCertificadoAlDia(e.admin, e.u1.id), NoEstaAlDia);
+    // Informar el pago no basta: sigue pendiente de verificación.
+    const t = await e.informar(e.r1, e.u1.id, 100000);
+    await assert.rejects(emitirCertificadoAlDia(e.admin, e.u1.id), /pendientes de verificación/);
+    assert.equal(await db.certificadoAlDia.count({ where: { unidadId: e.u1.id } }), 0);
+    // Verificado con la cartola: ahora sí.
+    const mov = await e.movimiento("2026-11-05", 100000);
+    await confirmarTransferencia(e.admin, { transferenciaId: t.id, movimientoId: mov.id, monto: 100000 });
+    const c = await emitirCertificadoAlDia(e.admin, e.u1.id);
+    const d = c.datos as unknown as DatosCertificado;
+    assert.equal(d.unidad, "101");
+    assert.equal(d.porVencer, 0);
+    assert.ok(!JSON.stringify(d).includes("Residente Ficticia"), "sin nombres de residentes");
+    assert.ok(await db.registroCambio.findFirst({ where: { entidad: "CertificadoAlDia", entidadId: c.id } }), "queda en el registro");
+    await assert.rejects(db.certificadoAlDia.update({ where: { id: c.id }, data: { emitidoPor: "otro" } }), "no se modifica");
+    const pdf = await pdfCertificadoAlDia(d, "https://ejemplo.invalid/verificar-certificado/x");
+    assert.equal(pdf.subarray(0, 4).toString(), "%PDF");
+    // Estado de cuenta en PDF con la misma fuente.
+    const est = (await estadoCuenta(e.u2.id, e.adm.id))!;
+    const pdf2 = await pdfEstadoCuenta(est, { comunidad: "Comunidad Ficticia", direccion: "Calle 1", unidad: "102", moneda: "CLP", emitidoPor: "Prueba" });
+    assert.equal(pdf2.subarray(0, 4).toString(), "%PDF");
   });
 });

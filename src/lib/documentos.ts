@@ -42,12 +42,12 @@ export function pdfAviso(d: DatosAviso, enlacePago?: string) {
     cifras(doc, [
       { etiqueta: "Total a pagar", valor: $(d.totalAPagar) },
       { etiqueta: "Vence el", valor: formatoFecha(aviso.vencimiento) },
-      { etiqueta: "Alícuota de la unidad", valor: formatoPorcentaje(aviso.unidad.alicuota) },
+      { etiqueta: "Porcentaje de prorrateo", valor: formatoPorcentaje(aviso.unidad.alicuota) },
     ]);
 
     subtitulo(doc, "Detalle del cobro del mes");
     const filas: { celdas: string[]; fuerte?: boolean }[] = [
-      { celdas: [`Gasto común (${formatoPorcentaje(aviso.unidad.alicuota)} de ${$(d.totalComun)})`, $(aviso.gastoComun)] },
+      { celdas: [`Gasto común (prorrateo ${formatoPorcentaje(aviso.unidad.alicuota)} de ${$(d.totalComun)})`, $(aviso.gastoComun)] },
       { celdas: [`Fondo de reserva (${condominio.porcentajeReserva.toString()} % del gasto común)`, $(aviso.fondoReserva)] },
       ...d.cargos.map((c) => ({ celdas: [`${c.categoria}: ${c.descripcion}`, $(c.monto)] })),
     ];

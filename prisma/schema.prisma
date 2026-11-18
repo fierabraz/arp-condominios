@@ -436,6 +436,7 @@ model Unidad {
   creditosApertura   CreditoApertura[]
   reservas           Reserva[]
   transferencias     TransferenciaInformada[]
+  certificados       CertificadoAlDia[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -1322,4 +1323,24 @@ model ConstanciaVersion {
   generadaEn   DateTime            @default(now())
 
   @@unique([constanciaId, version])
+}
+
+// PILOTO-001 · Certificado de «unidad al día» (sección 7). Solo se emite si la unidad no tiene
+// obligaciones VENCIDAS impagas (estar al día no es tener saldo cero). Lo emite la administración;
+// queda con folio, contenido fijo y código para verificarlo por QR. No se modifica ni se borra.
+model CertificadoAlDia {
+  id               String   @id @default(cuid())
+  folio            Int      @unique @default(autoincrement())
+  administradoraId String
+  condominioId     String
+  unidadId         String
+  unidad           Unidad   @relation(fields: [unidadId], references: [id], onDelete: Restrict)
+  codigo           String   @unique
+  datos            Json
+  huella           String
+  emitidoPor       String
+  emitidoEn        DateTime @default(now())
+
+  @@index([unidadId, emitidoEn])
+  @@index([condominioId])
 }

@@ -6,10 +6,10 @@ import { decrypt, LOGIN, SESSION_COOKIE } from "@/lib/session";
 // acción mediante src/lib/auth.ts.
 
 // /pagar: enlace del QR del aviso. Sin sesión muestra solo el nombre de la comunidad y el mes.
-// /verificar-pago: QR de la constancia de pago. Solo folio, estado y montos, sin datos personales.
-const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir", "/pagar", "/verificar-pago"];
+// /verificar-pago y /verificar-certificado: QR de constancias y certificados. Sin datos personales.
+const PUBLICAS = ["/login", "/recuperar", "/invitacion", "/salir", "/pagar", "/verificar-pago", "/verificar-certificado"];
 // Lo único que ve una sesión de residente: su cuenta y los documentos que se abren desde ella.
-const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones", "/pagar", "/comprobantes", "/verificar-pago"];
+const DE_RESIDENTE = ["/mi-cuenta", "/avisos", "/rendiciones", "/publicaciones", "/pagar", "/comprobantes", "/verificar-pago", "/verificar-certificado", "/documentos"];
 
 const empieza = (ruta: string, prefijos: string[]) => prefijos.some((p) => ruta === p || ruta.startsWith(`${p}/`));
 

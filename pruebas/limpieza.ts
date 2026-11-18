@@ -7,5 +7,6 @@ export async function borrarConstancias(administradoraId: string) {
     await tx.$executeRawUnsafe(`SET LOCAL convive.borrar_constancias = 'si'`);
     await tx.constanciaVersion.deleteMany({ where: { constancia: { administradoraId } } });
     await tx.constanciaPago.deleteMany({ where: { administradoraId } });
+    await tx.certificadoAlDia.deleteMany({ where: { administradoraId } });
   });
 }

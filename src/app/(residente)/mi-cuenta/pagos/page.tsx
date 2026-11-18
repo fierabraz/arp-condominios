@@ -1,5 +1,6 @@
 import { requirePermiso } from "@/lib/auth";
-import { BotonLink, Insignia, PageHeader, Vacio } from "@/components/ui";
+import { BotonDocumento, BotonLink, Insignia, PageHeader, Vacio } from "@/components/ui";
+import { formatoFolioCertificado } from "@/lib/certificados";
 import { formatoPorcentaje } from "@/lib/formato";
 import { EstadoCuenta } from "@/components/estado-cuenta";
 import { db } from "@/lib/db";
@@ -15,6 +16,11 @@ export default async function PagosPage({ searchParams }: PageProps<"/mi-cuenta/
       (u) => [u.id, u.alicuota],
     ),
   );
+  const certificados = await db.certificadoAlDia.findMany({
+    where: { unidadId: { in: visibles.map((u) => u.id) } },
+    orderBy: { emitidoEn: "desc" },
+    select: { id: true, folio: true, emitidoEn: true, unidadId: true },
+  });
   // Primero las unidades que deben más.
   const ordenadas = [...cuentas].sort((a, b) => b.estado.deuda - a.estado.deuda);
 
@@ -47,6 +53,17 @@ export default async function PagosPage({ searchParams }: PageProps<"/mi-cuenta/
                 {unidad.condominioNombre}
                 {alicuotas.has(unidad.id) && ` · Porcentaje de prorrateo ${formatoPorcentaje(alicuotas.get(unidad.id)!)}`}
               </p>
+              <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+                <BotonDocumento href={`/documentos/estado-cuenta/${unidad.id}`}>Descargar estado de cuenta (PDF)</BotonDocumento>
+                {certificados
+                  .filter((c) => c.unidadId === unidad.id)
+                  .slice(0, 3)
+                  .map((c) => (
+                    <a key={c.id} href={`/documentos/certificado/${c.id}`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                      Certificado al día {formatoFolioCertificado(c.folio)} ({c.emitidoEn.toLocaleDateString("es-CL")})
+                    </a>
+                  ))}
+              </div>
               <EstadoCuenta estado={estado} moneda={moneda} />
             </section>
           ))}
