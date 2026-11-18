@@ -7,6 +7,7 @@ import { useActionState, useState } from "react";
 import { Boton, Campo, Input, Insignia, Mensaje } from "@/components/ui";
 import type { EstadoForm } from "@/lib/forms";
 import type { EstadoConfirmar } from "@/app/(app)/condominios/transferencias-actions";
+import { DistribucionPago, type AvisoParaDistribuir } from "@/components/distribucion-pago";
 
 export type Opcion = {
   id: string;
@@ -27,12 +28,14 @@ export function FormularioConfirmar({
   montoInformado,
   deudaActual,
   ambigua,
+  avisos,
 }: {
   accion: (e: EstadoConfirmar, f: FormData) => Promise<EstadoConfirmar>;
   opciones: Opcion[];
   montoInformado: number;
   deudaActual: number;
   ambigua: boolean;
+  avisos: AvisoParaDistribuir[];
 }) {
   const [estado, enviar, pendiente] = useActionState(accion, {});
   // Solo se preselecciona si hay una única coincidencia fuerte; si es ambigua, la persona elige.
@@ -81,6 +84,7 @@ export function FormularioConfirmar({
       </Campo>
       {opcion && montoNum > opcion.restante && <p className="text-sm text-peligro">El movimiento solo tiene {pesos(opcion.restante)} sin conciliar.</p>}
       {montoNum !== Math.round(montoInformado) && <p className="text-sm text-alerta">El monto es distinto al informado ({pesos(montoInformado)}). Quedará anotado.</p>}
+      {montoNum > 0 && <DistribucionPago avisos={avisos} monto={montoNum} />}
       {montoNum > deudaActual && (
         <p className="text-sm text-alerta">
           La unidad debe hoy {pesos(deudaActual)}. Lo que sobre ({pesos(montoNum - deudaActual)}) quedará como saldo a favor, ya verificado.
@@ -98,8 +102,8 @@ export function FormularioConfirmar({
       {duplicadoOk && <input type="hidden" name="permitirDuplicado" value="1" />}
       <Mensaje texto={estado.mensaje} />
       <p className="text-xs text-texto-suave">
-        Al confirmar se registra un pago por transferencia en Recaudación (se aplica a la deuda más antigua) y el movimiento queda
-        conciliado. Si fue un error, se deshace anulando el pago en Recaudación.
+        Al confirmar se registra UN pago por transferencia en Recaudación, aplicado a los avisos elegidos, y esa parte del movimiento
+        queda conciliada. Todo ocurre junto o no ocurre. Si fue un error, se puede reversar el pago con un motivo (queda en el historial).
       </p>
       <Boton type="submit" disabled={pendiente || !elegido || montoNum <= 0 || (!!estado.duplicado && !duplicadoOk)}>
         {pendiente ? "Confirmando…" : "Confirmar pago verificado"}
@@ -135,6 +139,35 @@ export function FormularioNota({
       <Mensaje texto={estado.mensaje} />
       <Boton type="submit" variante={variante} disabled={pendiente}>
         {pendiente ? "Guardando…" : boton}
+      </Boton>
+    </form>
+  );
+}
+
+/** FIN-COMP A: un botón con confirmación para vincular con un pago ya registrado. */
+export function BotonAccion({
+  accion,
+  texto,
+  confirmar,
+  variante = "secundario",
+}: {
+  accion: (e: EstadoForm, f: FormData) => Promise<EstadoForm>;
+  texto: string;
+  confirmar: string;
+  variante?: "primario" | "secundario";
+}) {
+  const [estado, enviar, pendiente] = useActionState(accion, {});
+  const [seguro, setSeguro] = useState(false);
+  if (estado.ok) return <Mensaje tipo="ok" texto={estado.mensaje ?? "Listo."} />;
+  return (
+    <form action={enviar} className="space-y-2">
+      <label className="flex items-start gap-2 text-sm">
+        <input type="checkbox" checked={seguro} onChange={(e) => setSeguro(e.target.checked)} className="mt-0.5 h-5 w-5" />
+        <span>{confirmar}</span>
+      </label>
+      <Mensaje texto={estado.mensaje} />
+      <Boton type="submit" variante={variante} disabled={pendiente || !seguro}>
+        {pendiente ? "Guardando…" : texto}
       </Boton>
     </form>
   );

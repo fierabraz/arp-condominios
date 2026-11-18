@@ -59,8 +59,19 @@ export function FormularioInforme({
       }
       if (confirmar) fd.set("confirmar", "1");
       // Se llama a la acción directamente (no con <form action>) para que el formulario no se borre si hay que corregir algo.
-      const r = await accion(fd);
-      if (r) setEstado(r);
+      // FIN-COMP A: si se corta la conexión no sabemos si llegó. No se dice «rechazado» ni «recibido»:
+      // se pide revisar el estado antes de reenviar (y el control de repetidos evita duplicarlo).
+      try {
+        const r = await accion(fd);
+        if (r) setEstado(r);
+      } catch (err) {
+        const digest = (err as { digest?: string })?.digest;
+        if (typeof digest === "string" && digest.startsWith("NEXT_REDIRECT")) throw err;
+        setEstado({
+          mensaje:
+            "No pudimos confirmar si tu información llegó (problema de conexión). No transfieras de nuevo: revisa «Estado de mis transferencias informadas» en Pagar gastos comunes. Si no aparece ahí, vuelve a enviarla.",
+        });
+      }
     });
   }
 

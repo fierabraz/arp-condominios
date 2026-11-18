@@ -5,6 +5,9 @@ import { CondominioForm } from "../condominio-form";
 import { crearCondominio } from "../actions";
 import { crearComunidadVisual } from "../generador-actions";
 import { NuevaComunidad } from "./nueva-comunidad";
+import { demoPermitida } from "@/lib/demo-financiera";
+import { crearComunidadDemoAccion } from "../prueba-actions";
+import { Boton } from "@/components/ui";
 
 export default async function NuevoCondominioPage({ searchParams }: PageProps<"/condominios/nuevo">) {
   await requireAdministradora("propiedades.crear");
@@ -41,6 +44,18 @@ export default async function NuevoCondominioPage({ searchParams }: PageProps<"/
       <Card>
         <NuevaComunidad accion={crearComunidadVisual} />
       </Card>
+      {demoPermitida() && (
+        <Card className="mt-6 border-dashed">
+          <h2 className="font-bold">¿Solo quieres probar el módulo financiero?</h2>
+          <p className="mb-3 mt-1 text-sm text-texto-suave">
+            Crea una comunidad FICTICIA lista para probar pagos y conciliación: 8 unidades, un mes emitido, cuenta bancaria inventada y un residente de prueba.
+            Esta opción solo aparece en la vista previa, nunca en el sitio real.
+          </p>
+          <form action={crearComunidadDemoAccion}>
+            <Boton type="submit" variante="secundario">Crear comunidad ficticia de prueba</Boton>
+          </form>
+        </Card>
+      )}
     </>
   );
 }

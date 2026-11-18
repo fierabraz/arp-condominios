@@ -26,6 +26,7 @@ before(async () => {
 });
 after(async () => {
   for (const id of creadas) {
+    await db.conciliacionMovimiento.deleteMany({ where: { administradoraId: id } });
     await db.transferenciaInformada.deleteMany({ where: { administradoraId: id } });
     await db.movimientoBancario.deleteMany({ where: { administradoraId: id } });
     await db.importacionCartola.deleteMany({ where: { administradoraId: id } });

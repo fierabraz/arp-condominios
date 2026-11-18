@@ -26,15 +26,12 @@ export async function cuentaDeUnidad(usuario: UsuarioActual, unidad: UnidadResid
     }),
     db.unidad.findUniqueOrThrow({ where: { id: unidad.id }, select: { numero: true } }),
   ]);
-  const enVerificacion = transferencias.filter((t) => t.estado === "INFORMADA" || t.estado === "EN_REVISION");
   return {
     estado: estado!,
     numero: datosUnidad.numero,
     transferencias,
-    enVerificacion: {
-      cantidad: enVerificacion.length,
-      monto: enVerificacion.reduce((s, t) => s + Number(t.monto), 0),
-    },
+    // FIN-COMP A: el mismo cálculo que el estado de cuenta (una sola fuente).
+    enVerificacion: { cantidad: estado!.enVerificacion.cantidad, monto: estado!.enVerificacion.monto },
     // Avisos con saldo pendiente, del más antiguo al más nuevo (así se aplican los pagos).
     pendientes: estado!.avisos.filter((a) => Number(a.saldo) > 0).sort((a, b) => a.vencimiento.getTime() - b.vencimiento.getTime()),
   };

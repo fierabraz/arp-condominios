@@ -37,6 +37,43 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
     (c) => c.tipo !== "CAJA" && c.numeroFinal && /^\d{4}$/.test(c.numeroFinal) && !cuentas.some((x) => x.banco === c.banco && x.numeroFinal === c.numeroFinal),
   );
   const cuenta = cuentas.find((c) => c.id === sp.cuenta) ?? (cuentas.length === 1 ? cuentas[0] : undefined);
+  // FIN-COMP A: lo que falta conciliar en ingresos, para no perderlo de vista.
+  const [porIdentificar, enVerificacion] = await Promise.all([
+    db.movimientoBancario.findMany({
+      where: { condominioId: id, administradoraId, monto: { gt: 0 }, estado: { not: "CONCILIADO" } },
+      select: { monto: true, montoConciliado: true },
+    }),
+    db.transferenciaInformada.aggregate({
+      where: { condominioId: id, administradoraId, estado: { in: ["INFORMADA", "EN_REVISION"] } },
+      _count: true,
+      _sum: { monto: true },
+    }),
+  ]);
+  const montoPorIdentificar = porIdentificar.reduce((s, m) => s + Number(m.monto) - Number(m.montoConciliado), 0);
+  const resumenIngresos = (porIdentificar.length > 0 || enVerificacion._count > 0) && (
+    <div className="mb-6 grid gap-4 sm:grid-cols-2">
+      <Card className={porIdentificar.length > 0 ? "border-alerta/40" : undefined}>
+        <p className="text-sm text-texto-suave">Abonos de la cartola por identificar</p>
+        <p className="mt-1 text-2xl font-bold tabular-nums">{formatoMoneda(montoPorIdentificar, moneda)}</p>
+        <p className="text-sm text-texto-suave">{porIdentificar.length} movimiento{porIdentificar.length === 1 ? "" : "s"}. Importarlos no crea pagos: hay que conciliarlos.</p>
+        {porIdentificar.length > 0 && (
+          <Link href={`${base}/movimientos?tipo=abono&estado=PENDIENTE`} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-marca">
+            Conciliar ingresos →
+          </Link>
+        )}
+      </Card>
+      <Card className={enVerificacion._count > 0 ? "border-alerta/40" : undefined}>
+        <p className="text-sm text-texto-suave">Transferencias informadas pendientes de verificación</p>
+        <p className="mt-1 text-2xl font-bold tabular-nums">{formatoMoneda(Number(enVerificacion._sum.monto ?? 0), moneda)}</p>
+        <p className="text-sm text-texto-suave">{enVerificacion._count} informada{enVerificacion._count === 1 ? "" : "s"} por residentes. No son recaudación todavía.</p>
+        {enVerificacion._count > 0 && puede(usuario, "pagos.verificar", id) && (
+          <Link href={`/condominios/${id}/transferencias`} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-marca">
+            Revisar transferencias →
+          </Link>
+        )}
+      </Card>
+    </div>
+  );
 
   const encabezado = (
     <PageHeader
@@ -72,6 +109,7 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
       <div className="mb-6">
         <ElegirComunidad actual={id} comunidades={comunidades} />
       </div>
+      {resumenIngresos}
 
       {cuentas.length === 0 ? (
         <Card className="mb-6">

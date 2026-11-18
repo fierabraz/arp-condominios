@@ -261,6 +261,8 @@ model Condominio {
   reglamento         String?
   // Información complementaria disponible (texto libre).
   observaciones      String?
+  // FIN-COMP: comunidad ficticia creada para probar (solo en vistas previas o local). Nunca datos reales.
+  demo               Boolean                 @default(false)
   creadoEn           DateTime                @default(now())
 
   unidades       Unidad[]
@@ -562,9 +564,11 @@ model Pago {
   anuladoPor       String?
   motivoAnulacion  String?
 
-  aplicaciones  AplicacionPago[]
+  aplicaciones   AplicacionPago[]
   // PAG-001: si el pago salió de una transferencia informada y verificada con la cartola.
-  transferencia TransferenciaInformada?
+  transferencia  TransferenciaInformada?
+  // FIN-COMP A: movimiento(s) de la cartola que respaldan este pago (como máximo uno vigente).
+  conciliaciones ConciliacionMovimiento[]
 
   @@index([administradoraId])
 }
@@ -1142,6 +1146,8 @@ model MovimientoBancario {
 
   // PAG-001: transferencias informadas por residentes que se confirmaron con este movimiento.
   transferencias TransferenciaInformada[]
+  // FIN-COMP A: a qué se asignó el movimiento (pagos de unidades, otros ingresos...).
+  conciliaciones ConciliacionMovimiento[]
 
   @@unique([cuentaId, huella])
   @@index([cuentaId, fecha])
@@ -1183,6 +1189,7 @@ enum EstadoTransferencia {
   EN_REVISION // pendiente de revisión: ambigua, falta la cartola, monto distinto...
   CONCILIADA // verificada con la cartola y registrada como pago
   RECHAZADA // rechazada o con diferencias (con motivo)
+  ANULADA // FIN-COMP A: anulada o reversada (su pago se reversó con motivo; queda en el historial)
 }
 
 model TransferenciaInformada {
@@ -1219,7 +1226,8 @@ model TransferenciaInformada {
   revisadoEn       DateTime?
   creadoEn         DateTime            @default(now())
 
-  comprobante ComprobanteTransferencia?
+  comprobante    ComprobanteTransferencia?
+  conciliaciones ConciliacionMovimiento[]
 
   @@index([condominioId, estado, creadoEn])
   @@index([unidadId, creadoEn])
@@ -1241,4 +1249,42 @@ model ComprobanteTransferencia {
   creadoEn        DateTime               @default(now())
 
   @@index([condominioId, huella])
+}
+
+// ---------------------------------------------------------------------------
+// FIN-COMP · Entrega A · Conciliación de ingresos (FIN-003.2)
+//
+// Cada fila dice: «esta parte del movimiento de la cartola corresponde a esto». Un movimiento puede
+// repartirse en varias filas (pago de dos unidades, abono parcial...), pero la suma vigente nunca
+// pasa del monto del movimiento (MovimientoBancario.montoConciliado + su CHECK). Un pago tiene como
+// máximo UNA conciliación vigente (índice único parcial): la misma plata no se cuenta dos veces.
+// Nada se borra: deshacer una conciliación la marca anulada, con quién, cuándo y por qué.
+
+enum TipoConciliacion {
+  PAGO // pago de una unidad (registrado a mano, desde una transferencia informada o desde la cartola)
+  OTRO_INGRESO // ingreso de la comunidad que no es pago de una unidad (arriendo, intereses, devolución...)
+}
+
+model ConciliacionMovimiento {
+  id               String                  @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  movimientoId     String
+  movimiento       MovimientoBancario      @relation(fields: [movimientoId], references: [id], onDelete: Restrict)
+  tipo             TipoConciliacion
+  monto            Decimal                 @db.Decimal(16, 2)
+  pagoId           String?
+  pago             Pago?                   @relation(fields: [pagoId], references: [id], onDelete: Restrict)
+  transferenciaId  String?
+  transferencia    TransferenciaInformada? @relation(fields: [transferenciaId], references: [id], onDelete: Restrict)
+  concepto         String?
+  creadoPor        String
+  creadoEn         DateTime                @default(now())
+  anuladaEn        DateTime?
+  anuladaPor       String?
+  motivoAnulacion  String?
+
+  @@index([movimientoId])
+  @@index([pagoId])
+  @@index([condominioId, creadoEn])
 }

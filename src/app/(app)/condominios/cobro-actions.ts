@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { aMonto, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { leerDistribucion } from "@/lib/conciliacion";
 import { anularPago, emitirPeriodo, ErrorCobro, PagoDuplicado, registrarPago } from "@/lib/cobro-servicio";
 import { enviarAvisosPeriodo } from "@/lib/envio-avisos";
 import { MedioPago, TipoGasto } from "@/generated/prisma/enums";
@@ -189,9 +190,13 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
 
   const confirmado = formData.get("confirmarDuplicado") === "si";
   const moneda = usuario.administradora?.moneda;
+  // FIN-COMP A: qué avisos paga (propuesta revisada por la administración).
+  const distribucion = leerDistribucion(formData.get("distribucion"));
+  if (distribucion === "invalida") return { errores: { distribucion: ["La distribución entre avisos no es válida. Recarga la página."] } };
   try {
     await registrarPago(administradoraId, datos.data, {
       permitirDuplicado: confirmado,
+      distribucion,
       anotar: (pago) => ({
         autor: usuario,
         accion: "Registró un pago",
@@ -206,6 +211,7 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
           medio: datos.data.medio,
           referencia: datos.data.referencia ?? null,
           confirmadoComoDistinto: confirmado,
+          distribucion: distribucion ?? null,
         },
       }),
     });

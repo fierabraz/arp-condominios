@@ -20,6 +20,7 @@ export default async function MovimientosPage({ params, searchParams }: PageProp
   const sp = await searchParams;
   const { condominio, usuario, administradoraId, moneda } = await condominioVisible(id);
   const editable = puede(usuario, "banco.importar", id);
+  const verifica = puede(usuario, "pagos.verificar", id);
   const base = `/condominios/${id}/conciliacion`;
   const $ = (n: number) => formatoMoneda(n, moneda);
   const filtro = leerFiltro(sp);
@@ -163,6 +164,9 @@ export default async function MovimientosPage({ params, searchParams }: PageProp
                   <td className="min-w-48">
                     <Insignia tono={est.tono}>{est.texto}</Insignia>
                     {m.nota && <span className="mt-1 block text-xs text-texto-suave">{m.nota}</span>}
+                    <Link href={`${base}/movimientos/${m.id}`} className="mt-1 block text-sm font-semibold text-marca hover:underline">
+                      {monto > 0 && m.estado !== "CONCILIADO" && verifica ? "Conciliar →" : "Ver detalle →"}
+                    </Link>
                     <Link href={`${base}/importaciones/${m.importacion.id}`} className="mt-1 block text-xs text-texto-suave hover:underline">
                       {m.importacion.archivoNombre}
                       {m.fila ? `, fila ${m.fila}` : ""}

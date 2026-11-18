@@ -2,30 +2,72 @@ import { Card, Insignia, Tabla, Vacio } from "@/components/ui";
 import { ETIQUETAS_MEDIO_PAGO, formatoFecha, formatoMoneda } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
 import type { estadoCuenta } from "@/lib/cobro-servicio";
+import { ESTADOS_TRANSFERENCIA, MENSAJE_PAGO_PENDIENTE } from "@/lib/pagos";
 
 type Estado = NonNullable<Awaited<ReturnType<typeof estadoCuenta>>>;
 
-export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: string }) {
+/**
+ * Estado de cuenta de una unidad (lo ven el residente y la administración, con los mismos datos).
+ * FIN-COMP A: separa lo confirmado de lo pendiente. Un pago informado sin verificar se muestra,
+ * pero no resta de la deuda ni suma a lo pagado.
+ */
+export function EstadoCuenta({ estado, moneda, administracion = false }: { estado: Estado; moneda: string; administracion?: boolean }) {
   const $ = (n: number | { toString(): string }) => formatoMoneda(n, moneda);
   const ahora = new Date();
+  const pendientes = estado.enVerificacion;
   return (
     <>
-      <div className="mb-4 grid gap-4 sm:grid-cols-3">
+      <div className="mb-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
-          <p className="text-sm text-texto-suave">Deuda total</p>
+          <p className="text-sm text-texto-suave">Total adeudado confirmado</p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{$(estado.deuda)}</p>
+          {estado.vencida > 0 && <p className="mt-1 text-sm font-semibold text-peligro">{$(estado.vencida)} vencido</p>}
         </Card>
         <Card>
-          <p className="text-sm text-texto-suave">Vencida</p>
-          <p className={`mt-1 text-2xl font-bold tabular-nums ${estado.vencida > 0 ? "text-peligro" : ""}`}>
-            {$(estado.vencida)}
+          <p className="text-sm text-texto-suave">Pagos registrados</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{$(estado.pagado)}</p>
+          <p className="mt-1 text-xs text-texto-suave">Recibidos y registrados por la administración.</p>
+        </Card>
+        <Card className={pendientes.cantidad > 0 ? "border-alerta/50 bg-alerta-suave/40" : undefined}>
+          <p className="text-sm text-texto-suave">Pendiente de verificación</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{$(pendientes.monto)}</p>
+          <p className="mt-1 text-xs text-texto-suave">
+            {pendientes.cantidad > 0 ? "Informado, todavía no descuenta de la deuda." : "Sin pagos informados por verificar."}
           </p>
         </Card>
         <Card>
-          <p className="text-sm text-texto-suave">Saldo a favor</p>
+          <p className="text-sm text-texto-suave">Saldo a favor confirmado</p>
           <p className="mt-1 text-2xl font-bold tabular-nums">{$(estado.aFavor)}</p>
         </Card>
       </div>
+
+      {pendientes.cantidad > 0 && (
+        <section aria-label="Pagos pendientes de verificación" className="mb-6 rounded-2xl border border-alerta/40 bg-alerta-suave/60 p-4">
+          <p className="font-bold">{pendientes.cantidad === 1 ? "Pago pendiente de verificación" : `${pendientes.cantidad} pagos pendientes de verificación`}</p>
+          <p className="mt-1 text-sm">
+            {administracion
+              ? "El residente informó estos pagos. No cuentan como recaudación hasta verificarlos con la cartola del banco."
+              : MENSAJE_PAGO_PENDIENTE}
+          </p>
+          <ul className="mt-3 space-y-1 text-sm">
+            {pendientes.lista.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center gap-2">
+                <Insignia tono="alerta">{ESTADOS_TRANSFERENCIA[t.estado].texto}</Insignia>
+                <span className="font-semibold tabular-nums">{$(t.monto)}</span>
+                <span className="text-texto-suave">
+                  transferido el {formatoFecha(t.fecha)}
+                  {t.operacion && ` · operación ${t.operacion}`} · informado el {formatoFecha(t.creadoEn)}
+                </span>
+                {t.comprobante && (
+                  <a href={`/comprobantes/${t.id}`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                    comprobante
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <h4 className="mb-2 font-semibold">Avisos de cobro</h4>
       {estado.avisos.length === 0 ? (
@@ -128,6 +170,7 @@ export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: strin
               <th>Fecha</th>
               <th>Medio</th>
               <th>Referencia</th>
+              {administracion && <th>Banco</th>}
               <th className="text-right">Monto</th>
             </tr>
           </thead>
@@ -138,8 +181,17 @@ export function EstadoCuenta({ estado, moneda }: { estado: Estado; moneda: strin
                 <td>{ETIQUETAS_MEDIO_PAGO[p.medio]}</td>
                 <td className="text-texto-suave">
                   {p.referencia ?? "—"}
-                  {p.anuladoEn && <span className="ml-2"><Insignia tono="peligro">Anulado</Insignia></span>}
+                  {p.anuladoEn && <span className="ml-2"><Insignia tono="peligro">Anulado o reversado</Insignia></span>}
                 </td>
+                {administracion && (
+                  <td className="whitespace-nowrap text-sm">
+                    {p.anuladoEn ? "—" : p.conciliaciones.length > 0 ? (
+                      <Insignia tono="exito">Conciliado {formatoFecha(p.conciliaciones[0].movimiento.fecha)}</Insignia>
+                    ) : (
+                      <span className="text-texto-suave">Sin movimiento bancario</span>
+                    )}
+                  </td>
+                )}
                 <td className={`text-right tabular-nums ${p.anuladoEn ? "line-through" : ""}`}>{$(p.monto)}</td>
               </tr>
             ))}

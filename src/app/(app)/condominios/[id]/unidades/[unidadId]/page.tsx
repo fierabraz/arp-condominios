@@ -76,7 +76,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
 
       <section className="mb-8">
         <h2 className="mb-4 font-medium">Estado de cuenta</h2>
-        <EstadoCuenta estado={estado!} moneda={usuario.administradora?.moneda ?? "CLP"} />
+        <EstadoCuenta estado={estado!} moneda={usuario.administradora?.moneda ?? "CLP"} administracion />
       </section>
 
       <Card className="mb-6">

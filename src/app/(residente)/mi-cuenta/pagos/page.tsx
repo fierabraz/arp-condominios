@@ -45,7 +45,7 @@ export default async function PagosPage({ searchParams }: PageProps<"/mi-cuenta/
               </div>
               <p className="mb-4 text-sm text-texto-suave">
                 {unidad.condominioNombre}
-                {alicuotas.has(unidad.id) && ` · Alícuota ${formatoPorcentaje(alicuotas.get(unidad.id)!)}`}
+                {alicuotas.has(unidad.id) && ` · Porcentaje de prorrateo ${formatoPorcentaje(alicuotas.get(unidad.id)!)}`}
               </p>
               <EstadoCuenta estado={estado} moneda={moneda} />
             </section>
