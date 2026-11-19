@@ -32,23 +32,23 @@ export function estadoAlicuotas({
       return {
         tipo: "error",
         faltan: total - cargadas,
-        texto: `Las alícuotas ya suman 100 %, pero hay ${cargadas} de ${total} unidades cargadas. Revisa las alícuotas o corrige el total de unidades en Configurar propiedad.`,
+        texto: `Los porcentajes de prorrateo ya suman 100 %, pero hay ${cargadas} de ${total} unidades cargadas. Revisa los porcentajes de prorrateo o corrige el total de unidades en Configurar propiedad.`,
       };
     }
-    return { tipo: "ok", texto: `Las alícuotas de las ${unidades(cargadas)} suman 100 %. Cuadra.` };
+    return { tipo: "ok", texto: `Los porcentajes de prorrateo de las ${unidades(cargadas)} suman 100 %. Cuadra.` };
   }
 
   if (pasada) {
     return {
       tipo: "error",
-      texto: `Las alícuotas de las ${unidades(cargadas)} suman ${pct(suma)}, más de 100 %. Corrígelas antes de emitir el próximo cobro.`,
+      texto: `Los porcentajes de prorrateo de las ${unidades(cargadas)} suman ${pct(suma)}, más de 100 %. Corrígelas antes de emitir el próximo cobro.`,
     };
   }
 
   if (!total) {
     return {
       tipo: "revisar",
-      texto: `Hay ${unidades(cargadas)} cargadas y sus alícuotas suman ${pct(suma)}. Si aún faltan unidades por cargar, es normal. Indica cuántas unidades tiene la propiedad en total para seguir el avance.`,
+      texto: `Hay ${unidades(cargadas)} cargadas y sus porcentajes de prorrateo suman ${pct(suma)}. Si aún faltan unidades por cargar, es normal. Indica cuántas unidades tiene la propiedad en total para seguir el avance.`,
     };
   }
 
@@ -57,7 +57,7 @@ export function estadoAlicuotas({
     return {
       tipo: "progreso",
       faltan,
-      texto: `Llevas ${cargadas} de ${total} unidades cargadas (faltan ${faltan}). Sus alícuotas suman ${pct(suma)}; al completar todas deberían llegar a 100 %.`,
+      texto: `Llevas ${cargadas} de ${total} unidades cargadas (faltan ${faltan}). Sus porcentajes de prorrateo suman ${pct(suma)}; al completar todas deberían llegar a 100 %.`,
     };
   }
 
@@ -65,8 +65,8 @@ export function estadoAlicuotas({
     tipo: "error",
     texto:
       cargadas === total
-        ? `Ya están las ${total} unidades y sus alícuotas suman ${pct(suma)}. Deben sumar 100 % para cobrar bien: corrígelas antes de emitir el próximo cobro.`
-        : `Hay ${cargadas} unidades cargadas, más que las ${total} indicadas para la propiedad, y sus alícuotas suman ${pct(suma)}. Revisa el total de unidades en Configurar propiedad y las alícuotas.`,
+        ? `Ya están las ${total} unidades y sus porcentajes de prorrateo suman ${pct(suma)}. Deben sumar 100 % para cobrar bien: corrígelas antes de emitir el próximo cobro.`
+        : `Hay ${cargadas} unidades cargadas, más que las ${total} indicadas para la propiedad, y sus porcentajes de prorrateo suman ${pct(suma)}. Revisa el total de unidades en Configurar propiedad y los porcentajes de prorrateo.`,
   };
 }
 

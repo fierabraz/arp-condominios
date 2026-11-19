@@ -100,8 +100,8 @@ export default async function TransferenciasPage({ params, searchParams }: PageP
         </p>
       )}
 
-      <div className="mb-4 grid gap-3 sm:grid-cols-4">
-        {(["INFORMADA", "EN_REVISION", "CONCILIADA", "RECHAZADA"] as const).map((e) => (
+      <div className="mb-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {(["INFORMADA", "EN_REVISION", "CONCILIADA", "RECHAZADA", "ANULADA"] as const).map((e) => (
           <Link key={e} href={filtro(e)} className={`rounded-2xl border bg-white p-4 hover:border-convive ${estado === e ? "border-marca ring-2 ring-convive/30" : "border-borde"}`}>
             <span className="block text-sm text-texto-suave">{ESTADOS_TRANSFERENCIA[e].texto}</span>
             <span className="text-2xl font-bold tabular-nums">{cuenta(e)}</span>

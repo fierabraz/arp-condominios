@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { aMonto, aNumero, aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { leerDistribucion } from "@/lib/conciliacion";
 import { anularPago, emitirPeriodo, ErrorCobro, PagoDuplicado, registrarPago } from "@/lib/cobro-servicio";
 import { enviarAvisosPeriodo } from "@/lib/envio-avisos";
 import { MedioPago, TipoGasto } from "@/generated/prisma/enums";
@@ -13,6 +14,7 @@ import { nombrePeriodo } from "@/lib/cobro";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { registrar, registrarEn } from "@/lib/registro";
 import { cargarCobrosPendientes } from "@/lib/reservas-servicio";
+import { saldosFondos } from "@/lib/egresos-servicio";
 
 const PeriodoSchema = z.object({
   anio: z.number({ error: "Ingresa el año." }).int().min(2000, { error: "Año no válido." }).max(2100, { error: "Año no válido." }),
@@ -30,6 +32,11 @@ export async function abrirPeriodo(condominioId: string, _: EstadoForm, formData
     where: { condominioId_anio_mes: { condominioId, ...datos.data } },
   });
   if (existe) return { mensaje: "Ese período ya existe." };
+  // FIN-COMP D: los meses hasta la apertura incorporada pertenecen al sistema anterior.
+  const apertura = await db.periodo.findFirst({ where: { condominioId, deApertura: true }, select: { anio: true, mes: true } });
+  if (apertura && apertura.anio * 12 + apertura.mes >= datos.data.anio * 12 + datos.data.mes) {
+    return { mensaje: `Los meses hasta ${nombrePeriodo(apertura.anio, apertura.mes)} vienen del sistema anterior (apertura). Abre un mes posterior.` };
+  }
 
   const periodo = await db.periodo.create({ data: { ...datos.data, condominioId, administradoraId } });
   await registrar(usuario, "Abrió un mes", `${nombrePeriodo(periodo.anio, periodo.mes)} en ${condominio.nombre}`, condominioId);
@@ -48,11 +55,18 @@ const GastoSchema = z
     documento: z.string().optional(),
     monto: z.number({ error: "Ingresa el monto." }).gt(0, { error: "Debe ser mayor que 0." }),
     fecha: z.coerce.date({ error: "Ingresa la fecha." }),
+    // FIN-COMP B: con qué se paga (vacío = gasto común del mes) y si ya se pagó al proveedor.
+    fondoId: z.string().optional(),
+    pagado: z.boolean(),
+    fechaPago: z.coerce.date().optional(),
+    medioPago: z.enum(MedioPago).optional(),
   })
   .refine((g) => g.tipo !== "INDIVIDUAL" || g.unidadId, {
     error: "Elige la unidad a la que se carga.",
     path: ["unidadId"],
-  });
+  })
+  .refine((g) => !g.pagado || (g.fechaPago && g.medioPago), { error: "Indica la fecha y el medio de pago.", path: ["fechaPago"] })
+  .refine((g) => !g.fondoId || g.tipo === "COMUN", { error: "Solo un gasto común se puede pagar con un fondo.", path: ["fondoId"] });
 
 /** Lo que se guarda de un gasto en el registro (SEG-25). */
 function datosGasto(g: {
@@ -90,22 +104,45 @@ export async function agregarGasto(periodoId: string, _: EstadoForm, formData: F
     documento: aTexto(formData.get("documento")),
     monto: aMonto(formData.get("monto")),
     fecha: aTexto(formData.get("fecha")),
+    fondoId: aTexto(formData.get("fondoId")),
+    pagado: formData.get("pagado") === "1",
+    fechaPago: aTexto(formData.get("fechaPago")),
+    medioPago: aTexto(formData.get("medioPago")),
   });
   if (!datos.success) return erroresDe(datos.error);
 
   const periodo = await db.periodo.findFirst({ where: { id: periodoId, administradoraId } });
   if (!periodo || !puedeVerPropiedad(usuario, periodo.condominioId)) return { mensaje: "Período no encontrado." };
   if (periodo.estado === "CERRADO") return { mensaje: "El período está cerrado." };
-  const { unidadId, ...resto } = datos.data;
+  const { unidadId, fondoId, pagado, fechaPago, medioPago, ...resto } = datos.data;
   if (resto.tipo === "INDIVIDUAL") {
     const unidad = await db.unidad.findFirst({ where: { id: unidadId, condominioId: periodo.condominioId } });
     if (!unidad) return { errores: { unidadId: ["Unidad no encontrada."] } };
   }
+  const fondo = fondoId ? await db.fondo.findFirst({ where: { id: fondoId, condominioId: periodo.condominioId, administradoraId, activo: true } }) : null;
+  if (fondoId && !fondo) return { errores: { fondoId: ["Fondo no encontrado."] } };
+  if (fondo) {
+    const saldo = (await saldosFondos(periodo.condominioId, administradoraId)).find((f) => f.fondo.id === fondo.id)?.saldo ?? 0;
+    if (resto.monto > saldo) return { errores: { fondoId: [`${fondo.nombre} tiene ${formatoMoneda(saldo, usuario.administradora?.moneda)} disponibles.`] } };
+  }
+  // FIN-COMP B: si el proveedor está en el catálogo, el egreso queda unido a él.
+  const proveedor = resto.proveedor
+    ? await db.proveedor.findFirst({ where: { administradoraId, nombre: { equals: resto.proveedor, mode: "insensitive" } }, select: { id: true } })
+    : null;
 
   // SEG-25: el gasto y su registro se guardan juntos; si el registro falla, el gasto no queda.
   await db.$transaction(async (tx) => {
+    if (fondo) await tx.$queryRaw`SELECT id FROM "Fondo" WHERE id = ${fondo.id} FOR UPDATE`;
     const gasto = await tx.gasto.create({
-      data: { ...resto, unidadId: resto.tipo === "INDIVIDUAL" ? unidadId : null, periodoId, administradoraId },
+      data: {
+        ...resto,
+        unidadId: resto.tipo === "INDIVIDUAL" ? unidadId : null,
+        periodoId,
+        administradoraId,
+        fondoId: fondo?.id ?? null,
+        proveedorId: proveedor?.id ?? null,
+        ...(pagado ? { estadoPago: "PAGADO" as const, fechaPago, medioPago, pagadoPor: usuario.nombre } : {}),
+      },
     });
     await registrarEn(tx, {
       autor: usuario,
@@ -125,9 +162,11 @@ export async function eliminarGasto(gastoId: string) {
   const { usuario, administradoraId } = await requireAdministradora();
   const gasto = await db.gasto.findFirst({
     where: { id: gastoId, administradoraId },
-    include: { periodo: true },
+    include: { periodo: true, conciliaciones: { select: { id: true }, take: 1 } },
   });
   if (!gasto || gasto.periodo.estado === "CERRADO" || !puedeVerPropiedad(usuario, gasto.periodo.condominioId)) return;
+  // FIN-COMP B: un egreso con historial de conciliación bancaria no se quita (queda la trazabilidad).
+  if (gasto.conciliaciones.length) return;
   await db.$transaction(async (tx) => {
     await tx.gasto.delete({ where: { id: gastoId } });
     await registrarEn(tx, {
@@ -189,9 +228,13 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
 
   const confirmado = formData.get("confirmarDuplicado") === "si";
   const moneda = usuario.administradora?.moneda;
+  // FIN-COMP A: qué avisos paga (propuesta revisada por la administración).
+  const distribucion = leerDistribucion(formData.get("distribucion"));
+  if (distribucion === "invalida") return { errores: { distribucion: ["La distribución entre avisos no es válida. Recarga la página."] } };
   try {
     await registrarPago(administradoraId, datos.data, {
       permitirDuplicado: confirmado,
+      distribucion,
       anotar: (pago) => ({
         autor: usuario,
         accion: "Registró un pago",
@@ -206,6 +249,7 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
           medio: datos.data.medio,
           referencia: datos.data.referencia ?? null,
           confirmadoComoDistinto: confirmado,
+          distribucion: distribucion ?? null,
         },
       }),
     });
@@ -225,7 +269,19 @@ export async function nuevoPago(condominioId: string, _: EstadoForm, formData: F
         },
       };
     }
-    if (e instanceof ErrorCobro) return { mensaje: e.message };
+    // FIN-COMP C: si se rechaza (por ejemplo, fecha de un mes cerrado), el formulario conserva lo escrito.
+    if (e instanceof ErrorCobro) {
+      return {
+        mensaje: e.message,
+        valores: {
+          unidadId: datos.data.unidadId,
+          monto: aTexto(formData.get("monto")) ?? "",
+          fecha: aTexto(formData.get("fecha")) ?? "",
+          medio: datos.data.medio,
+          referencia: datos.data.referencia ?? "",
+        },
+      };
+    }
     throw e;
   }
   revalidatePath(`/condominios/${condominioId}`, "layout");

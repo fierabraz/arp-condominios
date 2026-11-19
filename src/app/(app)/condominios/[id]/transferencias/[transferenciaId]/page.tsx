@@ -5,13 +5,14 @@ import { db } from "@/lib/db";
 import { Card, Insignia, PageHeader, Vacio } from "@/components/ui";
 import { formatoFecha, formatoFechaHora, formatoMoneda } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
+import { formatoFolio } from "@/lib/constancias";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
 import { puede } from "@/lib/permisos";
 import { coincidenciasDe } from "@/lib/transferencias-servicio";
 import { condominioVisible } from "../../condominio-actual";
-import { cambiarEstadoAccion, confirmarTransferenciaAccion } from "../../../transferencias-actions";
-import { FormularioConfirmar, FormularioNota } from "./formularios";
+import { cambiarEstadoAccion, confirmarTransferenciaAccion, reversarTransferenciaAccion, vincularTransferenciaAccion } from "../../../transferencias-actions";
+import { BotonAccion, FormularioConfirmar, FormularioNota } from "./formularios";
 
 // PAG-001 · Revisar una transferencia informada.
 
@@ -28,16 +29,33 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
       comprobante: { select: { nombre: true, tipo: true, tamano: true } },
       movimiento: { include: { cuenta: { select: { banco: true, numeroFinal: true } } } },
       pago: { select: { id: true, monto: true, fecha: true, anuladoEn: true } },
+      constancia: { select: { folio: true, versiones: { orderBy: { version: "asc" }, select: { version: true, estado: true, generadaEn: true } } } },
     },
   });
   if (!t) notFound();
   const $ = (n: number | { toString(): string }) => formatoMoneda(n, moneda);
   const abierta = ESTADOS_ABIERTOS.includes(t.estado);
-  const [estado, coincidencias, historial] = await Promise.all([
+  const desde = new Date(t.fecha.getTime() - 15 * 86_400_000);
+  const hasta = new Date(t.fecha.getTime() + 15 * 86_400_000);
+  const [estado, coincidencias, historial, pagosManuales] = await Promise.all([
     estadoCuenta(t.unidadId, administradoraId),
-    abierta ? coincidenciasDe(t) : null,
+    abierta && !t.pagoId ? coincidenciasDe(t) : null,
     db.registroCambio.findMany({ where: { entidad: "TransferenciaInformada", entidadId: t.id }, orderBy: { creadoEn: "asc" } }),
+    // FIN-COMP A: pagos de la unidad que la administración ya registró y que no están unidos a otra transferencia.
+    abierta && !t.pagoId
+      ? db.pago.findMany({
+          where: { unidadId: t.unidadId, administradoraId, anuladoEn: null, transferencia: null, fecha: { gte: desde, lte: hasta } },
+          orderBy: { fecha: "desc" },
+          include: { conciliaciones: { where: { anuladaEn: null }, select: { id: true } } },
+          take: 10,
+        })
+      : [],
   ]);
+  const ahora = new Date();
+  const avisos = (estado?.avisos ?? [])
+    .filter((a) => Number(a.saldo) > 0)
+    .sort((a, b) => a.vencimiento.getTime() - b.vencimiento.getTime())
+    .map((a) => ({ id: a.id, etiqueta: nombrePeriodo(a.periodo.anio, a.periodo.mes), saldo: Number(a.saldo), vencido: a.vencimiento < ahora }));
   const e = ESTADOS_TRANSFERENCIA[t.estado];
   const base = `/condominios/${id}/transferencias`;
 
@@ -97,6 +115,29 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
             <p className="mt-3 text-xs text-texto-suave">El comprobante sirve de apoyo, pero el pago solo se confirma con el movimiento de la cartola.</p>
           </Card>
           <Card>
+            <h2 className="mb-2 font-bold">Constancia de pago {t.constancia ? formatoFolio(t.constancia.folio) : ""}</h2>
+            <p className="mb-3 text-sm text-texto-suave">
+              Cada cambio de estado agrega una versión con el mismo folio. Las versiones anteriores no se borran. El residente ve las mismas.
+            </p>
+            <ul className="space-y-1 text-sm">
+              {(t.constancia?.versiones ?? []).map((v, i, todas) => (
+                <li key={v.version}>
+                  <a href={`/comprobantes/${t.id}/constancia?v=${v.version}`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                    Versión {v.version}: {ESTADOS_TRANSFERENCIA[v.estado].texto}
+                  </a>{" "}
+                  <span className="text-texto-suave">· {formatoFechaHora(v.generadaEn)}{i === todas.length - 1 ? " · vigente" : ""}</span>
+                </li>
+              ))}
+              {!t.constancia && (
+                <li>
+                  <a href={`/comprobantes/${t.id}/constancia`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                    Generar constancia (PDF)
+                  </a>
+                </li>
+              )}
+            </ul>
+          </Card>
+          <Card>
             <h2 className="mb-3 font-bold">Cuenta de la unidad</h2>
             <dl className="grid grid-cols-[1fr_auto] gap-y-1 text-sm">
               <dt className="text-texto-suave">Deuda cuando informó</dt>
@@ -115,7 +156,7 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
         <div className="space-y-6">
           {t.estado === "CONCILIADA" && t.movimiento && t.pago && (
             <Card className="border-exito/30">
-              <h2 className="mb-2 font-bold text-exito">Verificada y conciliada</h2>
+              <h2 className="mb-2 font-bold text-exito">Verificado y conciliado</h2>
               <p className="text-sm">
                 {t.revisadoPor} la confirmó el {formatoFechaHora(t.revisadoEn!)} con el movimiento del {formatoFecha(t.movimiento.fecha)} por{" "}
                 {$(t.movimiento.monto)} ({t.movimiento.cuenta.banco} ···{t.movimiento.cuenta.numeroFinal}).
@@ -125,6 +166,32 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
                 <Link href={`/condominios/${id}/pagos`} className="font-semibold text-marca underline">Recaudación</Link>.
               </p>
               {t.nota && <p className="mt-1 text-sm text-texto-suave">{t.nota}</p>}
+              <details className="mt-4 border-t border-borde pt-3">
+                <summary className="cursor-pointer text-sm font-semibold text-peligro">Reversar este pago</summary>
+                <p className="my-2 text-sm text-texto-suave">
+                  Úsalo solo si el ingreso no corresponde (por ejemplo, el banco devolvió la transferencia). El pago queda anulado (no se borra),
+                  la deuda vuelve a los avisos, el movimiento queda libre y la transferencia pasa a «Anulado o reversado». El residente verá el motivo.
+                </p>
+                <FormularioNota accion={reversarTransferenciaAccion.bind(null, id, t.id)} boton="Reversar pago" variante="peligro" ayuda="Motivo del reverso" />
+              </details>
+            </Card>
+          )}
+          {t.estado === "ANULADA" && (
+            <Card className="border-peligro/30">
+              <h2 className="mb-2 font-bold text-peligro">Anulado o reversado</h2>
+              <p className="text-sm">{t.nota}</p>
+              <p className="mt-1 text-xs text-texto-suave">{t.revisadoPor} · {t.revisadoEn && formatoFechaHora(t.revisadoEn)}. El pago anulado sigue en Recaudación, tachado.</p>
+            </Card>
+          )}
+          {abierta && t.pago && (
+            <Card className="border-alerta/40">
+              <h2 className="mb-2 font-bold">Unida a un pago ya registrado</h2>
+              <p className="text-sm">
+                Corresponde al pago de {$(t.pago.monto)} del {formatoFecha(t.pago.fecha)} que ya está en Recaudación. Falta encontrarlo en la cartola:
+                cuando cargues la cartola, concilia ese movimiento desde{" "}
+                <Link href={`/condominios/${id}/conciliacion/movimientos?tipo=abono&estado=PENDIENTE`} className="font-semibold text-marca underline">Movimientos bancarios</Link>{" "}
+                y esta transferencia quedará verificada sola. No se creará otro ingreso.
+              </p>
             </Card>
           )}
           {t.estado === "RECHAZADA" && (
@@ -154,6 +221,7 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
                     montoInformado={Number(t.monto)}
                     deudaActual={estado?.deuda ?? 0}
                     ambigua={coincidencias.ambigua}
+                    avisos={avisos}
                     opciones={coincidencias.coincidencias.slice(0, 8).map((c) => ({
                       id: c.id,
                       fecha: formatoFecha(c.fecha),
@@ -167,10 +235,33 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
                   />
                 )}
               </Card>
+              {pagosManuales.length > 0 && (
+                <Card>
+                  <h2 className="mb-1 font-bold">¿Ya registraste este pago a mano?</h2>
+                  <p className="mb-3 text-sm text-texto-suave">
+                    Pagos de la unidad {t.unidad.numero} en Recaudación con fecha cercana. Si uno de ellos es esta transferencia, vincúlalos: no se crea un segundo ingreso.
+                  </p>
+                  <ul className="space-y-4">
+                    {pagosManuales.map((p) => (
+                      <li key={p.id} className="rounded-xl border border-borde p-3">
+                        <p className="text-sm font-semibold">
+                          {$(p.monto)} · {formatoFecha(p.fecha)} {p.referencia && <span className="font-normal text-texto-suave">· {p.referencia}</span>}
+                        </p>
+                        <p className="mb-2 text-xs text-texto-suave">{p.conciliaciones.length > 0 ? "Ya conciliado con la cartola." : "Todavía sin movimiento bancario."}</p>
+                        <BotonAccion
+                          accion={vincularTransferenciaAccion.bind(null, id, t.id, p.id)}
+                          texto="Vincular con este pago"
+                          confirmar="Revisé que esta transferencia es el mismo pago ya registrado."
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
               <Card>
                 <h2 className="mb-3 font-bold">Si no se puede confirmar</h2>
                 <div className="grid gap-6 md:grid-cols-2">
-                  {t.estado === "INFORMADA" && (
+                  {t.estado === "INFORMADA" && !t.pagoId && (
                     <FormularioNota
                       accion={cambiarEstadoAccion.bind(null, id, t.id, "EN_REVISION")}
                       boton="Dejar pendiente de revisión"

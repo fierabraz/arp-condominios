@@ -5,6 +5,7 @@ import "dotenv/config";
 import { after, before, describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../src/lib/db";
+import { borrarConstancias } from "./limpieza";
 import { anularPago, emitirPeriodo, estadoCuenta } from "../src/lib/cobro-servicio";
 import {
   cambiarEstadoTransferencia,
@@ -26,6 +27,8 @@ before(async () => {
 });
 after(async () => {
   for (const id of creadas) {
+    await borrarConstancias(id);
+    await db.conciliacionMovimiento.deleteMany({ where: { administradoraId: id } });
     await db.transferenciaInformada.deleteMany({ where: { administradoraId: id } });
     await db.movimientoBancario.deleteMany({ where: { administradoraId: id } });
     await db.importacionCartola.deleteMany({ where: { administradoraId: id } });

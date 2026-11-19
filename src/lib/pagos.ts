@@ -8,29 +8,42 @@ import type { EstadoTransferencia } from "@/generated/prisma/enums";
 // ---------------------------------------------------------------------------
 // Estados de una transferencia informada
 
+/**
+ * FIN-COMP A · Mensaje obligatorio mientras un pago informado no se ha comprobado. Nunca se dice
+ * «rechazado» ni «pagado» por falta de respuesta, y no se sugiere volver a pagar.
+ */
+export const MENSAJE_PAGO_PENDIENTE =
+  "Hemos recibido la información de tu pago, pero todavía está pendiente de verificación. Una vez confirmado, se actualizará tu estado de cuenta.";
+
 export const ESTADOS_TRANSFERENCIA: Record<
   EstadoTransferencia,
   { texto: string; tono: "neutro" | "alerta" | "exito" | "peligro"; residente: string }
 > = {
+  // FIN-COMP A: los cinco estados mínimos de un pago informado, con los mismos nombres en todo Convive.
   INFORMADA: {
-    texto: "Informada",
-    tono: "neutro",
-    residente: "Pendiente de verificación por la administración.",
+    texto: "Pendiente de verificación",
+    tono: "alerta",
+    residente: MENSAJE_PAGO_PENDIENTE,
   },
   EN_REVISION: {
-    texto: "Pendiente de revisión",
+    texto: "En revisión",
     tono: "alerta",
-    residente: "La administración la está revisando. Todavía no se descuenta de tu deuda.",
+    residente: "La administración la está revisando. Todavía no se descuenta de tu deuda. No es necesario que vuelvas a transferir.",
   },
   CONCILIADA: {
-    texto: "Verificada y conciliada",
+    texto: "Verificado y conciliado",
     tono: "exito",
     residente: "La administración la verificó en la cartola del banco y la registró como pago.",
   },
   RECHAZADA: {
-    texto: "Rechazada o con diferencias",
+    texto: "Rechazado o con diferencias",
     tono: "peligro",
-    residente: "La administración no pudo verificarla. Revisa el motivo y, si corresponde, infórmala de nuevo.",
+    residente: "La administración no pudo aceptarla tal como se informó. Revisa el motivo y, si tienes dudas, contacta a tu administración.",
+  },
+  ANULADA: {
+    texto: "Anulado o reversado",
+    tono: "peligro",
+    residente: "El pago se había registrado, pero la administración lo reversó. Revisa el motivo.",
   },
 };
 

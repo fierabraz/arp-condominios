@@ -3,17 +3,21 @@ import { notFound } from "next/navigation";
 import { puedeEditar, puedeVerPropiedad, requireAdministradora } from "@/lib/auth";
 import { filtroPersonas } from "@/lib/permisos";
 import { db } from "@/lib/db";
-import { Boton, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
+import { Boton, BotonDocumento, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { UnidadForm } from "../../../unidad-form";
 import { cambiarDiaPago, editarUnidad, eliminarUnidad, terminarVinculoPersona, vincularPersona } from "../../../actions";
 import { DiaPagoForm } from "./dia-pago-form";
 import { TerminarAsignacionForm } from "../../estructura/formularios";
 import { ORDEN_TIPOS, relacionDe, TIPOS_VINCULO } from "@/lib/vinculos";
 import { diaISO } from "@/lib/forms";
-import { formatoDia } from "@/lib/formato";
+import { formatoDia, formatoFechaHora } from "@/lib/formato";
 import { VinculoForm } from "./vinculo-form";
 import { estadoCuenta } from "@/lib/cobro-servicio";
 import { EstadoCuenta } from "@/components/estado-cuenta";
+import { puede } from "@/lib/permisos";
+import { formatoFolioCertificado } from "@/lib/certificados";
+import { emitirCertificadoAccion } from "../../../certificado-actions";
+import { EmitirCertificado } from "./certificado";
 import { historialUnidad } from "@/lib/unidades";
 import { asignacionVigente, CLASES, hoyDia, opcionesAgrupaciones } from "@/lib/estructura";
 
@@ -39,7 +43,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
   if (!unidad) notFound();
   const vigentes = unidad.vinculos.filter((v) => !v.hasta).sort((a, b) => ORDEN_TIPOS.indexOf(a.tipo) - ORDEN_TIPOS.indexOf(b.tipo));
   const terminados = unidad.vinculos.filter((v) => v.hasta);
-  const [estado, historial, agrupaciones, espacios] = await Promise.all([
+  const [estado, historial, agrupaciones, espacios, certificados] = await Promise.all([
     estadoCuenta(unidad.id, administradoraId),
     historialUnidad(unidad.id),
     db.agrupacion.findMany({ where: { condominioId: id } }),
@@ -52,6 +56,7 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
       include: { asignaciones: { where: { unidadId: unidad.id } } },
       orderBy: [{ clase: "asc" }, { codigo: "asc" }],
     }),
+    db.certificadoAlDia.findMany({ where: { unidadId: unidad.id }, orderBy: { emitidoEn: "desc" }, take: 10, select: { id: true, folio: true, emitidoEn: true, emitidoPor: true } }),
   ]);
   const opcionesAgrupacion = opcionesAgrupaciones(agrupaciones);
   const espaciosUnidad = espacios
@@ -76,8 +81,32 @@ export default async function UnidadPage({ params }: PageProps<"/condominios/[id
 
       <section className="mb-8">
         <h2 className="mb-4 font-medium">Estado de cuenta</h2>
-        <EstadoCuenta estado={estado!} moneda={usuario.administradora?.moneda ?? "CLP"} />
+        <EstadoCuenta estado={estado!} moneda={usuario.administradora?.moneda ?? "CLP"} administracion />
       </section>
+
+      <Card className="mb-6">
+        <h2 className="mb-2 font-bold">Documentos de la cuenta</h2>
+        <p className="mb-3 text-sm text-texto-suave">
+          El estado de cuenta en PDF usa los mismos datos de esta pantalla y de Recaudación. El certificado de unidad al día solo se emite si la unidad no tiene
+          obligaciones vencidas impagas (puede tener un aviso por vencer); los pagos pendientes de verificación no cuentan como pagados.
+        </p>
+        <div className="mb-4 flex flex-wrap items-start gap-3">
+          <BotonDocumento href={`/documentos/estado-cuenta/${unidad.id}`}>Estado de cuenta (PDF)</BotonDocumento>
+          {puede(usuario, "certificados.emitir", id) && <EmitirCertificado accion={emitirCertificadoAccion.bind(null, id, unidad.id)} alDia={estado!.vencida === 0} />}
+        </div>
+        {certificados.length > 0 && (
+          <ul className="space-y-1 text-sm">
+            {certificados.map((c) => (
+              <li key={c.id}>
+                <a href={`/documentos/certificado/${c.id}`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                  Certificado {formatoFolioCertificado(c.folio)}
+                </a>{" "}
+                <span className="text-texto-suave">· {formatoFechaHora(c.emitidoEn)} · {c.emitidoPor}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
 
       <Card className="mb-6">
         <h2 className="mb-4 font-medium">Datos de la unidad</h2>

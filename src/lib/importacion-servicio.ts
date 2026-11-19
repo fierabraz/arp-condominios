@@ -179,6 +179,7 @@ export async function aplicarImportacion(
   administradoraId: string,
   condominioId: string,
   filas: FilaImportada[],
+  nota = "",
 ) {
   const plan = await planDe(filas, condominioId, administradoraId);
   if (plan.errores.length) return { ok: false as const, plan };
@@ -221,7 +222,7 @@ export async function aplicarImportacion(
     async (tx) => {
       if (nuevasUnidades.length) await tx.unidad.createMany({ data: nuevasUnidades });
       for (const u of plan.unidades.filter((u) => u.accion === "actualizar")) {
-        await tx.unidad.update({ where: { id: u.id }, data: { tipo: u.tipo, alicuota: u.alicuota } });
+        await tx.unidad.update({ where: { id: u.id }, data: { tipo: u.tipo, alicuota: u.alicuota, prorrateoProvisional: false } });
       }
       if (nuevasPersonas.length) await tx.persona.createMany({ data: nuevasPersonas });
       for (const p of plan.personas.filter((p) => p.accion === "completar")) {
@@ -242,7 +243,7 @@ export async function aplicarImportacion(
   await registrar(
     autor,
     "Cargó unidades y personas desde una planilla",
-    `${r.unidadesNuevas} unidades nuevas, ${r.unidadesActualizadas} actualizadas, ${r.personasNuevas} personas nuevas, ${r.personasCompletadas} con datos completados, ${r.vinculosNuevos} vínculos nuevos. Suma de alícuotas: ${plan.sumaAlicuotas} %.`,
+    `${r.unidadesNuevas} unidades nuevas, ${r.unidadesActualizadas} actualizadas, ${r.personasNuevas} personas nuevas, ${r.personasCompletadas} con datos completados, ${r.vinculosNuevos} vínculos nuevos. Suma de porcentajes de prorrateo: ${plan.sumaAlicuotas} %.${nota}`,
     condominioId,
   );
   return { ok: true as const, plan, resumen: r };

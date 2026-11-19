@@ -52,7 +52,7 @@ export function VotacionForm({
       </Campo>
       <Campo etiqueta="Cómo se cuentan los votos" error={e.ponderacion}>
         <Select name="ponderacion" defaultValue="ALICUOTA">
-          <option value="ALICUOTA">Según alícuota de cada unidad</option>
+          <option value="ALICUOTA">Según porcentaje de prorrateo de cada unidad</option>
           <option value="UNIDAD">Una unidad, un voto</option>
         </Select>
       </Campo>

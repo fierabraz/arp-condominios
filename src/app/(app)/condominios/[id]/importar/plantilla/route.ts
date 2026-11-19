@@ -5,6 +5,9 @@ import { ETIQUETAS_TIPO_UNIDAD } from "@/lib/formato";
 import { COLUMNAS } from "@/lib/importacion";
 import { ORDEN_TIPOS, TIPOS_VINCULO } from "@/lib/vinculos";
 
+/** PILOTO-001 · Versión de la planilla oficial: subirla si cambian las columnas. */
+const VERSION_PLANILLA = 1;
+
 /**
  * Planilla para la carga desde Excel. Trae lo que la propiedad ya tiene (una fila por persona
  * y unidad), así sirve tanto para cargar desde cero como para corregir y volver a subir.
@@ -48,6 +51,8 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
   }
 
   const ayuda = [
+    [{ value: "Planilla oficial de Convive", fontWeight: "bold" as const }, { value: `Versión ${VERSION_PLANILLA}. Unidades, porcentajes de prorrateo, propietarios y residentes.` }],
+    [],
     [
       { value: "Columna", fontWeight: "bold" as const },
       { value: "Qué poner", fontWeight: "bold" as const },
@@ -60,9 +65,10 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
     [{ value: "•" }, { value: "El ocupante queda registrado, pero no recibe acceso a la app ni cobros." }],
     [{ value: "•" }, { value: "Para terminar un vínculo (por ejemplo, un arrendatario que se fue) hazlo en la ficha de la unidad: la planilla solo agrega." }],
     [{ value: "•" }, { value: "Una unidad sin nombre de persona se carga sola (útil para bodegas y estacionamientos)." }],
-    [{ value: "•" }, { value: "Si la unidad ya existe, se actualizan su tipo y alícuota. A las personas ya registradas (mismo RUT o correo) solo se les agregan los datos que les falten." }],
+    [{ value: "•" }, { value: "Si la unidad ya existe, se actualizan su tipo y porcentaje de prorrateo. A las personas ya registradas (mismo RUT o correo) solo se les agregan los datos que les falten." }],
     [{ value: "•" }, { value: "Nada se borra: quitar una fila de la planilla no elimina la unidad ni la persona." }],
     [{ value: "•" }, { value: "Antes de guardar verás una revisión con todo lo que se va a cargar." }],
+    [{ value: "•" }, { value: "Si algunas filas tienen problemas, puedes cargar solo las que están bien: las unidades con problemas quedan fuera completas (nunca a medias) y después vuelves a subir la planilla corregida sin duplicar nada." }],
   ];
 
   const buffer = await writeXlsxFile([
@@ -75,7 +81,7 @@ export async function GET(_: Request, { params }: RouteContext<"/condominios/[id
     { sheet: "Instrucciones", data: ayuda, columns: [{ width: 16 }, { width: 110 }] },
   ]).toBuffer();
 
-  const nombre = `planilla-${condominio.nombre.normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.xlsx`;
+  const nombre = `planilla-oficial-convive-v${VERSION_PLANILLA}-${condominio.nombre.normalize("NFD").replace(/[^\w]+/g, "-").replace(/^-|-$/g, "").toLowerCase()}.xlsx`;
   return new Response(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

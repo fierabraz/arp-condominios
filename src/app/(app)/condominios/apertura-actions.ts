@@ -28,6 +28,8 @@ import {
 import { abrirArchivo } from "@/lib/importacion-servicio";
 import { datosApertura } from "@/lib/apertura-servicio";
 import { formatoMoneda } from "@/lib/formato";
+import { puede } from "@/lib/permisos";
+import { ErrorIncorporacion, incorporarApertura } from "@/lib/apertura-incorporacion";
 
 const NO_ENCONTRADA = { mensaje: "Propiedad no encontrada." };
 
@@ -113,6 +115,7 @@ export async function cambiarEstadoApertura(condominioId: string, destino: "BORR
   const a = await acceso(condominioId);
   if (!a?.apertura) return NO_ENCONTRADA;
   if (a.apertura.estado === destino) return { ok: true };
+  if (a.apertura.estado === "INCORPORADA") return { mensaje: "La apertura ya está incorporada a las finanzas: no se puede cambiar." };
   if (destino === "EN_REVISION") {
     const datos = await datosApertura(a.apertura.id);
     const r = revisarApertura(datos.datos, datos.resumen);
@@ -452,5 +455,26 @@ export async function confirmarDeudasPlanilla(condominioId: string, _: EstadoCar
   } catch (e) {
     console.error("Error al cargar deudas de apertura:", e);
     return { etapa: "inicio", errores: [{ fila: 0, mensaje: "No se pudo completar la carga y no se guardó nada. Inténtalo de nuevo." }] };
+  }
+}
+
+/**
+ * FIN-COMP D: incorpora la apertura revisada a las finanzas (avisos de deuda, saldos a favor,
+ * fondos, cuentas y cuentas por pagar). Una sola vez y solo el administrador principal.
+ */
+export async function incorporarAperturaAccion(condominioId: string): Promise<EstadoForm> {
+  const a = await acceso(condominioId);
+  if (!a?.apertura) return NO_ENCONTRADA;
+  if (!puede(a.usuario, "propiedad.habilitarCobros", condominioId)) return { mensaje: "Solo el administrador principal puede incorporar la apertura." };
+  try {
+    const r = await incorporarApertura(a.usuario, condominioId);
+    refrescar(condominioId);
+    return {
+      ok: true,
+      mensaje: `Apertura incorporada: ${r.avisos} unidad(es) con deuda por ${pesos(r.emitido)}, saldos a favor por ${pesos(r.creditos)} y cuentas por pagar por ${pesos(r.porPagar)}.`,
+    };
+  } catch (e) {
+    if (e instanceof ErrorIncorporacion) return { mensaje: e.message };
+    throw e;
   }
 }

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { BotonDocumento, Card, PageHeader, Tabla, Vacio } from "@/components/ui";
-import { formatoFecha, formatoMoneda, hoyISO } from "@/lib/formato";
+import { BotonDocumento, Card, Insignia, PageHeader, Tabla, Vacio } from "@/components/ui";
+import { formatoFecha, formatoFechaHora, formatoMoneda, hoyISO } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
 import { ErrorCobro, previsualizarPeriodo } from "@/lib/cobro-servicio";
 import { agregarGasto, cerrarPeriodo, eliminarGasto, enviarAvisos } from "../../../cobro-actions";
@@ -11,6 +11,13 @@ import { GastoForm } from "./gasto-form";
 import { CerrarForm } from "./cerrar-form";
 import { EnviarForm } from "./enviar-form";
 import { correoConfigurado } from "@/lib/correo";
+import { saldosFondos } from "@/lib/egresos-servicio";
+import { datosCierre } from "@/lib/cierre-servicio";
+import { ESTADOS_MES, estadoMes } from "@/lib/cierre";
+import { puede } from "@/lib/permisos";
+import { FormularioSimple } from "@/components/formulario-simple";
+import { cerrarMesAccion, reabrirMesAccion } from "../../../cierre-actions";
+import { FormularioNota } from "../../transferencias/[transferenciaId]/formularios";
 
 const ETIQUETAS_ENVIO = { ENVIADO: "Enviado", SIMULADO: "Prueba", ERROR: "Error" } as const;
 
@@ -19,7 +26,7 @@ type Linea = { envio?: Envio; avisoId?: string; vencimiento?: Date; unidadId: st
 
 export default async function PeriodoPage({ params }: PageProps<"/condominios/[id]/periodos/[periodoId]">) {
   const { id, periodoId } = await params;
-  const { condominio, editable, moneda, administradoraId } = await condominioVisible(id);
+  const { condominio, editable, moneda, administradoraId, usuario } = await condominioVisible(id);
 
   const periodo = await db.periodo.findFirst({
     where: { id: periodoId, condominioId: id },
@@ -37,12 +44,15 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
   const proveedores = editable
     ? await db.proveedor.findMany({ where: { administradoraId }, orderBy: { nombre: "asc" }, select: { nombre: true } })
     : [];
+  const cierre = periodo.estado === "CERRADO" ? await datosCierre(periodo.id, administradoraId) : null;
+  const fondos = editable && periodo.estado === "ABIERTO" ? await saldosFondos(id, administradoraId) : [];
+  const nombreFondo = new Map(fondos.map((f) => [f.fondo.id, f.fondo.nombre]));
   const numeroDe = new Map(unidades.map((u) => [u.id, u.numero]));
   const abierto = periodo.estado === "ABIERTO";
   const nombre = nombrePeriodo(periodo.anio, periodo.mes);
   const $ = (n: number | { toString(): string }) => formatoMoneda(n, moneda);
 
-  const totalComun = periodo.gastos.filter((g) => g.tipo === "COMUN").reduce((s, g) => s + Number(g.monto), 0);
+  const totalComun = periodo.gastos.filter((g) => g.tipo === "COMUN" && !g.fondoId).reduce((s, g) => s + Number(g.monto), 0);
   const totalIndividual = periodo.gastos.filter((g) => g.tipo === "INDIVIDUAL").reduce((s, g) => s + Number(g.monto), 0);
 
   let lineas: Linea[] = [];
@@ -90,7 +100,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
         descripcion={
           abierto
             ? "Período abierto: registra los gastos del mes y ciérralo para emitir los cobros."
-            : `Cerrado. Los cobros vencen el ${formatoFecha(periodo.vencimiento!)}${
+            : `Avisos emitidos. Los cobros vencen el ${formatoFecha(periodo.vencimiento!)}${
                 conDiaPropio ? ` (${conDiaPropio === 1 ? "1 unidad tiene" : `${conDiaPropio} unidades tienen`} su propio día de pago)` : ""
               }.`
         }
@@ -119,6 +129,67 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
         </Card>
       </div>
 
+      {!abierto && cierre && (
+        <Card className={`mb-6 ${periodo.mesCerradoEn ? "" : "border-convive/40"}`}>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-bold">Cierre del mes</h2>
+            <Insignia tono={ESTADOS_MES[estadoMes(periodo)].tono}>{ESTADOS_MES[estadoMes(periodo)].texto}</Insignia>
+          </div>
+          {periodo.mesCerradoEn ? (
+            <>
+              <p className="mb-3 text-sm">
+                Cerrado el {formatoFechaHora(periodo.mesCerradoEn)} por {periodo.mesCerradoPor}. Nada con fecha de {nombre.toLowerCase()} se puede agregar, cambiar
+                ni anular. Los pagos que lleguen después se registran con su fecha real y se aplican a esta deuda sin alterar el cierre.
+              </p>
+              <div className="flex flex-wrap items-start gap-3">
+                <BotonDocumento href={`/condominios/${id}/periodos/${periodo.id}/cierre`}>Informe de cierre (PDF)</BotonDocumento>
+                {puede(usuario, "propiedad.habilitarCobros", id) && (
+                  <details>
+                    <summary className="cursor-pointer text-sm font-semibold text-peligro">Reabrir el mes</summary>
+                    <div className="mt-2 w-80 max-w-full">
+                      <FormularioNota accion={reabrirMesAccion.bind(null, periodo.id)} boton="Reabrir" variante="peligro" ayuda="Motivo (queda en el registro de cambios)" />
+                    </div>
+                  </details>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mb-3 text-sm text-texto-suave">
+                Al cerrar, Convive guarda un resumen fijo (cobrado, recaudado, egresos, banco y fondos) y bloquea todo lo que tenga fecha de este mes.
+              </p>
+              {cierre.revision.bloqueos.length > 0 && (
+                <ul className="mb-3 space-y-1 rounded-xl bg-peligro-suave px-3 py-2 text-sm text-peligro">
+                  {cierre.revision.bloqueos.map((b) => (
+                    <li key={b}>• {b}</li>
+                  ))}
+                </ul>
+              )}
+              {cierre.revision.advertencias.length > 0 && (
+                <ul className="mb-3 space-y-1 rounded-xl bg-alerta-suave px-3 py-2 text-sm text-alerta">
+                  {cierre.revision.advertencias.map((b) => (
+                    <li key={b}>• {b}</li>
+                  ))}
+                </ul>
+              )}
+              {cierre.revision.bloqueos.length === 0 && cierre.revision.advertencias.length === 0 && (
+                <p className="mb-3 rounded-xl bg-exito-suave px-3 py-2 text-sm text-exito">Todo revisado: el mes se puede cerrar.</p>
+              )}
+              {editable && cierre.revision.bloqueos.length === 0 && (
+                <FormularioSimple accion={cerrarMesAccion.bind(null, periodo.id)} boton="Cerrar el mes" variante="primario">
+                  {cierre.revision.advertencias.length > 0 && (
+                    <label className="flex items-start gap-2 text-sm">
+                      <input type="checkbox" name="confirmo" value="1" required className="mt-0.5 h-5 w-5" />
+                      Revisé las advertencias y quiero cerrar igual.
+                    </label>
+                  )}
+                </FormularioSimple>
+              )}
+            </>
+          )}
+        </Card>
+      )}
+
       {abierto && editable && (
         <Card className="mb-6">
           <h2 className="mb-4 font-medium">Registrar gasto</h2>
@@ -127,6 +198,7 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
             unidades={unidades}
             fecha={fechaGasto}
             proveedores={proveedores.map((p) => p.nombre)}
+            fondos={fondos.filter((f) => f.fondo.activo).map((f) => ({ id: f.fondo.id, nombre: f.fondo.nombre, saldo: $(f.saldo) }))}
           />
         </Card>
       )}
@@ -152,7 +224,12 @@ export default async function PeriodoPage({ params }: PageProps<"/condominios/[i
                 <td className="whitespace-nowrap">{formatoFecha(g.fecha)}</td>
                 <td>{g.categoria}</td>
                 <td>
-                  {g.descripcion}
+                  <Link href={`/condominios/${id}/egresos/${g.id}`} className="text-marca hover:underline">
+                    {g.descripcion}
+                  </Link>
+                  {g.fondoId && (
+                    <span className="ml-2 rounded bg-fondo px-1.5 py-0.5 text-xs text-texto-suave">pagado con {nombreFondo.get(g.fondoId) ?? "un fondo"}, no se reparte</span>
+                  )}
                   {(g.proveedor || g.documento) && (
                     <span className="block text-xs text-texto-suave">
                       {[g.proveedor, g.documento && `doc. ${g.documento}`].filter(Boolean).join(" · ")}

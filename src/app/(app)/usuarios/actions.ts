@@ -1,95 +1,67 @@
 "use server";
 
-import bcrypt from "bcryptjs";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { requirePrincipal } from "@/lib/auth";
+import { invitarEquipo, renovarInvitacionEquipo, type PerfilEquipo, type ResultadoInvitacionEquipo } from "@/lib/cuentas";
 import { aTexto, erroresDe, type EstadoForm } from "@/lib/forms";
+import { esPermisoAsignable } from "@/lib/permisos";
 import { registrar } from "@/lib/registro";
-import { ETIQUETAS_ROL } from "@/lib/formato";
-import { ClaveSchema, CorreoSchema } from "@/lib/usuarios";
+import { CorreoSchema } from "@/lib/usuarios";
 
-const UsuarioSchema = z
-  .object({
-    nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
-    correo: CorreoSchema,
-    clave: ClaveSchema,
-    rol: z.enum(["ADMINISTRADOR", "COMITE", "RESIDENTE"], { error: "Elige un rol." }),
-    condominioId: z.string().optional(),
-    personaId: z.string().optional(),
-  })
-  .refine((d) => d.rol !== "COMITE" || d.condominioId, {
-    error: "Elige el condominio que verá el comité.",
-    path: ["condominioId"],
-  })
-  .refine((d) => d.rol !== "RESIDENTE" || d.personaId, {
-    error: "Elige la persona a la que corresponde esta cuenta.",
-    path: ["personaId"],
-  });
+// PILOTO-001: el equipo de la administración se suma por invitación (cada persona crea su propia
+// contraseña con el enlace que le llega). Nadie escribe ni comparte la contraseña de otro.
 
-export async function crearUsuario(_: EstadoForm, formData: FormData): Promise<EstadoForm> {
+const PERFILES = ["PRINCIPAL", "ADMINISTRADOR", "SUBADMINISTRADOR", "ASISTENTE", "CONSERJE", "PERSONAL", "COMITE"] as const;
+
+const InvitarSchema = z.object({
+  nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }).max(120),
+  correo: CorreoSchema,
+  perfil: z.enum(PERFILES, { error: "Elige un perfil." }),
+});
+
+const listas = (f: FormData) => ({
+  asignados: [...new Set(f.getAll("asignados").map(String).filter(Boolean))],
+  permisosExtra: [...new Set(f.getAll("permisosExtra").map(String).filter(esPermisoAsignable))],
+});
+
+export type EstadoInvitacion = EstadoForm & { invitacion?: Extract<ResultadoInvitacionEquipo, { ok: true }> };
+
+export async function invitarMiembro(_: EstadoInvitacion, formData: FormData): Promise<EstadoInvitacion> {
   const { usuario, administradoraId } = await requirePrincipal();
-  const datos = UsuarioSchema.safeParse({
+  const datos = InvitarSchema.safeParse({
     nombre: aTexto(formData.get("nombre")),
     correo: aTexto(formData.get("correo")),
-    clave: aTexto(formData.get("clave")),
-    rol: formData.get("rol"),
-    condominioId: aTexto(formData.get("condominioId")),
-    personaId: aTexto(formData.get("personaId")),
+    perfil: aTexto(formData.get("perfil")),
   });
   if (!datos.success) return erroresDe(datos.error);
-  const { clave, rol, condominioId, personaId, ...resto } = datos.data;
-  const acceso = await leerAcceso(formData, administradoraId);
-  if (rol === "ADMINISTRADOR" && "error" in acceso) return { errores: { asignados: [acceso.error] } };
-
-  if (await db.usuario.findUnique({ where: { correo: resto.correo } })) {
-    return { errores: { correo: ["Ese correo ya tiene una cuenta."] } };
-  }
-  // Verificar que el condominio o la persona sean de esta administradora.
-  if (rol === "COMITE" && !(await db.condominio.findFirst({ where: { id: condominioId, administradoraId } }))) {
-    return { mensaje: "Condominio no encontrado." };
-  }
-  if (rol === "RESIDENTE") {
-    if (!(await db.persona.findFirst({ where: { id: personaId, administradoraId } }))) {
-      return { mensaje: "Persona no encontrada." };
-    }
-    if (await db.usuario.findUnique({ where: { personaId } })) {
-      return { errores: { personaId: ["Esa persona ya tiene una cuenta."] } };
-    }
-  }
-
-  await db.usuario.create({
-    data: {
-      ...resto,
-      rol,
-      administradoraId,
-      claveHash: await bcrypt.hash(clave, 10),
-      condominioId: rol === "COMITE" ? condominioId : null,
-      personaId: rol === "RESIDENTE" ? personaId : null,
-      ...(rol === "ADMINISTRADOR" && !("error" in acceso)
-        ? {
-            accesoTodas: acceso.todas,
-            asignaciones: { create: acceso.ids.map((id) => ({ condominioId: id })) },
-          }
-        : {}),
-    },
+  const { asignados, permisosExtra } = listas(formData);
+  const r = await invitarEquipo(usuario, administradoraId, {
+    ...datos.data,
+    perfil: datos.data.perfil as PerfilEquipo,
+    condominioIds: asignados,
+    permisosExtra,
   });
-  await registrar(
-    usuario,
-    "Creó una cuenta de acceso",
-    `${resto.nombre} (${resto.correo}) como ${ETIQUETAS_ROL[rol].toLowerCase()}${
-      rol === "ADMINISTRADOR" && !("error" in acceso) ? `: ${await textoAcceso(acceso, administradoraId)}` : ""
-    }`,
-  );
+  if (!r.ok) return { errores: r.errores, mensaje: r.mensaje };
   revalidatePath("/usuarios");
-  return { ok: true, mensaje: `Cuenta creada para ${resto.nombre}.` };
+  return { ok: true, invitacion: r };
+}
+
+export async function renovarInvitacion(usuarioId: string): Promise<string | null> {
+  const { usuario, administradoraId } = await requirePrincipal();
+  const enlace = await renovarInvitacionEquipo(usuario, administradoraId, usuarioId);
+  revalidatePath("/usuarios");
+  return enlace;
 }
 
 export async function eliminarUsuario(id: string) {
   const { usuario, administradoraId } = await requirePrincipal();
   if (id === usuario.id) return; // no borrarse a sí mismo
-  const borrado = await db.usuario.findFirst({ where: { id, administradoraId }, select: { nombre: true, correo: true } });
+  const borrado = await db.usuario.findFirst({
+    where: { id, administradoraId, rol: { in: ["ADMINISTRADOR", "COMITE"] } },
+    select: { nombre: true, correo: true },
+  });
   if (!borrado) return;
   await db.usuario.deleteMany({ where: { id, administradoraId } });
   await registrar(usuario, "Borró una cuenta de acceso", `${borrado.nombre} (${borrado.correo})`);
@@ -97,51 +69,59 @@ export async function eliminarUsuario(id: string) {
 }
 
 /**
- * Lee del formulario el alcance de un administrador: "todas" (principal) o la lista de
- * propiedades asignadas. Solo acepta propiedades de la misma administradora.
+ * Cambia el perfil de alguien del equipo, sus comunidades y sus permisos adicionales. Siempre
+ * debe quedar al menos un administrador principal, y nadie se quita a sí mismo el ser principal.
  */
-type Acceso = { todas: boolean; ids: string[] };
-
-async function leerAcceso(formData: FormData, administradoraId: string): Promise<Acceso | { error: string }> {
-  const todas = formData.get("accesoTodas") === "si";
-  const pedidas = [...new Set(formData.getAll("asignados").map(String).filter(Boolean))];
-  const ids = todas
-    ? []
-    : (await db.condominio.findMany({ where: { administradoraId, id: { in: pedidas } }, select: { id: true } })).map((c) => c.id);
-  if (!todas && ids.length === 0) return { error: "Elige al menos una propiedad, o marca que vea todas." };
-  return { todas, ids };
-}
-
-async function textoAcceso(acceso: Acceso, administradoraId: string) {
-  if (acceso.todas) return "principal, ve todas las propiedades";
-  const nombres = await db.condominio.findMany({
-    where: { administradoraId, id: { in: acceso.ids } },
-    select: { nombre: true },
-    orderBy: { nombre: "asc" },
-  });
-  return `ve ${nombres.map((n) => n.nombre).join(", ")}`;
-}
-
-/** Cambia qué propiedades ve un administrador. Siempre debe quedar al menos un principal. */
-export async function guardarAcceso(usuarioId: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
+export async function guardarPerfil(usuarioId: string, _: EstadoForm, formData: FormData): Promise<EstadoForm> {
   const { usuario, administradoraId } = await requirePrincipal();
+  const perfil = z.enum(PERFILES).safeParse(aTexto(formData.get("perfil")));
+  if (!perfil.success) return { mensaje: "Elige un perfil." };
+  const p = perfil.data;
   const cuenta = await db.usuario.findFirst({
-    where: { id: usuarioId, administradoraId, rol: "ADMINISTRADOR" },
-    select: { id: true, nombre: true, accesoTodas: true },
+    where: { id: usuarioId, administradoraId, rol: { in: ["ADMINISTRADOR", "COMITE"] } },
+    select: { id: true, nombre: true, rol: true, accesoTodas: true, cargo: true },
   });
   if (!cuenta) return { mensaje: "Cuenta no encontrada." };
-  const acceso = await leerAcceso(formData, administradoraId);
-  if ("error" in acceso) return { mensaje: acceso.error };
-  if (cuenta.id === usuario.id && !acceso.todas) {
-    return { mensaje: "No puedes quitarte a ti mismo el acceso a todas las propiedades. Pídeselo a otro administrador principal." };
+  if (cuenta.id === usuario.id && p !== "PRINCIPAL") {
+    return { mensaje: "No puedes quitarte a ti mismo el perfil de principal. Pídeselo a otro administrador principal." };
   }
+  const { asignados, permisosExtra } = listas(formData);
+  const ids =
+    p === "PRINCIPAL"
+      ? []
+      : (await db.condominio.findMany({ where: { administradoraId, id: { in: asignados } }, select: { id: true } })).map((c) => c.id);
+  if (p === "COMITE" && ids.length !== 1) return { mensaje: "El comité ve una sola comunidad: elige una." };
+  if (p !== "PRINCIPAL" && p !== "COMITE" && ids.length === 0) return { mensaje: "Elige al menos una comunidad." };
 
+  const eraPrincipal = cuenta.rol === "ADMINISTRADOR" && cuenta.accesoTodas && !cuenta.cargo;
+  if (eraPrincipal && p !== "PRINCIPAL") {
+    const otros = await db.usuario.count({
+      where: { administradoraId, rol: "ADMINISTRADOR", accesoTodas: true, cargo: null, activo: true, id: { not: cuenta.id } },
+    });
+    if (otros === 0) return { mensaje: "Debe quedar al menos un administrador principal." };
+  }
+  const cargo = p === "PRINCIPAL" || p === "ADMINISTRADOR" || p === "COMITE" ? null : p;
   await db.$transaction([
-    db.usuario.update({ where: { id: cuenta.id }, data: { accesoTodas: acceso.todas } }),
+    db.usuario.update({
+      where: { id: cuenta.id },
+      data: {
+        rol: p === "COMITE" ? "COMITE" : "ADMINISTRADOR",
+        accesoTodas: p === "PRINCIPAL",
+        cargo,
+        permisosExtra: p === "ASISTENTE" ? permisosExtra : [],
+        condominioId: p === "COMITE" ? ids[0] : null,
+      },
+    }),
     db.asignacionCondominio.deleteMany({ where: { usuarioId: cuenta.id } }),
-    db.asignacionCondominio.createMany({ data: acceso.ids.map((id) => ({ usuarioId: cuenta.id, condominioId: id })) }),
+    ...(p !== "PRINCIPAL" && p !== "COMITE"
+      ? [db.asignacionCondominio.createMany({ data: ids.map((id) => ({ usuarioId: cuenta.id, condominioId: id })) })]
+      : []),
   ]);
-  await registrar(usuario, "Cambió el acceso de un administrador", `${cuenta.nombre}: ${await textoAcceso(acceso, administradoraId)}`);
+  await registrar(
+    usuario,
+    "Cambió el perfil de una persona del equipo",
+    `${cuenta.nombre}: ${p.toLowerCase()}${ids.length ? `, ${ids.length} comunidad(es)` : ""}${p === "ASISTENTE" && permisosExtra.length ? `, permisos: ${permisosExtra.join(", ")}` : ""}`,
+  );
   revalidatePath("/usuarios");
-  return { ok: true, mensaje: "Acceso guardado." };
+  return { ok: true, mensaje: "Perfil guardado." };
 }

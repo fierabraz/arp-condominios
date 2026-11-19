@@ -4,7 +4,7 @@ import { requirePermiso } from "@/lib/auth";
 import { BotonLink, Card, Insignia, PageHeader, Vacio } from "@/components/ui";
 import { ETIQUETAS_MEDIO_PAGO, formatoFecha, formatoFechaHora, formatoMoneda } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
-import { ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
+import { ESTADOS_TRANSFERENCIA, MENSAJE_PAGO_PENDIENTE } from "@/lib/pagos";
 import { conUnidad, cuentasDe } from "../../datos-residente";
 import { avisoDeUnidad, cuentaDeUnidad, unidadAPagar } from "./datos";
 
@@ -60,7 +60,7 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
   const { estado, pendientes, transferencias, enVerificacion } = cuenta;
   const ahora = new Date();
   const conAviso = (href: string) => conUnidad(escaneado ? `${href}?aviso=${escaneado.id}` : href, unidad.id);
-  const informada = sp.informada === "1";
+  const informada = typeof sp.informada === "string" && /^[\w-]{1,40}$/.test(sp.informada) ? sp.informada : null;
 
   return (
     <>
@@ -70,8 +70,13 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
         <div role="status" className="mb-6 flex items-start gap-3 rounded-2xl border border-exito/30 bg-exito-suave p-4 text-exito">
           <CheckCircle2 size={24} aria-hidden="true" className="shrink-0" />
           <p>
-            <strong className="block">Transferencia informada. Pendiente de verificación por la administración.</strong>
-            <span className="text-sm text-texto">Tu saldo no cambia hasta que la administración la encuentre en la cartola del banco y la registre.</span>
+            <strong className="block">Transferencia informada: pendiente de verificación.</strong>
+            <span className="text-sm text-texto">{MENSAJE_PAGO_PENDIENTE}</span>
+            {informada !== "1" && (
+              <a href={`/comprobantes/${informada}/constancia`} target="_blank" rel="noopener" className="mt-2 block text-sm font-semibold text-marca underline">
+                Descargar constancia de pago informado (PDF)
+              </a>
+            )}
           </p>
         </div>
       )}
@@ -105,7 +110,7 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
       <section aria-labelledby="saldo" className="mb-8 grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card className="bg-gradient-to-br from-white to-convive-suave/60">
           <h2 id="saldo" className="text-sm font-semibold text-texto-suave">
-            Saldo total actualizado
+            Total adeudado confirmado
           </h2>
           <p className="mt-1 text-4xl font-bold tabular-nums text-convive-oscuro">{$(estado.deuda)}</p>
           <p className="mt-1 text-sm text-texto-suave">
@@ -128,11 +133,14 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
         <Card>
           <h2 className="mb-2 font-bold">Pagos informados</h2>
           {enVerificacion.cantidad > 0 ? (
-            <p className="text-sm">
-              Tienes <strong>{enVerificacion.cantidad}</strong> transferencia{enVerificacion.cantidad === 1 ? "" : "s"} por{" "}
-              <strong className="tabular-nums">{$(enVerificacion.monto)}</strong> pendiente{enVerificacion.cantidad === 1 ? "" : "s"} de verificación.
-              Tu saldo se actualiza cuando la administración las verifica.
-            </p>
+            <div className="rounded-xl border border-alerta/40 bg-alerta-suave/60 p-3 text-sm">
+              <p className="font-bold">
+                {enVerificacion.cantidad === 1 ? "Pago pendiente de verificación" : `${enVerificacion.cantidad} pagos pendientes de verificación`}:{" "}
+                <span className="tabular-nums">{$(enVerificacion.monto)}</span>
+              </p>
+              <p className="mt-1">{MENSAJE_PAGO_PENDIENTE}</p>
+              <p className="mt-1 text-texto-suave">Antes de hacer otra transferencia, revisa que no sea la misma que ya informaste.</p>
+            </div>
           ) : (
             <p className="text-sm text-texto-suave">No tienes transferencias pendientes de verificación.</p>
           )}
@@ -219,7 +227,7 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
                     <Insignia tono={e.tono}>{e.texto}</Insignia>
                   </div>
                   <p className="mt-1 text-sm text-texto-suave">{e.residente}</p>
-                  {t.estado === "RECHAZADA" && t.nota && <p className="mt-1 text-sm"><strong>Motivo:</strong> {t.nota}</p>}
+                  {(t.estado === "RECHAZADA" || t.estado === "ANULADA") && t.nota && <p className="mt-1 text-sm"><strong>Motivo:</strong> {t.nota}</p>}
                   {t.estado === "CONCILIADA" && t.nota && <p className="mt-1 text-sm">{t.nota}</p>}
                   <p className="mt-1 text-xs text-texto-suave">
                     Informada el {formatoFechaHora(t.creadoEn)}
@@ -232,6 +240,10 @@ export default async function PagarPage({ searchParams }: PageProps<"/mi-cuenta/
                         </a>
                       </>
                     )}
+                    {" · "}
+                    <a href={`/comprobantes/${t.id}/constancia`} target="_blank" rel="noopener" className="font-semibold text-marca">
+                      constancia de pago (PDF)
+                    </a>
                   </p>
                 </li>
               );

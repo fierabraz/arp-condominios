@@ -916,11 +916,11 @@ function PasoRevisar({
 
       {comp.crear.unidades.length > 0 && (
         <p className="text-xs text-texto-suave">
-          Las unidades nuevas quedan con una <strong>alícuota provisional igual</strong> (100 % repartido en partes iguales). Corrígela en Unidades o con Excel antes de habilitar cobros. La comunidad sigue en configuración: no se emite ningún cobro.
+          Las unidades nuevas quedan con un <strong>porcentaje de prorrateo provisional igual</strong> (100 % repartido en partes iguales). Corrígela en Unidades o con Excel antes de habilitar cobros. La comunidad sigue en configuración: no se emite ningún cobro.
         </p>
       )}
       {bloqueadoFinanciera && (
-        <Mensaje texto="Esta comunidad ya emite cobros: el generador no crea unidades nuevas aquí. Agrégalas en Unidades con su alícuota. Sí puedes ordenar el plano." />
+        <Mensaje texto="Esta comunidad ya emite cobros: el generador no crea unidades nuevas aquí. Agrégalas en Unidades con su porcentaje de prorrateo. Sí puedes ordenar el plano." />
       )}
 
       {editable && (

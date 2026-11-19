@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import {
   alcanzaCondominio,
@@ -8,6 +8,8 @@ import {
   filtroPersonas,
   filtroPorCondominio,
   filtroRegistro,
+  perfilDe,
+  puede,
   type Alcance,
 } from "./permisos";
 
@@ -70,14 +72,14 @@ test("residentes y plataforma no entran a propiedades desde la administración",
 });
 
 test("SEG-17: catálogo de permisos por perfil (si cambia, esta tabla debe cambiar a propósito)", async () => {
-  const { PERMISOS, perfilDe, puede } = await import("./permisos");
+  const { PERMISOS } = await import("./permisos");
   const cuentas = { principal, asignado, comite, residente, plataforma };
   const tabla = Object.fromEntries(
     Object.entries(cuentas).map(([nombre, a]) => [nombre, Object.keys(PERMISOS).filter((p) => puede(a, p as keyof typeof PERMISOS))]),
   );
   assert.deepEqual(tabla, {
-    principal: ["propiedad.ver", "propiedad.administrar", "banco.importar", "pagos.verificar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
-    asignado: ["propiedad.ver", "propiedad.administrar", "banco.importar", "pagos.verificar"],
+    principal: ["propiedad.ver", "propiedad.administrar", "solicitudes.revisar", "banco.importar", "pagos.verificar", "certificados.emitir", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
+    asignado: ["propiedad.ver", "propiedad.administrar", "solicitudes.revisar", "banco.importar", "pagos.verificar", "certificados.emitir"],
     comite: ["propiedad.ver"],
     residente: ["portal.residente"],
     plataforma: ["plataforma"],
@@ -87,7 +89,6 @@ test("SEG-17: catálogo de permisos por perfil (si cambia, esta tabla debe cambi
 });
 
 test("SEG-17: con una propiedad, además debe alcanzarla", async () => {
-  const { puede } = await import("./permisos");
   assert.equal(puede(principal, "propiedad.administrar", "Z"), true);
   assert.equal(puede(asignado, "propiedad.administrar", "A"), true);
   assert.equal(puede(asignado, "propiedad.administrar", "B"), false);
@@ -104,4 +105,51 @@ test("SEG-17: con una propiedad, además debe alcanzarla", async () => {
   assert.equal(puede(asignado, "pagos.verificar", "B"), false);
   assert.equal(puede(asignado, "pagos.verificar", "A"), true);
   assert.equal(puede(residente, "pagos.verificar"), false);
+});
+
+describe("PILOTO-001: cargos del equipo y permisos adicionales", () => {
+  const sub: Alcance = { rol: "ADMINISTRADOR", accesoTodas: false, condominioId: null, asignados: ["A"], cargo: "SUBADMINISTRADOR" };
+  const asistente: Alcance = { ...sub, cargo: "ASISTENTE" };
+  const conserje: Alcance = { ...sub, cargo: "CONSERJE" };
+  test("un cargo nunca es principal, aunque tenga accesoTodas", () => {
+    const raro: Alcance = { ...asistente, accesoTodas: true };
+    assert.equal(esPrincipal(raro), false);
+    assert.deepEqual(condominiosPermitidos(raro), ["A"]);
+    assert.equal(puede(raro, "cuentas.administrar"), false);
+  });
+  test("subadministrador: administra sus comunidades, verifica pagos, no maneja cuentas", () => {
+    assert.equal(perfilDe(sub), "ADMINISTRADOR");
+    assert.equal(puede(sub, "propiedad.administrar", "A"), true);
+    assert.equal(puede(sub, "propiedad.administrar", "B"), false);
+    assert.equal(puede(sub, "pagos.verificar", "A"), true);
+    assert.equal(puede(sub, "cuentas.administrar"), false);
+    assert.equal(puede(sub, "propiedades.crear"), false);
+  });
+  test("asistente: administra, pero verifica pagos o ve el banco solo con permiso", () => {
+    assert.equal(puede(asistente, "propiedad.administrar", "A"), true);
+    assert.equal(puede(asistente, "pagos.verificar", "A"), false);
+    assert.equal(puede(asistente, "solicitudes.revisar", "A"), false);
+    const conPermiso = { ...asistente, permisosExtra: ["pagos.verificar"] };
+    assert.equal(puede(conPermiso, "pagos.verificar", "A"), true);
+    assert.equal(puede(conPermiso, "pagos.verificar", "B"), false);
+    assert.equal(puede(conPermiso, "banco.importar", "A"), false);
+  });
+  test("un permiso adicional no asignable no sirve (ni plataforma ni cuentas)", () => {
+    const tramposo = { ...asistente, permisosExtra: ["plataforma", "cuentas.administrar", "propiedades.crear"] };
+    assert.equal(puede(tramposo, "plataforma"), false);
+    assert.equal(puede(tramposo, "cuentas.administrar"), false);
+    assert.equal(puede(tramposo, "propiedades.crear"), false);
+  });
+  test("conserje y personal: solo consultan sus comunidades; los extras no les sirven", () => {
+    assert.equal(perfilDe(conserje), "PERSONAL");
+    assert.equal(puede(conserje, "propiedad.ver", "A"), true);
+    assert.equal(puede(conserje, "propiedad.ver", "B"), false);
+    assert.equal(puede(conserje, "propiedad.administrar", "A"), false);
+    assert.equal(puede({ ...conserje, permisosExtra: ["pagos.verificar"] }, "pagos.verificar", "A"), false);
+  });
+  test("residente con permisos extra no gana nada de administración", () => {
+    const r: Alcance = { rol: "RESIDENTE", accesoTodas: false, condominioId: null, asignados: [], permisosExtra: ["pagos.verificar"] };
+    assert.equal(puede(r, "pagos.verificar"), false);
+    assert.equal(puede(r, "propiedad.ver"), false);
+  });
 });

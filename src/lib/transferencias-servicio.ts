@@ -12,15 +12,14 @@ import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import type { UsuarioActual } from "@/lib/auth";
 import { registrarEn } from "@/lib/registro";
-import { bloquearUnidades, registrarPagoEn } from "@/lib/cobro-servicio";
-import { aMinimo, decimalesMoneda, deMinimo } from "@/lib/cobro";
+import { bloquearUnidades } from "@/lib/cobro-servicio";
+import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
+import { ErrorConciliacion, registrarIngresoDesdeMovimiento } from "@/lib/conciliacion-servicio";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import {
   buscarCoincidencias,
   COMPROBANTE_TAMANO_MAXIMO,
   cuentaPublicable,
-  ESTADOS_ABIERTOS,
-  ESTADOS_TRANSFERENCIA,
   tipoComprobante,
 } from "@/lib/pagos";
 
@@ -114,13 +113,13 @@ export async function informarTransferencia(
       const operacion = datos.operacion?.trim();
       if (operacion) {
         const misma = await tx.transferenciaInformada.findFirst({
-          where: { condominioId: unidad.condominioId, operacion, estado: { not: "RECHAZADA" } },
+          where: { condominioId: unidad.condominioId, operacion, estado: { notIn: ["RECHAZADA", "ANULADA"] } },
           select: { id: true },
         });
         if (misma) motivos.push(`Ya se informó una transferencia con el número de operación ${operacion}.`);
       }
       const igual = await tx.transferenciaInformada.findFirst({
-        where: { unidadId: unidad.id, fecha: datos.fecha, monto: datos.monto, estado: { not: "RECHAZADA" } },
+        where: { unidadId: unidad.id, fecha: datos.fecha, monto: datos.monto, estado: { notIn: ["RECHAZADA", "ANULADA"] } },
         select: { id: true },
       });
       if (igual) motivos.push("Ya informaste una transferencia por el mismo monto y la misma fecha para esta unidad.");
@@ -173,6 +172,8 @@ export async function informarTransferencia(
       entidadId: t.id,
       despues: { estado: t.estado, monto: datos.monto, fecha: datos.fecha.toISOString().slice(0, 10) },
     });
+    // Constancia con folio, versión 1 «Pendiente de verificación», en la misma transacción.
+    await sincronizarConstanciaEn(tx, t.id, usuario.nombre);
     return t;
   });
 }
@@ -222,84 +223,32 @@ async function bloquearTransferencia(tx: Parameters<Parameters<typeof db.$transa
 const etiqueta = (t: { unidad: { numero: string; condominio: { nombre: string } } }) => `${t.unidad.condominio.nombre}, unidad ${t.unidad.numero}`;
 
 /**
- * Confirma la transferencia con un movimiento de la cartola: registra el pago en Recaudación
- * (se aplica a la deuda más antigua, como todo pago), concilia ese monto del movimiento y deja
- * unidos transferencia, movimiento y pago. Todo o nada.
+ * Confirma la transferencia con un movimiento de la cartola: registra UN pago en Recaudación
+ * (con la distribución que eligió la administración o, si no eligió, a lo más antiguo), concilia
+ * ese monto del movimiento y deja unidos transferencia, movimiento y pago. Todo o nada.
+ * FIN-COMP A: la lógica vive en conciliacion-servicio.ts, la misma que concilia desde la cartola.
  */
 export async function confirmarTransferencia(
   autor: Autor,
-  datos: { transferenciaId: string; movimientoId: string; monto: number; permitirDuplicado?: boolean },
+  datos: { transferenciaId: string; movimientoId: string; monto: number; permitirDuplicado?: boolean; distribucion?: { avisoId: string; monto: number }[] },
 ) {
   const administradoraId = autor.administradoraId!;
-  const adm = await db.administradora.findUniqueOrThrow({ where: { id: administradoraId }, select: { moneda: true } });
-  const dec = decimalesMoneda(adm.moneda);
-  return db.$transaction(async (tx) => {
-    const t = await bloquearTransferencia(tx, datos.transferenciaId, administradoraId);
-    if (!ESTADOS_ABIERTOS.includes(t.estado)) throw new ErrorTransferencia(`La transferencia ya está «${ESTADOS_TRANSFERENCIA[t.estado].texto}».`);
-    await tx.$queryRaw`SELECT id FROM "MovimientoBancario" WHERE id = ${datos.movimientoId} FOR UPDATE`;
-    const m = await tx.movimientoBancario.findFirst({
-      where: { id: datos.movimientoId, condominioId: t.condominioId, administradoraId },
-      include: { cuenta: { select: { banco: true, numeroFinal: true } } },
-    });
-    if (!m) throw new ErrorTransferencia("Ese movimiento no es de una cuenta de esta comunidad.");
-    const montoMin = aMinimo(datos.monto, dec);
-    const restante = aMinimo(m.monto.toString(), dec) - aMinimo(m.montoConciliado.toString(), dec);
-    if (aMinimo(m.monto.toString(), dec) <= 0) throw new ErrorTransferencia("Ese movimiento es un cargo, no un abono.");
-    if (montoMin <= 0) throw new ErrorTransferencia("El monto a registrar debe ser mayor que cero.");
-    if (montoMin > restante) {
-      throw new ErrorTransferencia(`El movimiento solo tiene ${formatoMoneda(deMinimo(restante, dec), adm.moneda)} sin conciliar.`);
-    }
-    const monto = deMinimo(montoMin, dec);
-    const referencia = [`Transferencia informada`, t.operacion && `op. ${t.operacion}`, `cartola ${m.cuenta.banco} ···${m.cuenta.numeroFinal}`]
-      .filter(Boolean)
-      .join(" · ")
-      .slice(0, 120);
-
-    // El pago de siempre: SEG-22 avisa si ya hay uno igual registrado a mano (PagoDuplicado).
-    const pago = await registrarPagoEn(
-      tx,
-      administradoraId,
-      { unidadId: t.unidadId, monto, fecha: m.fecha, medio: "TRANSFERENCIA", referencia },
-      { permitirDuplicado: datos.permitirDuplicado },
-    );
-
-    const conciliado = aMinimo(m.montoConciliado.toString(), dec) + montoMin;
-    const completo = conciliado >= aMinimo(m.monto.toString(), dec);
-    await tx.movimientoBancario.update({
-      where: { id: m.id },
-      data: {
-        montoConciliado: deMinimo(conciliado, dec),
-        estado: completo ? "CONCILIADO" : "REVISAR",
-        nota: completo ? m.nota : `Conciliado en parte (${formatoMoneda(deMinimo(conciliado, dec), adm.moneda)}). Falta identificar el resto.`,
-      },
-    });
-    const ahora = new Date();
-    const diferencia = Number(t.monto) !== monto;
-    const actualizada = await tx.transferenciaInformada.update({
-      where: { id: t.id },
-      data: {
-        estado: "CONCILIADA",
-        movimientoId: m.id,
-        pagoId: pago.id,
-        revisadoPor: autor.nombre,
-        revisadoEn: ahora,
-        nota: diferencia
-          ? `Se registró ${formatoMoneda(monto, adm.moneda)} (el residente informó ${formatoMoneda(Number(t.monto), adm.moneda)}).`
-          : t.nota,
-      },
-    });
-    await registrarEn(tx, {
-      autor,
-      accion: "Verificó y concilió una transferencia",
-      detalle: `${etiqueta(t)}: pago de ${formatoMoneda(monto, adm.moneda)} con el movimiento del ${formatoFecha(m.fecha)} (${m.cuenta.banco} ···${m.cuenta.numeroFinal}).`,
+  const t = await db.transferenciaInformada.findFirst({ where: { id: datos.transferenciaId, administradoraId }, select: { condominioId: true, unidadId: true } });
+  if (!t) throw new ErrorTransferencia("La transferencia no existe.");
+  try {
+    return await registrarIngresoDesdeMovimiento(autor, {
       condominioId: t.condominioId,
-      entidad: "TransferenciaInformada",
-      entidadId: t.id,
-      antes: { estado: t.estado },
-      despues: { estado: actualizada.estado, pagoId: pago.id, movimientoId: m.id, monto, movimientoConciliado: deMinimo(conciliado, dec) },
+      movimientoId: datos.movimientoId,
+      unidadId: t.unidadId,
+      monto: datos.monto,
+      transferenciaId: datos.transferenciaId,
+      permitirDuplicado: datos.permitirDuplicado,
+      distribucion: datos.distribucion,
     });
-    return { pagoId: pago.id };
-  });
+  } catch (e) {
+    if (e instanceof ErrorConciliacion) throw new ErrorTransferencia(e.message);
+    throw e;
+  }
 }
 
 /** Cambia el estado sin registrar pagos: a revisión, rechazada o de vuelta a revisión. */
@@ -311,7 +260,11 @@ export async function cambiarEstadoTransferencia(
   return db.$transaction(async (tx) => {
     const t = await bloquearTransferencia(tx, datos.transferenciaId, administradoraId);
     if (t.estado === "CONCILIADA") {
-      throw new ErrorTransferencia("Ya está conciliada. Para deshacerla, anula su pago en Recaudación (queda registrado).");
+      throw new ErrorTransferencia("Ya está conciliada. Para deshacerla, reversa su pago (queda registrado).");
+    }
+    if (t.estado === "ANULADA") throw new ErrorTransferencia("Su pago ya fue reversado; no se puede cambiar.");
+    if (t.pagoId && datos.estado === "RECHAZADA") {
+      throw new ErrorTransferencia("Está unida a un pago ya registrado. Si ese pago no corresponde, anúlalo primero en Recaudación.");
     }
     if (t.estado === datos.estado && datos.estado === "RECHAZADA") throw new ErrorTransferencia("Ya estaba rechazada.");
     const actualizada = await tx.transferenciaInformada.update({
@@ -328,5 +281,6 @@ export async function cambiarEstadoTransferencia(
       antes: { estado: t.estado, nota: t.nota },
       despues: { estado: actualizada.estado, nota: actualizada.nota },
     });
+    await sincronizarConstanciaEn(tx, t.id, autor.nombre);
   });
 }

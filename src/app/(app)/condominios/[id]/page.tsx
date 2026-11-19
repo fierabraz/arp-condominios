@@ -117,6 +117,14 @@ export default async function PanelPropiedadPage({ params }: PageProps<"/condomi
         <span aria-hidden="true"> › </span>
         <span>{condominio.nombre}</span>
       </nav>
+      {condominio.demo && (
+        <p className="mb-4 rounded-xl border border-dashed border-alerta/60 bg-alerta-suave/50 px-4 py-3 text-sm">
+          <strong>Comunidad FICTICIA de prueba.</strong> Datos inventados.{" "}
+          <Link href={`${base}/prueba`} className="font-semibold text-marca underline">
+            Ver el recorrido de prueba
+          </Link>
+        </p>
+      )}
       <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-convive-oscuro md:text-[2rem]">{condominio.nombre}</h1>
