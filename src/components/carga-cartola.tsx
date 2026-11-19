@@ -27,6 +27,70 @@ import {
 import { formatoMoneda } from "@/lib/formato";
 
 type Accion = (formData: FormData) => Promise<EstadoCartola>;
+type Verificacion = Extract<NonNullable<Extract<EstadoCartola, { etapa: "listo" }>["verificacion"]>, { activa: true }>;
+
+/** VER-001: resumen de la verificación automática al terminar la carga. */
+function ResumenVerificacionCarga({ r, base, moneda }: { r: Verificacion; base: string; moneda: string }) {
+  const transferencias = base.replace(/\/conciliacion$/, "/transferencias");
+  if (r.error) return <Mensaje texto={r.error} />;
+  const fila = (n: number, texto: string, href: string | null, tono: "exito" | "alerta" | "peligro") => (
+    <li className="flex items-center justify-between gap-3 rounded-xl border border-borde bg-white px-3 py-2">
+      <span className="text-sm">
+        <Insignia tono={tono}>{n}</Insignia> <span className="ml-1">{texto}</span>
+      </span>
+      {href && n > 0 && (
+        <Link href={href} className="text-sm font-semibold text-marca hover:underline">
+          Revisar
+        </Link>
+      )}
+    </li>
+  );
+  return (
+    <section aria-labelledby="verificacion-auto" className="space-y-3 rounded-2xl border border-convive/30 bg-convive-suave/40 p-4">
+      <h3 id="verificacion-auto" className="font-bold">
+        Verificación automática de transferencias
+      </h3>
+      <p className="text-sm text-texto-suave">
+        Se compararon {r.revisadas} transferencia{r.revisadas === 1 ? "" : "s"} informada{r.revisadas === 1 ? "" : "s"} pendiente{r.revisadas === 1 ? "" : "s"} con los abonos de la cartola (monto, fecha y n° de operación).
+      </p>
+      <ul className="grid gap-2 sm:grid-cols-3">
+        {fila(r.verificadas, r.verificadas === 1 ? "verificada sola y registrada como pago" : "verificadas solas y registradas como pago", `${transferencias}?estado=CONCILIADA`, "exito")}
+        {fila(r.porConfirmar, "en revisión, por confirmar con un clic", `${transferencias}?auto=POR_CONFIRMAR`, "alerta")}
+        {fila(r.conDiferencias, "con diferencias, para revisar a mano", `${transferencias}?auto=CON_DIFERENCIAS`, "peligro")}
+      </ul>
+      <div>
+        <p className="text-sm font-semibold">
+          Abonos de esta cartola sin transferencia informada: {r.totalSinTransferencia}
+        </p>
+        {r.totalSinTransferencia === 0 ? (
+          <p className="text-sm text-texto-suave">Todos los abonos quedaron asociados a una transferencia.</p>
+        ) : (
+          <>
+            <p className="mb-2 text-sm text-texto-suave">Regístralos como pago y asígnalos a una unidad (o como otro ingreso) desde su ficha.</p>
+            <ul className="divide-y divide-borde rounded-xl border border-borde bg-white">
+              {r.sinTransferencia.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+                  <span>
+                    <span className="font-semibold tabular-nums">{formatoMoneda(a.monto, moneda)}</span> · {fecha(a.fecha)}
+                    {a.glosa && <span className="block text-xs text-texto-suave">{a.glosa}</span>}
+                  </span>
+                  <Link href={`${base}/movimientos/${a.id}`} className="inline-flex min-h-11 items-center font-semibold text-marca hover:underline">
+                    Registrar pago
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {r.totalSinTransferencia > r.sinTransferencia.length && (
+              <Link href={`${base}/movimientos?tipo=abono&estado=PENDIENTE`} className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-marca">
+                Ver los {r.totalSinTransferencia} abonos →
+              </Link>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
 type Revision = Extract<EstadoCartola, { etapa: "revision" }>;
 type Columnas = Extract<EstadoCartola, { etapa: "columnas" }>;
 
@@ -115,7 +179,14 @@ function Pasos({ revisar, confirmar, banco, base, moneda, otraVez }: { revisar: 
           {estado.omitidos > 0 && <li>{estado.omitidos} ya estaban registrados y no se repitieron</li>}
           {estado.errores > 0 && <li>{estado.errores} filas con error quedaron fuera (se pueden consultar en el historial)</li>}
         </ul>
-        <p className="text-sm text-texto-suave">Quedan «Pendientes de identificar». Todavía no pagan avisos ni cambian saldos de residentes.</p>
+        {estado.verificacion?.activa ? (
+          <ResumenVerificacionCarga r={estado.verificacion} base={base} moneda={moneda} />
+        ) : (
+          <p className="text-sm text-texto-suave">
+            Quedan «Pendientes de identificar». Todavía no pagan avisos ni cambian saldos de residentes.
+            {estado.verificacion && " La verificación automática de transferencias está desactivada en esta comunidad (se activa más abajo, en esta misma página)."}
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           <Link href={`${base}/movimientos`} className="inline-flex min-h-11 items-center rounded-xl bg-marca px-4 text-sm font-semibold text-white hover:bg-marca-oscuro">
             Ver movimientos

@@ -53,6 +53,34 @@ export async function confirmarTransferenciaAccion(condominioId: string, transfe
   return { ok: true, mensaje: "Pago registrado y movimiento conciliado." };
 }
 
+/**
+ * VER-001: confirma con un clic la sugerencia de la verificación automática (transferencia «por
+ * confirmar»): usa el abono sugerido y el monto informado, igual que confirmar a mano.
+ */
+export async function confirmarSugerenciaAccion(condominioId: string, transferenciaId: string): Promise<EstadoForm> {
+  const a = await acceso(condominioId, transferenciaId);
+  if (!a) return { mensaje: "Transferencia no encontrada." };
+  const t = await db.transferenciaInformada.findFirst({
+    where: { id: transferenciaId, condominioId, administradoraId: a.administradoraId },
+    select: { estado: true, monto: true, autoResultado: true, autoMovimientoId: true },
+  });
+  if (!t || t.estado !== "EN_REVISION" || t.autoResultado !== "POR_CONFIRMAR" || !t.autoMovimientoId) {
+    return { mensaje: "Esta transferencia ya no tiene un abono sugerido por confirmar. Recarga la página." };
+  }
+  try {
+    await confirmarTransferencia(a.usuario, { transferenciaId, movimientoId: t.autoMovimientoId, monto: Number(t.monto) });
+  } catch (e) {
+    if (e instanceof PagoDuplicado) {
+      return { mensaje: "La unidad ya tiene un pago igual registrado ese día. Abre la transferencia y, si es el mismo, usa «Vincular con este pago»." };
+    }
+    if (e instanceof ErrorTransferencia || e instanceof ErrorCobro) return { mensaje: e.message };
+    throw e;
+  }
+  refrescar(condominioId, transferenciaId);
+  revalidatePath(`/condominios/${condominioId}`, "layout");
+  return { ok: true, mensaje: "Confirmada: pago registrado y abono conciliado." };
+}
+
 const NotaSchema = z.string().trim().min(5, { error: "Explica el motivo (al menos 5 letras): el residente lo verá." }).max(500);
 
 export async function cambiarEstadoAccion(condominioId: string, transferenciaId: string, estado: "EN_REVISION" | "RECHAZADA", _: EstadoForm, formData: FormData): Promise<EstadoForm> {

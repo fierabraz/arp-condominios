@@ -182,3 +182,26 @@ export function MarcarMovimiento({ accion, estado: actual, nota }: { accion: Acc
     </details>
   );
 }
+
+/** VER-001: botón que llama a una acción del servidor sin formulario y muestra el resultado. */
+export function BotonServidor({
+  accion,
+  children,
+  variante = "secundario",
+  pendienteTexto = "Procesando…",
+}: {
+  accion: () => Promise<EstadoForm>;
+  children: React.ReactNode;
+  variante?: "primario" | "secundario" | "peligro";
+  pendienteTexto?: string;
+}) {
+  const [estado, enviar, pendiente] = useActionState(async () => accion(), {} as EstadoForm);
+  return (
+    <form action={enviar} className="space-y-2">
+      <Boton type="submit" variante={variante} disabled={pendiente}>
+        {pendiente ? pendienteTexto : children}
+      </Boton>
+      <Mensaje texto={estado.mensaje} tipo={estado.ok ? "ok" : "error"} />
+    </form>
+  );
+}

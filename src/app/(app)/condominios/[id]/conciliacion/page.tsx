@@ -8,8 +8,8 @@ import { formatoFechaHora, formatoMoneda } from "@/lib/formato";
 import { filtroCondominios, puede } from "@/lib/permisos";
 import { BotonAccion } from "../estructura/formularios";
 import { condominioVisible } from "../condominio-actual";
-import { confirmarCartolaAccion, crearCuenta, eliminarCuenta, revisarCartolaAccion } from "../../conciliacion-actions";
-import { ElegirComunidad, FormularioCuenta } from "./formularios";
+import { cambiarVerificacionAccion, confirmarCartolaAccion, crearCuenta, eliminarCuenta, revisarCartolaAccion, verificarAhoraAccion } from "../../conciliacion-actions";
+import { BotonServidor, ElegirComunidad, FormularioCuenta } from "./formularios";
 
 // FIN-003.1 · Finanzas → Conciliación bancaria: cuentas de la comunidad, carga de cartolas,
 // estado de los movimientos e historial de importaciones.
@@ -49,6 +49,52 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
       _sum: { monto: true },
     }),
   ]);
+  // VER-001: verificación automática de transferencias informadas.
+  const puedeVerificar = editable && puede(usuario, "pagos.verificar", id);
+  const [config, ultimaVerificacion] = await Promise.all([
+    db.condominio.findUniqueOrThrow({ where: { id }, select: { verificacionAutomatica: true } }),
+    db.verificacionCartola.findFirst({ where: { condominioId: id, administradoraId }, orderBy: { creadoEn: "desc" } }),
+  ]);
+  const tarjetaVerificacion = puedeVerificar && (
+    <Card className="mb-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="max-w-2xl">
+          <h2 className="flex items-center gap-2 text-lg font-bold">
+            Verificación automática de transferencias{" "}
+            {config.verificacionAutomatica ? <Insignia tono="exito">Activada</Insignia> : <Insignia tono="neutro">Desactivada</Insignia>}
+          </h2>
+          <p className="mt-1 text-sm text-texto-suave">
+            Al cargar una cartola, cada transferencia informada por un residente se compara con los abonos: si coinciden monto, fecha y n° de operación
+            se registra el pago sola (a la deuda más antigua); si coinciden solo algunos datos queda «En revisión» para confirmarla con un clic; si el monto
+            no calza queda «con diferencias». Nunca se rechaza una transferencia sola, no se usan abonos marcados como posibles duplicados y un abono sirve
+            para un solo pago.
+          </p>
+          {ultimaVerificacion && (
+            <p className="mt-2 text-sm">
+              Última revisión {formatoFechaHora(ultimaVerificacion.creadoEn)} ({ultimaVerificacion.usuarioNombre}):{" "}
+              <strong>{ultimaVerificacion.verificadas}</strong> verificadas solas, <strong>{ultimaVerificacion.porConfirmar}</strong> por confirmar,{" "}
+              <strong>{ultimaVerificacion.conDiferencias}</strong> con diferencias.{" "}
+              {ultimaVerificacion.porConfirmar + ultimaVerificacion.conDiferencias > 0 && (
+                <Link href={`/condominios/${id}/transferencias?auto=todas`} className="font-semibold text-marca underline">
+                  Revisar sugerencias
+                </Link>
+              )}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {config.verificacionAutomatica && (
+            <BotonServidor accion={verificarAhoraAccion.bind(null, id)} variante="primario" pendienteTexto="Comparando…">
+              Verificar ahora
+            </BotonServidor>
+          )}
+          <BotonServidor accion={cambiarVerificacionAccion.bind(null, id, !config.verificacionAutomatica)} pendienteTexto="Guardando…">
+            {config.verificacionAutomatica ? "Desactivar" : "Activar"}
+          </BotonServidor>
+        </div>
+      </div>
+    </Card>
+  );
   const montoPorIdentificar = porIdentificar.reduce((s, m) => s + Number(m.monto) - Number(m.montoConciliado), 0);
   const resumenIngresos = (porIdentificar.length > 0 || enVerificacion._count > 0) && (
     <div className="mb-6 grid gap-4 sm:grid-cols-2">
@@ -110,6 +156,7 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
         <ElegirComunidad actual={id} comunidades={comunidades} />
       </div>
       {resumenIngresos}
+      {tarjetaVerificacion}
 
       {cuentas.length === 0 ? (
         <Card className="mb-6">
@@ -242,7 +289,7 @@ async function DetalleCuenta({
           </p>
         )}
         <p className="mt-1 text-sm text-texto-suave">
-          En esta primera versión los movimientos se consultan y se marcan para revisión. Relacionarlos con pagos y egresos llega en FIN-003.2.
+          Abre un movimiento para relacionarlo con un pago, una transferencia informada, un egreso u otro ingreso.
         </p>
       </section>
 

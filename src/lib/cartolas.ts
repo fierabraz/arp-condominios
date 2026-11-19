@@ -4,6 +4,7 @@
 // Este archivo también lo usa la pantalla (tipos y textos), así que no importa nada del servidor.
 
 import { celdaTexto, columnasReconocidas, letraColumna, normalizarTitulo } from "./importacion";
+import type { ResumenVerificacion } from "./verificacion-automatica";
 
 // ---------------------------------------------------------------------------
 // Campos de Convive
@@ -627,7 +628,16 @@ export type EstadoCartola =
       mensaje?: string;
       perfilGuardado?: string;
     })
-  | { etapa: "listo"; importacionId: string; nuevos: number; omitidos: number; errores: number; periodo: { desde: string; hasta: string } | null };
+  | {
+      etapa: "listo";
+      importacionId: string;
+      nuevos: number;
+      omitidos: number;
+      errores: number;
+      periodo: { desde: string; hasta: string } | null;
+      /** VER-001: resultado de la verificación automática de transferencias (si se pudo correr). */
+      verificacion?: ResumenVerificacion;
+    };
 
 /** Lo que la pantalla manda junto con el archivo. */
 export type OpcionesEnvio = {

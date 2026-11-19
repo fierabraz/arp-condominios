@@ -305,6 +305,10 @@ model Condominio {
 
   // PILOTO-001: código que la administración comparte para que los residentes pidan unirse.
   codigoIncorporacion String?                @unique
+  // VER-001: al cargar una cartola, verificar solas las transferencias informadas que calzan en
+  // monto, fecha y número de operación. Cada comunidad la activa o desactiva (parte desactivada).
+  verificacionAutomatica Boolean             @default(false)
+  verificaciones      VerificacionCartola[]
   unidades            Unidad[]
   periodos            Periodo[]
   usuarios            Usuario[]
@@ -1326,6 +1330,13 @@ model TransferenciaInformada {
   nota             String?
   revisadoPor      String?
   revisadoEn       DateTime?
+  // VER-001 · Resultado de la última verificación automática con la cartola (si la hubo).
+  // POR_CONFIRMAR y CON_DIFERENCIAS dejan la transferencia «En revisión» con el abono sugerido;
+  // nunca la rechazan. Si la administración cambia el estado a mano, se borra.
+  autoResultado    ResultadoVerificacionAuto?
+  autoMovimientoId String?
+  autoMotivos      String?
+  autoEn           DateTime?
   creadoEn         DateTime            @default(now())
 
   comprobante    ComprobanteTransferencia?
@@ -1339,6 +1350,36 @@ model TransferenciaInformada {
 
 // Comprobante opcional (PDF o imagen, hasta ~900 KB). Se guarda en la base mientras no exista
 // un almacenamiento de archivos (ARC-001). La huella permite avisar si se sube el mismo dos veces.
+// VER-001 · Verificación automática de transferencias informadas con la cartola.
+enum ResultadoVerificacionAuto {
+  VERIFICADA // monto, fecha y n° de operación coinciden: se registró el pago solo
+  POR_CONFIRMAR // coinciden algunos datos: en revisión con el abono sugerido (confirmar con un clic)
+  CON_DIFERENCIAS // el abono parece ser este pago, pero el monto no calza: revisar a mano
+}
+
+// Cada pasada de la verificación automática (al cargar una cartola o a pedido), con su resumen.
+model VerificacionCartola {
+  id               String     @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  condominio       Condominio @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  // La cartola que la provocó (null = «Verificar ahora» con las cartolas ya cargadas).
+  importacionId    String?
+  usuarioNombre    String
+  revisadas        Int
+  verificadas      Int
+  porConfirmar     Int
+  conDiferencias   Int
+  // Abonos de la cartola que no tienen ninguna transferencia informada.
+  sinTransferencia Int
+  // Detalle por transferencia (unidad, monto, resultado, motivos). Sin datos de contacto.
+  detalle          Json
+  creadoEn         DateTime   @default(now())
+
+  @@index([condominioId, creadoEn])
+  @@index([importacionId])
+}
+
 model ComprobanteTransferencia {
   id              String                 @id @default(cuid())
   transferenciaId String                 @unique

@@ -10,7 +10,10 @@ import { estadoCuenta } from "@/lib/cobro-servicio";
 import { ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
 import { puede } from "@/lib/permisos";
 import { coincidenciasDe } from "@/lib/transferencias-servicio";
+import { RESULTADOS_AUTO } from "@/lib/verificacion-automatica";
 import { condominioVisible } from "../../condominio-actual";
+import { BotonServidor } from "../../conciliacion/formularios";
+import { confirmarSugerenciaAccion } from "../../../transferencias-actions";
 import { cambiarEstadoAccion, confirmarTransferenciaAccion, reversarTransferenciaAccion, vincularTransferenciaAccion } from "../../../transferencias-actions";
 import { BotonAccion, FormularioConfirmar, FormularioNota } from "./formularios";
 
@@ -37,7 +40,7 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
   const abierta = ESTADOS_ABIERTOS.includes(t.estado);
   const desde = new Date(t.fecha.getTime() - 15 * 86_400_000);
   const hasta = new Date(t.fecha.getTime() + 15 * 86_400_000);
-  const [estado, coincidencias, historial, pagosManuales] = await Promise.all([
+  const [estado, coincidencias, historial, pagosManuales, sugerido] = await Promise.all([
     estadoCuenta(t.unidadId, administradoraId),
     abierta && !t.pagoId ? coincidenciasDe(t) : null,
     db.registroCambio.findMany({ where: { entidad: "TransferenciaInformada", entidadId: t.id }, orderBy: { creadoEn: "asc" } }),
@@ -50,6 +53,10 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
           take: 10,
         })
       : [],
+    // VER-001: el abono que sugirió la verificación automática.
+    abierta && t.autoMovimientoId
+      ? db.movimientoBancario.findFirst({ where: { id: t.autoMovimientoId, condominioId: id }, include: { cuenta: { select: { banco: true, numeroFinal: true } } } })
+      : null,
   ]);
   const ahora = new Date();
   const avisos = (estado?.avisos ?? [])
@@ -154,6 +161,31 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
         </div>
 
         <div className="space-y-6">
+          {abierta && t.autoResultado && sugerido && (
+            <Card className={t.autoResultado === "CON_DIFERENCIAS" ? "border-peligro/30" : "border-alerta/40"}>
+              <h2 className="mb-1 flex flex-wrap items-center gap-2 font-bold">
+                Verificación automática <Insignia tono={RESULTADOS_AUTO[t.autoResultado].tono}>{RESULTADOS_AUTO[t.autoResultado].texto}</Insignia>
+              </h2>
+              <p className="text-sm text-texto-suave">{RESULTADOS_AUTO[t.autoResultado].ayuda}</p>
+              <p className="mt-3 text-sm">
+                Abono sugerido: <strong>{$(sugerido.monto)}</strong> del {formatoFecha(sugerido.fecha)} ({sugerido.cuenta.banco} ···{sugerido.cuenta.numeroFinal})
+                {[sugerido.descripcion, sugerido.referencia].filter(Boolean).length > 0 && <span className="block text-texto-suave">{[sugerido.descripcion, sugerido.referencia].filter(Boolean).join(" · ")}</span>}
+              </p>
+              {t.autoMotivos && <p className="mt-1 text-sm">{t.autoMotivos}.</p>}
+              {t.autoResultado === "POR_CONFIRMAR" && Number(sugerido.montoConciliado) === 0 && (
+                <div className="mt-3">
+                  <BotonServidor accion={confirmarSugerenciaAccion.bind(null, id, t.id)} variante="primario" pendienteTexto="Confirmando…">
+                    Confirmar con este abono ({$(t.monto)}, a la deuda más antigua)
+                  </BotonServidor>
+                </div>
+              )}
+              <p className="mt-3 text-xs text-texto-suave">
+                {t.autoResultado === "POR_CONFIRMAR"
+                  ? "Si no es este abono, elige otro más abajo o deja una nota."
+                  : "Puedes confirmar más abajo por el monto que corresponda, o rechazarla con un motivo que el residente verá."}
+              </p>
+            </Card>
+          )}
           {t.estado === "CONCILIADA" && t.movimiento && t.pago && (
             <Card className="border-exito/30">
               <h2 className="mb-2 font-bold text-exito">Verificado y conciliado</h2>
