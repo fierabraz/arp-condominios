@@ -1,20 +1,24 @@
 import { requireAdministradora } from "@/lib/auth";
 import { condominiosPermitidos, esPrincipal } from "@/lib/permisos";
-import { BotonLink, PageHeader, Vacio } from "@/components/ui";
+import { PageHeader, Vacio } from "@/components/ui";
 import { TarjetaPropiedad } from "@/components/tarjeta-propiedad";
+import { BotonNuevaComunidad } from "@/components/cupo-comunidades";
+import { cupoDe } from "@/lib/planes-servicio";
 import { resumenPropiedades } from "@/lib/resumen-propiedades";
 
 export default async function CondominiosPage() {
   const { usuario, administradoraId } = await requireAdministradora();
   const propiedades = await resumenPropiedades(administradoraId, condominiosPermitidos(usuario) ?? undefined);
   const principal = esPrincipal(usuario);
+  // SUS-001: cupo de comunidades del plan (solo lo necesita quien puede crear).
+  const cupo = principal ? await cupoDe(administradoraId) : null;
 
   return (
     <>
       <PageHeader
         titulo="Mis propiedades"
         descripcion={principal ? "Edificios y condominios que administras" : "Edificios y condominios que tienes asignados"}
-        acciones={principal ? <BotonLink href="/condominios/nuevo">Nueva comunidad</BotonLink> : undefined}
+        acciones={principal ? <BotonNuevaComunidad cupo={cupo!} /> : undefined}
       />
       {propiedades.length === 0 ? (
         <Vacio>

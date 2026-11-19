@@ -15,6 +15,7 @@ import { DIA_PAGO_MAX, DIA_PAGO_MIN } from "@/lib/cobro";
 import { historialUnidad } from "@/lib/unidades";
 import { TIPOS_VINCULO } from "@/lib/vinculos";
 import { crearVinculo, terminarVinculo } from "@/lib/vinculos-servicio";
+import { crearDentroDelCupo, SinCupoError } from "@/lib/planes-servicio";
 
 const CondominioSchema = z.object({
   nombre: z.string({ error: "Ingresa el nombre." }).min(2, { error: "Ingresa el nombre." }),
@@ -91,7 +92,16 @@ export async function crearCondominio(_: EstadoForm, formData: FormData): Promis
   if (!datos.success) return erroresDe(datos.error);
 
   // Nace "En configuración" (valor por defecto de la tabla): se completa en el configurador.
-  const condominio = await db.condominio.create({ data: { ...paraGuardar(datos.data), administradoraId } });
+  // SUS-001: solo dentro del cupo del plan que asignó la plataforma.
+  let condominio;
+  try {
+    condominio = await crearDentroDelCupo(administradoraId, (tx) =>
+      tx.condominio.create({ data: { ...paraGuardar(datos.data), administradoraId } }),
+    );
+  } catch (e) {
+    if (e instanceof SinCupoError) return { mensaje: e.message };
+    throw e;
+  }
   await registrar(usuario, "Creó una propiedad", `${condominio.nombre} (en configuración)`, condominio.id);
   redirect(`/condominios/${condominio.id}/configuracion?creada=1`);
 }
