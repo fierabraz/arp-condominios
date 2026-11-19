@@ -361,7 +361,7 @@ export function MenuLateral({
             href="/contrasena"
             className="mt-3 flex min-h-11 items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-convive-suave/70"
           >
-            <KeyRound size={16} /> Cambiar contraseña
+            <KeyRound size={16} /> Mi perfil y contraseña
           </Link>
           <form action={cerrarSesion}>
             <button className="flex min-h-11 w-full items-center gap-3 rounded-xl px-2 text-sm text-texto hover:bg-convive-suave/70">

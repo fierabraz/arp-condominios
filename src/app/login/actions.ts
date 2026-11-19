@@ -8,6 +8,8 @@ import { createSession, deleteSession, LOGIN, tipoDeRol, type TipoSesion } from 
 import { getUsuarioActual } from "@/lib/auth";
 import { erroresDe, type EstadoForm } from "@/lib/forms";
 import { anotarIntento, bloqueoVigente, ipCliente } from "@/lib/intentos";
+import { volverPermitido } from "@/lib/pagos";
+import { enviarVerificacion } from "@/lib/cuentas";
 
 const LoginSchema = z.object({
   correo: z.email({ error: "Ingresa un correo válido." }).trim().toLowerCase(),
@@ -41,6 +43,16 @@ export async function iniciarSesion(tipo: TipoSesion, _: EstadoForm, formData: F
   }
   await anotarIntento(correo, ip, true);
   if (!usuario.activo) return { mensaje: "Esta cuenta está desactivada. Pide a la administración que la active." };
+  // PILOTO-001: una cuenta creada por la propia persona entra solo después de confirmar su correo.
+  if (!usuario.correoVerificadoEn) {
+    const envio = await enviarVerificacion(usuario);
+    return {
+      mensaje:
+        envio === "LIMITE"
+          ? `Aún no confirmas tu correo. Ya te enviamos varios enlaces a ${usuario.correo}: revisa tu bandeja de entrada y la carpeta de spam.`
+          : `Aún no confirmas tu correo. Te enviamos un enlace nuevo a ${usuario.correo}: ábrelo y vuelve a ingresar.`,
+    };
+  }
 
   // Cada tipo de cuenta entra por su propia puerta.
   const tipoCuenta = tipoDeRol(usuario.rol);
@@ -56,7 +68,8 @@ export async function iniciarSesion(tipo: TipoSesion, _: EstadoForm, formData: F
     rol: usuario.rol,
     administradoraId: usuario.administradoraId,
   });
-  redirect(tipo === "RESIDENTE" ? "/mi-cuenta" : "/");
+  // PAG-001: si llegó desde el QR de un aviso, vuelve a ese enlace (solo enlaces de pago de Convive).
+  redirect(volverPermitido(formData.get("volver")) ?? (tipo === "RESIDENTE" ? "/mi-cuenta" : "/"));
 }
 
 export async function cerrarSesion() {

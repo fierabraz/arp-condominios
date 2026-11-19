@@ -4,6 +4,7 @@ import { puedeVerUnidad } from "@/lib/acceso";
 import { datosAviso } from "@/lib/reportes";
 import { pdfAviso } from "@/lib/documentos";
 import { respuestaPdf } from "@/lib/pdf";
+import { enlacePagoAviso } from "@/lib/sitio";
 
 export async function GET(_: Request, { params }: RouteContext<"/avisos/[avisoId]/pdf">) {
   const { avisoId } = await params;
@@ -21,5 +22,5 @@ export async function GET(_: Request, { params }: RouteContext<"/avisos/[avisoId
   const datos = (await datosAviso(avisoId, usuario.administradoraId))!;
   const { anio, mes } = datos.aviso.periodo;
   const nombre = `aviso-${anio}-${String(mes).padStart(2, "0")}-unidad-${datos.aviso.unidad.numero}.pdf`;
-  return respuestaPdf(await pdfAviso(datos), nombre);
+  return respuestaPdf(await pdfAviso(datos, await enlacePagoAviso(datos.aviso.codigoPago)), nombre);
 }

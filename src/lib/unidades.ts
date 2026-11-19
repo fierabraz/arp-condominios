@@ -8,7 +8,8 @@ import { db } from "@/lib/db";
 export async function historialUnidad(unidadId: string) {
   const [avisos, pagos, gastos, votos, vinculos, apertura, reservas] = await Promise.all([
     db.avisoCobro.count({ where: { unidadId } }),
-    db.pago.count({ where: { unidadId } }),
+    // PAG-001: las transferencias informadas también son historia de pagos.
+    Promise.all([db.pago.count({ where: { unidadId } }), db.transferenciaInformada.count({ where: { unidadId } })]).then(([a, b]) => a + b),
     db.gasto.count({ where: { unidadId } }),
     db.voto.count({ where: { unidadId } }),
     // COM-001: vínculos ya terminados son historial de propietarios y arrendatarios.

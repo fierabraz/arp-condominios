@@ -5,24 +5,33 @@ import { cerrarSesion } from "@/app/login/actions";
 import { ETIQUETAS_ROL } from "@/lib/formato";
 import { MenuLateral, type EnlaceMenu } from "@/components/menu-lateral";
 import type { Rol } from "@/generated/prisma/enums";
-import { esPrincipal, filtroCondominios } from "@/lib/permisos";
+import { esPrincipal, filtroCondominios, perfilDe, type Perfil } from "@/lib/permisos";
+import { textoPerfil } from "@/lib/cuentas-reglas";
 import { AsistenteFlotante } from "@/components/asistente/asistente-flotante";
 
-function enlaces(rol: Rol, condominioId: string | null, principal: boolean): EnlaceMenu[] {
+function enlaces(rol: Rol, condominioId: string | null, principal: boolean, perfil: Perfil): EnlaceMenu[] {
   switch (rol) {
     case "SUPERADMIN":
       return [
         { href: "/plataforma", texto: "Administradoras", icono: "edificios" },
+        { href: "/plataforma/codigos", texto: "Códigos de acceso", icono: "permisos" },
         { href: "/plataforma/usuarios", texto: "Usuarios", icono: "personas" },
         { href: "/plataforma/correo", texto: "Correo", icono: "correo" },
         { href: "/plataforma/asistente", texto: "Asistente IA", icono: "asistente" },
       ];
     case "ADMINISTRADOR":
-      // Permisos y Crear propiedad son solo del administrador principal.
+      // PILOTO-001: conserje y personal autorizado solo consultan sus comunidades.
+      if (perfil === "PERSONAL") {
+        return [
+          { href: "/condominios", texto: "Mis propiedades", icono: "edificios" as const },
+          { href: "/", texto: "Panel de propiedades", icono: "panel" as const },
+        ];
+      }
+      // Equipo y Crear propiedad son solo del administrador principal.
       return [
         { href: "/condominios", texto: "Mis propiedades", icono: "edificios" as const },
         { href: "/personas", texto: "Propietarios y residentes", icono: "personas" as const },
-        ...(principal ? [{ href: "/usuarios", texto: "Permisos", icono: "permisos" as const }] : []),
+        ...(principal ? [{ href: "/usuarios", texto: "Equipo y permisos", icono: "permisos" as const }] : []),
         { href: "/reportes", texto: "Reportes globales", icono: "reportes" as const },
         { href: "/", texto: "Panel de propiedades", icono: "panel" as const },
         ...(principal ? [{ href: "/condominios/nuevo", texto: "Crear propiedad", icono: "crear" as const }] : []),
@@ -51,10 +60,10 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="fondo-convive flex min-h-screen flex-col md:flex-row">
       <MenuLateral
-        enlaces={enlaces(usuario.rol, usuario.condominioId, esPrincipal(usuario))}
+        enlaces={enlaces(usuario.rol, usuario.condominioId, esPrincipal(usuario), perfilDe(usuario))}
         subtitulo={usuario.administradora?.nombre ?? "Plataforma"}
         usuario={usuario.nombre}
-        rol={ETIQUETAS_ROL[usuario.rol]}
+        rol={usuario.rol === "SUPERADMIN" ? ETIQUETAS_ROL.SUPERADMIN : textoPerfil({ ...usuario, cargo: usuario.cargo ?? null })}
         cerrarSesion={cerrarSesion}
         propiedades={propiedades}
         editable={puedeEditar(usuario)}

@@ -25,6 +25,9 @@ export const getUsuarioActual = cache(async () => {
       condominioId: true,
       personaId: true,
       accesoTodas: true,
+      cargo: true,
+      permisosExtra: true,
+      telefono: true,
       asignaciones: { select: { condominioId: true } },
       administradora: { select: { nombre: true, moneda: true } },
     },
@@ -38,7 +41,10 @@ export const getUsuarioActual = cache(async () => {
   return { ...datos, asignados: asignaciones.map((a) => a.condominioId) };
 });
 
-export type UsuarioActual = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
+type UsuarioLeido = NonNullable<Awaited<ReturnType<typeof getUsuarioActual>>>;
+/** PILOTO-001: cargo, permisos extra y teléfono son opcionales para quien arma una cuenta a mano (pruebas). */
+export type UsuarioActual = Omit<UsuarioLeido, "cargo" | "permisosExtra" | "telefono"> &
+  Partial<Pick<UsuarioLeido, "cargo" | "permisosExtra" | "telefono">>;
 
 /** Cualquier cuenta con sesión. Para exigir algo más se usa requirePermiso. */
 export async function requireUsuario() {

@@ -35,9 +35,9 @@ export const CLASES: Record<Clase, { singular: string; plural: string }> = {
 };
 
 export const REGIMENES: Record<Regimen, { texto: string; ayuda: string }> = {
-  UNIDAD_PRIVADA: { texto: "Unidad privada", ayuda: "Tiene rol y alícuota propios: se cobra como una unidad más." },
+  UNIDAD_PRIVADA: { texto: "Unidad privada", ayuda: "Tiene rol y porcentaje de prorrateo propios: se cobra como una unidad más." },
   ACCESORIO: { texto: "Accesorio de una unidad", ayuda: "Pertenece a un departamento, casa o local." },
-  BIEN_COMUN: { texto: "Bien común", ayuda: "Es de la comunidad. No tiene alícuota ni se cobra." },
+  BIEN_COMUN: { texto: "Bien común", ayuda: "Es de la comunidad. No tiene porcentaje de prorrateo ni se cobra." },
   POR_DEFINIR: { texto: "Por definir", ayuda: "Aún no se sabe. No se supone ninguna condición." },
 };
 
@@ -151,11 +151,11 @@ export function revisarEspacio(d: DatosEspacio): { errores: Record<string, strin
   }
   if (d.regimen === "ACCESORIO") {
     if (!d.unidadPrincipalId) errores.unidadPrincipalId = "Indica la unidad a la que pertenece.";
-    if (d.unidadPropiaId) errores.unidadPropiaId = "Un accesorio no tiene alícuota propia: deja este campo vacío.";
+    if (d.unidadPropiaId) errores.unidadPropiaId = "Un accesorio no tiene porcentaje de prorrateo propio: deja este campo vacío.";
   }
   if (d.regimen === "UNIDAD_PRIVADA") {
     if (d.unidadPrincipalId) errores.unidadPrincipalId = "Una unidad privada no pertenece a otra unidad.";
-    if (!d.unidadPropiaId) advertencias.push("Falta indicar la unidad con alícuota que lo representa (en Unidades).");
+    if (!d.unidadPropiaId) advertencias.push("Falta indicar la unidad con porcentaje de prorrateo que lo representa (en Unidades).");
   }
   if (d.regimen === "POR_DEFINIR") advertencias.push("Su condición jurídica está por definir.");
   if (!d.destino) advertencias.push("Falta indicar su destino.");

@@ -2,6 +2,8 @@ import "server-only";
 import { MENSAJE_SIN_FINANZAS, operaFinanzas } from "./configuracion";
 import { db } from "@/lib/db";
 import { registrarEn, type Auditoria } from "@/lib/registro";
+import { sincronizarConstanciaEn } from "@/lib/constancias-servicio";
+import { exigirMesAbierto, MesCerrado } from "@/lib/mes-cerrado";
 import type { MedioPago } from "@/generated/prisma/enums";
 import {
   aMinimo,
@@ -12,11 +14,22 @@ import {
   diaPagoDe,
   fechaVencimiento,
 } from "@/lib/cobro";
+import { DistribucionInvalida, validarDistribucion, estadoSegunConciliado, type LineaDistribucion } from "@/lib/conciliacion";
 
 // Operaciones de cobro que tocan la base de datos. Todas reciben administradoraId
 // y filtran por él, para que un cliente nunca toque datos de otro.
 
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/** El bloqueo de mes cerrado llega como ErrorCobro (las pantallas ya muestran su mensaje). */
+async function enCobro<T>(p: Promise<T>) {
+  try {
+    return await p;
+  } catch (e) {
+    if (e instanceof MesCerrado) throw new ErrorCobro(e.message);
+    throw e;
+  }
+}
 
 async function monedaDe(tx: Pick<Tx, "administradora">, administradoraId: string) {
   const adm = await tx.administradora.findUniqueOrThrow({ where: { id: administradoraId } });
@@ -46,20 +59,31 @@ async function aplicarSaldosAFavor(tx: Tx, unidadId: string, dec: number) {
   }
 }
 
-async function aplicarMonto(tx: Tx, pagoId: string, unidadId: string, monto: number, dec: number) {
-  const pendientes = await tx.avisoCobro.findMany({
-    where: { unidadId, saldo: { gt: 0 } },
-    orderBy: [{ vencimiento: "asc" }, { emitidoEn: "asc" }],
-  });
-  const { aplicaciones } = aplicarPago(
-    monto,
-    pendientes.map((a) => ({ id: a.id, saldo: aMinimo(a.saldo.toString(), dec) })),
-  );
+async function aplicarMonto(tx: Tx, pagoId: string, unidadId: string, monto: number, dec: number, elegidas?: LineaDistribucion[]) {
+  const aplicaciones = elegidas ?? (await propuestaAntigua(tx, unidadId, monto, dec));
   for (const ap of aplicaciones) {
     const valor = deMinimo(ap.monto, dec);
     await tx.aplicacionPago.create({ data: { pagoId, avisoId: ap.avisoId, monto: valor } });
     await tx.avisoCobro.update({ where: { id: ap.avisoId }, data: { saldo: { decrement: valor } } });
   }
+}
+
+/** Lo de siempre cuando nadie elige: primero la deuda más antigua. */
+async function propuestaAntigua(tx: Tx, unidadId: string, monto: number, dec: number) {
+  const pendientes = await tx.avisoCobro.findMany({
+    where: { unidadId, saldo: { gt: 0 } },
+    orderBy: [{ vencimiento: "asc" }, { emitidoEn: "asc" }],
+  });
+  return aplicarPago(
+    monto,
+    pendientes.map((a) => ({ id: a.id, saldo: aMinimo(a.saldo.toString(), dec) })),
+  ).aplicaciones;
+}
+
+/** Avisos con saldo de la unidad, en unidades mínimas (para revisar una distribución elegida). */
+async function avisosConSaldo(tx: Tx, unidadId: string, dec: number) {
+  const avisos = await tx.avisoCobro.findMany({ where: { unidadId, saldo: { gt: 0 } }, select: { id: true, saldo: true, vencimiento: true } });
+  return avisos.map((a) => ({ id: a.id, saldo: aMinimo(a.saldo.toString(), dec), vencimiento: a.vencimiento }));
 }
 
 export class ErrorCobro extends Error {}
@@ -80,7 +104,7 @@ type AnotarCon<T> = (resultado: T) => Auditoria;
  * ya actualizados. Se bloquean en orden de id para que dos operaciones nunca se esperen entre sí.
  * No cambia ningún cálculo.
  */
-async function bloquearUnidades(tx: Tx, unidadIds: string[]) {
+export async function bloquearUnidades(tx: Tx, unidadIds: string[]) {
   if (unidadIds.length === 0) return;
   const ids = [...new Set(unidadIds)].sort();
   await tx.$queryRaw`SELECT id FROM "Unidad" WHERE id = ANY(${ids}::text[]) ORDER BY id FOR UPDATE`;
@@ -107,10 +131,18 @@ async function calcularPeriodo(
 ) {
   const { condominio } = periodo;
   if (condominio.unidades.length === 0) throw new ErrorCobro("El condominio no tiene unidades.");
+  // FIN-COMP C: no se cobra con porcentajes de prorrateo provisionales (los del generador visual).
+  const provisionales = condominio.unidades.filter((u) => u.prorrateoProvisional).length;
+  if (provisionales) {
+    throw new ErrorCobro(
+      `${provisionales} unidad(es) tienen un porcentaje de prorrateo provisional (puesto por el generador). Confírmalos o corrígelos en Unidades o con la planilla Excel antes de emitir.`,
+    );
+  }
 
   const dec = await monedaDe(tx, administradoraId);
   const totalComun = periodo.gastos
-    .filter((g) => g.tipo === "COMUN")
+    // FIN-COMP B: lo que se paga con un fondo no se reparte otra vez entre las unidades.
+    .filter((g) => g.tipo === "COMUN" && !g.fondoId)
     .reduce((s, g) => s + aMinimo(g.monto.toString(), dec), 0);
 
   const unidades = await Promise.all(
@@ -207,13 +239,28 @@ export async function emitirPeriodo(periodoId: string, administradoraId: string,
   });
 }
 
-/** Registra un pago y lo aplica a la deuda más antigua de la unidad. */
-export async function registrarPago(
-  administradoraId: string,
-  datos: { unidadId: string; monto: number; fecha: Date; medio: MedioPago; referencia?: string },
-  opciones: { permitirDuplicado?: boolean; anotar?: AnotarCon<{ id: string }> } = {},
-) {
-  return db.$transaction(async (tx) => {
+type DatosPago = { unidadId: string; monto: number; fecha: Date; medio: MedioPago; referencia?: string };
+type OpcionesPago = {
+  permitirDuplicado?: boolean;
+  anotar?: AnotarCon<{ id: string }>;
+  /**
+   * FIN-COMP A: qué avisos paga y cuánto a cada uno (en la moneda, no en unidades mínimas). Sin
+   * esto se propone lo de siempre (lo más antiguo primero). Lo que no se reparte queda a favor.
+   */
+  distribucion?: { avisoId: string; monto: number }[];
+};
+
+/** Registra un pago y lo aplica según la distribución elegida (o, si no se eligió, a lo más antiguo). */
+export async function registrarPago(administradoraId: string, datos: DatosPago, opciones: OpcionesPago = {}) {
+  return db.$transaction((tx) => registrarPagoEn(tx, administradoraId, datos, opciones));
+}
+
+/**
+ * Lo mismo que registrarPago, dentro de una transacción ya abierta. PAG-001 la usa para que el
+ * pago, el movimiento de la cartola y la transferencia informada cambien juntos o nada.
+ */
+export async function registrarPagoEn(tx: Tx, administradoraId: string, datos: DatosPago, opciones: OpcionesPago = {}) {
+  {
     const unidad = await tx.unidad.findFirst({
       where: { id: datos.unidadId, administradoraId },
       include: { condominio: { select: { estado: true } } },
@@ -221,6 +268,7 @@ export async function registrarPago(
     if (!unidad) throw new ErrorCobro("Unidad no encontrada.");
     if (!operaFinanzas(unidad.condominio.estado)) throw new ErrorCobro(MENSAJE_SIN_FINANZAS);
     await bloquearUnidades(tx, [unidad.id]);
+    await enCobro(exigirMesAbierto(tx, unidad.condominioId, datos.fecha, "registrar un pago"));
     const dec = await monedaDe(tx, administradoraId);
     const monto = aMinimo(datos.monto, dec);
     if (!opciones.permitirDuplicado) {
@@ -234,13 +282,27 @@ export async function registrarPago(
       });
       if (igual) throw new PagoDuplicado(igual);
     }
+    // La distribución elegida se revisa ANTES de guardar nada, con la unidad ya bloqueada.
+    let elegidas: LineaDistribucion[] | undefined;
+    if (opciones.distribucion) {
+      try {
+        elegidas = validarDistribucion(
+          monto,
+          opciones.distribucion.map((l) => ({ avisoId: l.avisoId, monto: aMinimo(l.monto, dec) })),
+          await avisosConSaldo(tx, unidad.id, dec),
+        ).lineas;
+      } catch (e) {
+        if (e instanceof DistribucionInvalida) throw new ErrorCobro(e.message);
+        throw e;
+      }
+    }
     const pago = await tx.pago.create({
       data: { ...datos, monto: deMinimo(monto, dec), administradoraId },
     });
-    await aplicarMonto(tx, pago.id, unidad.id, monto, dec);
+    await aplicarMonto(tx, pago.id, unidad.id, monto, dec, elegidas);
     if (opciones.anotar) await registrarEn(tx, opciones.anotar(pago));
     return pago;
-  });
+  }
 }
 
 /**
@@ -251,15 +313,28 @@ export async function registrarPago(
 export async function anularPago(
   pagoId: string,
   administradoraId: string,
-  anulacion: { por: string; motivo: string },
+  anulacion: { por: string; motivo: string; transferencia?: "EN_REVISION" | "ANULADA" },
   anotar?: AnotarCon<{ id: string; devuelto: string }>,
 ) {
-  return db.$transaction(async (tx) => {
+  return db.$transaction((tx) => anularPagoEn(tx, pagoId, administradoraId, anulacion, anotar));
+}
+
+/** Lo mismo que anularPago, dentro de una transacción ya abierta. */
+export async function anularPagoEn(
+  tx: Tx,
+  pagoId: string,
+  administradoraId: string,
+  anulacion: { por: string; motivo: string; transferencia?: "EN_REVISION" | "ANULADA" },
+  anotar?: AnotarCon<{ id: string; devuelto: string }>,
+) {
+  {
     const pago = await tx.pago.findFirst({
       where: { id: pagoId, administradoraId },
     });
     if (!pago) throw new ErrorCobro("Pago no encontrado.");
     await bloquearUnidades(tx, [pago.unidadId]);
+    const { condominioId } = await tx.unidad.findUniqueOrThrow({ where: { id: pago.unidadId }, select: { condominioId: true } });
+    await enCobro(exigirMesAbierto(tx, condominioId, pago.fecha, "anular un pago"));
     // Marcar primero y solo si sigue vigente: dos anulaciones a la vez no devuelven el monto dos veces.
     const { count } = await tx.pago.updateMany({
       where: { id: pago.id, anuladoEn: null },
@@ -272,6 +347,11 @@ export async function anularPago(
       await tx.avisoCobro.update({ where: { id: ap.avisoId }, data: { saldo: { increment: ap.monto } } });
     }
     await tx.aplicacionPago.deleteMany({ where: { pagoId: pago.id } });
+    // FIN-COMP A: el movimiento de la cartola que lo respaldaba vuelve a quedar disponible (la
+    // conciliación queda anulada, no se borra) y, si venía de una transferencia informada, esta
+    // vuelve a revisión o queda «Anulado o reversado», según se eligió.
+    await liberarConciliaciones(tx, pago.id, anulacion);
+    await liberarTransferencia(tx, pago.id, anulacion);
     // Si la unidad tenía otros saldos a favor, ahora pueden cubrir lo que quedó pendiente.
     const dec = await monedaDe(tx, administradoraId);
     await aplicarSaldosAFavor(tx, pago.unidadId, dec);
@@ -280,15 +360,84 @@ export async function anularPago(
       await registrarEn(tx, anotar({ id: pago.id, devuelto: String(devuelto) }));
     }
     return pago;
-  });
+  }
 }
 
-/** Estado de cuenta de una unidad: avisos, pagos, deuda y saldo a favor. */
+/**
+ * Anula las conciliaciones vigentes de un pago y devuelve ese monto al movimiento de la cartola.
+ * También la usa «deshacer conciliación» (conciliacion-servicio.ts).
+ */
+export async function liberarConciliaciones(tx: Tx, pagoId: string, anulacion: { por: string; motivo: string }) {
+  const vigentes = await tx.conciliacionMovimiento.findMany({ where: { pagoId, anuladaEn: null } });
+  for (const c of vigentes) await anularConciliacionEn(tx, c.id, anulacion);
+}
+
+/** Marca anulada una conciliación (sin borrarla) y descuenta su monto del movimiento. */
+export async function anularConciliacionEn(tx: Tx, conciliacionId: string, anulacion: { por: string; motivo: string }) {
+  const { count } = await tx.conciliacionMovimiento.updateMany({
+    where: { id: conciliacionId, anuladaEn: null },
+    data: { anuladaEn: new Date(), anuladaPor: anulacion.por, motivoAnulacion: anulacion.motivo.slice(0, 500) },
+  });
+  if (count === 0) throw new ErrorCobro("Esa conciliación ya estaba deshecha.");
+  const c = await tx.conciliacionMovimiento.findUniqueOrThrow({ where: { id: conciliacionId } });
+  await tx.$queryRaw`SELECT id FROM "MovimientoBancario" WHERE id = ${c.movimientoId} FOR UPDATE`;
+  const mov = await tx.movimientoBancario.findUniqueOrThrow({ where: { id: c.movimientoId }, select: { fecha: true } });
+  await enCobro(exigirMesAbierto(tx, c.condominioId, mov.fecha, "deshacer una conciliación"));
+  // `montoConciliado` lleva el signo del movimiento: en un cargo se devuelve sumando.
+  const esCargo = c.tipo === "EGRESO" || c.tipo === "OTRO_EGRESO";
+  const m = await tx.movimientoBancario.update({
+    where: { id: c.movimientoId },
+    data: { montoConciliado: esCargo ? { increment: c.monto } : { decrement: c.monto } },
+    select: { id: true, monto: true, montoConciliado: true },
+  });
+  await tx.movimientoBancario.update({
+    where: { id: m.id },
+    data: { estado: estadoSegunConciliado(Number(m.monto), Number(m.montoConciliado)) },
+  });
+  return c;
+}
+
+async function liberarTransferencia(tx: Tx, pagoId: string, anulacion: { por: string; motivo: string; transferencia?: "EN_REVISION" | "ANULADA" }) {
+  const t = await tx.transferenciaInformada.findUnique({ where: { pagoId }, select: { id: true, estado: true, movimientoId: true, administradoraId: true, condominioId: true } });
+  if (!t) return;
+  const destino = anulacion.transferencia ?? "EN_REVISION";
+  await tx.registroCambio.create({
+    data: {
+      administradoraId: t.administradoraId,
+      condominioId: t.condominioId,
+      usuarioNombre: anulacion.por,
+      accion: destino === "ANULADA" ? "Reversó el pago de una transferencia" : "Volvió a revisión por anulación del pago",
+      detalle: `${destino === "ANULADA" ? "Pago reversado" : "El pago de la transferencia se anuló en Recaudación"}: ${anulacion.motivo}`.slice(0, 1000),
+      entidad: "TransferenciaInformada",
+      entidadId: t.id,
+      antes: { estado: t.estado, pagoId, movimientoId: t.movimientoId },
+      despues: { estado: destino },
+    },
+  });
+  await tx.transferenciaInformada.update({
+    where: { id: t.id },
+    data: {
+      estado: destino,
+      pagoId: null,
+      movimientoId: null,
+      nota: `${destino === "ANULADA" ? "Pago reversado" : "El pago se anuló en Recaudación"} (${anulacion.por}): ${anulacion.motivo}`.slice(0, 500),
+      revisadoPor: anulacion.por,
+      revisadoEn: new Date(),
+    },
+  });
+  await sincronizarConstanciaEn(tx, t.id, anulacion.por);
+}
+
+/**
+ * Estado de cuenta de una unidad: avisos, pagos, deuda y saldo a favor. FIN-COMP A: también los
+ * pagos informados que siguen PENDIENTES DE VERIFICACIÓN. Se muestran aparte y nunca se restan de
+ * la deuda ni se suman a lo pagado: solo cuentan cuando la administración los verifica.
+ */
 export async function estadoCuenta(unidadId: string, administradoraId: string) {
   const unidad = await db.unidad.findFirst({ where: { id: unidadId, administradoraId } });
   if (!unidad) return null;
   const dec = await monedaDe(db, administradoraId);
-  const [avisos, pagos] = await Promise.all([
+  const [avisos, pagos, enVerificacion] = await Promise.all([
     db.avisoCobro.findMany({
       where: { unidadId },
       orderBy: [{ vencimiento: "desc" }],
@@ -297,7 +446,16 @@ export async function estadoCuenta(unidadId: string, administradoraId: string) {
     db.pago.findMany({
       where: { unidadId },
       orderBy: [{ fecha: "desc" }, { creadoEn: "desc" }],
-      include: { aplicaciones: { select: { monto: true } } },
+      include: {
+        aplicaciones: { select: { monto: true, aviso: { select: { periodo: { select: { anio: true, mes: true } } } } } },
+        conciliaciones: { where: { anuladaEn: null }, select: { id: true, movimiento: { select: { fecha: true } } } },
+        transferencia: { select: { id: true, estado: true } },
+      },
+    }),
+    db.transferenciaInformada.findMany({
+      where: { unidadId, administradoraId, estado: { in: ["INFORMADA", "EN_REVISION"] } },
+      orderBy: { creadoEn: "desc" },
+      select: { id: true, fecha: true, monto: true, operacion: true, estado: true, creadoEn: true, informante: true, comprobante: { select: { id: true } } },
     }),
   ]);
   const ahora = new Date();
@@ -305,17 +463,24 @@ export async function estadoCuenta(unidadId: string, administradoraId: string) {
   const vencida = avisos
     .filter((a) => a.vencimiento < ahora)
     .reduce((s, a) => s + aMinimo(a.saldo.toString(), dec), 0);
-  const aFavor = pagos.filter((p) => !p.anuladoEn).reduce(
+  const vigentes = pagos.filter((p) => !p.anuladoEn);
+  const aFavor = vigentes.reduce(
     (s, p) =>
       s + aMinimo(p.monto.toString(), dec) - p.aplicaciones.reduce((t, a) => t + aMinimo(a.monto.toString(), dec), 0),
     0,
   );
+  const pagado = vigentes.reduce((s, p) => s + aMinimo(p.monto.toString(), dec), 0);
+  const pendiente = enVerificacion.reduce((s, t) => s + aMinimo(t.monto.toString(), dec), 0);
   return {
     avisos,
     pagos,
     deuda: deMinimo(deuda, dec),
     vencida: deMinimo(vencida, dec),
     aFavor: deMinimo(aFavor, dec),
+    /** Pagos efectivamente registrados (vigentes, sin anulados). */
+    pagado: deMinimo(pagado, dec),
+    /** Pagos informados todavía sin verificar: visibles, pero NO descuentan deuda. */
+    enVerificacion: { lista: enVerificacion, cantidad: enVerificacion.length, monto: deMinimo(pendiente, dec) },
   };
 }
 

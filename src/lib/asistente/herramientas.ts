@@ -45,6 +45,8 @@ async function cuentaDeUnidad(usuario: UsuarioActual, unidadId: string) {
     deuda_total: $(estado.deuda),
     deuda_vencida: $(estado.vencida),
     saldo_a_favor: $(estado.aFavor),
+    // Transferencias informadas que la administración aún no verifica: NO descuentan deuda.
+    transferencias_en_verificacion: { cantidad: estado.enVerificacion.cantidad, monto: $(estado.enVerificacion.monto) },
     avisos_recientes: estado.avisos.slice(0, 6).map((a) => ({
       mes: nombrePeriodo(a.periodo.anio, a.periodo.mes),
       total: $(a.total.toString()),

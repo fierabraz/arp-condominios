@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FileText, Lock } from "lucide-react";
 import { db } from "@/lib/db";
+import { puede } from "@/lib/permisos";
 import { Card, Insignia, PageHeader, Tabla, Vacio } from "@/components/ui";
 import { diaISO } from "@/lib/forms";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
@@ -29,6 +30,7 @@ import {
   agregarFondo,
   agregarObligacion,
   cambiarEstadoApertura,
+  incorporarAperturaAccion,
   confirmarDeudasPlanilla,
   eliminarDeApertura,
   guardarApertura,
@@ -43,7 +45,7 @@ const $ = (n: number | null | undefined) => (n === null || n === undefined ? "�
 
 export default async function AperturaPage({ params }: PageProps<"/condominios/[id]/apertura">) {
   const { id } = await params;
-  const { condominio, editable } = await condominioVisible(id);
+  const { condominio, editable, usuario } = await condominioVisible(id);
   // El detalle de deudas por unidad es solo para administradores (D-COM-09, por decidir).
   if (!editable) notFound();
   const base = `/condominios/${id}`;
@@ -108,13 +110,24 @@ export default async function AperturaPage({ params }: PageProps<"/condominios/[
         descripcion="Lo que la comunidad trae del sistema anterior a la fecha de corte: deudas por unidad, saldos a favor, fondos, bancos y cuentas por pagar."
       />
 
-      <p className="mb-6 flex items-start gap-2 rounded-xl bg-alerta-suave px-4 py-3 text-sm text-alerta">
-        <Lock size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-        <span>
-          Es un borrador de control: todavía no cambia cobros, pagos, intereses, morosidad ni la página de Fondos. Aprobarla y que esos
-          saldos se cobren queda restringido hasta que se aprueben las reglas de apertura (D-COM-05 a D-COM-08) y el libro de fondos.
-        </span>
-      </p>
+      {ap?.apertura.estado === "INCORPORADA" ? (
+        <p className="mb-6 flex items-start gap-2 rounded-xl bg-exito-suave px-4 py-3 text-sm text-exito">
+          <Lock size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>
+            Incorporada a las finanzas el {formatoFecha(ap.apertura.incorporadaEn!)} por {ap.apertura.incorporadaPor}. Las deudas confirmadas y en convenio
+            se cobran desde el mes de apertura, los fondos tienen su saldo inicial y las cuentas por pagar están en Egresos. Ya no se puede cambiar: lo
+            que falte se corrige con movimientos nuevos.
+          </span>
+        </p>
+      ) : (
+        <p className="mb-6 flex items-start gap-2 rounded-xl bg-alerta-suave px-4 py-3 text-sm text-alerta">
+          <Lock size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>
+            Mientras no se incorpore, es un borrador de control: no cambia cobros, pagos, morosidad ni fondos. Cuando esté revisada, el administrador
+            principal la incorpora a las finanzas (una sola vez).
+          </span>
+        </p>
+      )}
 
       {/* ── Fecha de corte ── */}
       <Card className="mb-8">
@@ -131,7 +144,7 @@ export default async function AperturaPage({ params }: PageProps<"/condominios/[
         {borrador ? (
           <FormularioApertura accion={guardarApertura.bind(null, id)} campos={camposCorte} textoBoton={ap ? "Guardar" : "Comenzar apertura"} />
         ) : (
-          <p className="text-sm">{ESTADOS_APERTURA.EN_REVISION.ayuda}</p>
+          <p className="text-sm">{ESTADOS_APERTURA[ap!.apertura.estado].ayuda}</p>
         )}
       </Card>
 
@@ -222,14 +235,23 @@ export default async function AperturaPage({ params }: PageProps<"/condominios/[
                     Marcar lista para revisión
                   </BotonAccion>
                 )
+              ) : apertura.estado === "EN_REVISION" ? (
+                <div className="flex flex-wrap items-start gap-3">
+                  <BotonAccion accion={cambiarEstadoApertura.bind(null, id, "BORRADOR")} pregunta="¿Volver a borrador para corregir?">
+                    Volver a borrador
+                  </BotonAccion>
+                  {puede(usuario, "propiedad.habilitarCobros", id) && (
+                    <BotonAccion
+                      accion={incorporarAperturaAccion.bind(null, id)}
+                      pregunta="¿Incorporar la apertura a las finanzas? Las deudas confirmadas y en convenio pasan a cobrarse, los fondos quedan con su saldo inicial y las cuentas por pagar pasan a Egresos. No se puede deshacer."
+                    >
+                      Incorporar a las finanzas
+                    </BotonAccion>
+                  )}
+                </div>
               ) : (
-                <BotonAccion accion={cambiarEstadoApertura.bind(null, id, "BORRADOR")} pregunta="¿Volver a borrador para corregir?">
-                  Volver a borrador
-                </BotonAccion>
+                <p className="text-sm text-exito">Incorporada a las finanzas.</p>
               )}
-              <p className="mt-3 flex items-center gap-1 text-xs text-texto-suave">
-                <Lock size={14} aria-hidden="true" /> Aprobar la apertura: restringido hasta aprobar las reglas.
-              </p>
             </Card>
           </div>
         </section>

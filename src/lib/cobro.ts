@@ -73,7 +73,7 @@ export function calcularAvisos({
   unidades: UnidadCobro[];
 }): LineaAviso[] {
   if (!alicuotasCuadran(unidades.map((u) => u.alicuota))) {
-    throw new Error("Las alícuotas del condominio deben sumar 100 %.");
+    throw new Error("Los porcentajes de prorrateo del condominio deben sumar 100 %.");
   }
   const pesos = unidades.map((u) => u.alicuota);
   const totalReserva = Math.round((totalGastosComunes * porcentajeReserva) / 100);

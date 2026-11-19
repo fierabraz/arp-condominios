@@ -144,7 +144,7 @@ export function CondominioForm({
             aria-describedby="ayuda-total-unidades"
           />
           <span id="ayuda-total-unidades" className="mt-1 block text-xs text-texto-suave">
-            Departamentos, casas, locales, estacionamientos y bodegas con alícuota propia. Sirve para seguir el avance mientras
+            Departamentos, casas, locales, estacionamientos y bodegas con porcentaje de prorrateo propio. Sirve para seguir el avance mientras
             las cargas.
           </span>
         </Campo>

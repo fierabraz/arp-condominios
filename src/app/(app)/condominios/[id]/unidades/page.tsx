@@ -11,6 +11,8 @@ import { crearUnidad } from "../../actions";
 import { ListaUnidades } from "./lista-unidades";
 import { COLOR_ALICUOTAS, estadoAlicuotas } from "@/lib/alicuotas";
 import { opcionesAgrupaciones } from "@/lib/estructura";
+import { FormularioSimple } from "@/components/formulario-simple";
+import { confirmarProrrateosAccion } from "../../cierre-actions";
 
 export default async function UnidadesPage({ params }: PageProps<"/condominios/[id]/unidades">) {
   const { id } = await params;
@@ -32,6 +34,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
   const conDeuda = new Set((await morosidad(id, administradoraId)).map((m) => m.unidadId));
 
   const editable = puedeEditar(usuario);
+  const provisionales = condominio.unidades.filter((u) => u.prorrateoProvisional).length;
   const conDiaPropio = condominio.unidades.filter((u) => u.diaPago !== null).length;
   const sumaAlicuotas = condominio.unidades.reduce((s, u) => s + Number(u.alicuota), 0);
   const estado = estadoAlicuotas({ cargadas: condominio.unidades.length, suma: sumaAlicuotas, total: condominio.totalUnidades });
@@ -55,6 +58,18 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
         }
       />
 
+      {provisionales > 0 && (
+        <Card className="mb-6 border-alerta/40">
+          <p className="mb-2 text-sm">
+            <strong>{provisionales} unidad(es) tienen un porcentaje de prorrateo provisional</strong> (el generador puso el mismo a todas). No se pueden emitir
+            cobros hasta confirmarlos. Corrígelos uno por uno, con la planilla Excel, o confírmalos si ya son los correctos.
+          </p>
+          {editable && (
+            <FormularioSimple accion={confirmarProrrateosAccion.bind(null, id)} boton="Los porcentajes actuales son los correctos: confirmarlos" />
+          )}
+        </Card>
+      )}
+
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Card>
           <p className="text-sm text-texto-suave">Unidades</p>
@@ -75,7 +90,7 @@ export default async function UnidadesPage({ params }: PageProps<"/condominios/[
           )}
         </Card>
         <Card>
-          <p className="text-sm text-texto-suave">Suma de alícuotas</p>
+          <p className="text-sm text-texto-suave">Suma de porcentajes de prorrateo</p>
           <p className={`mt-1 text-2xl font-bold ${estado.tipo === "error" ? "text-peligro" : ""}`}>
             {formatoPorcentaje(sumaAlicuotas)}
           </p>

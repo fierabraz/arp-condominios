@@ -7,6 +7,8 @@ import type { TipoToken } from "@/generated/prisma/enums";
 export const MINUTOS_VALIDEZ = 60;
 /** Días que dura una invitación: el residente puede tardar en verla. */
 export const DIAS_INVITACION = 7;
+/** PILOTO-001: horas que dura el enlace para confirmar el correo de una cuenta nueva. */
+export const HORAS_VERIFICACION = 48;
 /** Solicitudes de enlace permitidas por cuenta en una hora. */
 export const SOLICITUDES_POR_HORA = 3;
 
@@ -15,6 +17,7 @@ export const hashToken = (token: string) => createHash("sha256").update(token).d
 const VALIDEZ_MS: Record<TipoToken, number> = {
   RECUPERACION: MINUTOS_VALIDEZ * 60_000,
   INVITACION: DIAS_INVITACION * 24 * 3_600_000,
+  VERIFICACION: HORAS_VERIFICACION * 3_600_000,
 };
 
 /** Crea un enlace de un solo uso; devuelve el token en claro (solo va en el correo o al administrador). */
@@ -31,7 +34,18 @@ export async function tokenVigente(token: string, tipo: TipoToken = "RECUPERACIO
   const t = await db.tokenRecuperacion.findUnique({
     where: { tokenHash: hashToken(token) },
     include: {
-      usuario: { select: { id: true, nombre: true, rol: true, administradoraId: true, correo: true, activo: true } },
+      usuario: {
+        select: {
+          id: true,
+          nombre: true,
+          rol: true,
+          administradoraId: true,
+          correo: true,
+          activo: true,
+          correoVerificadoEn: true,
+          cargo: true,
+        },
+      },
     },
   });
   if (!t || t.tipo !== tipo || t.usadoEn || t.expiraEn < new Date() || !t.usuario.activo) return null;
@@ -54,12 +68,40 @@ export async function canjearToken(token: string, tipo: TipoToken, claveNueva: s
   if (count === 0) return null;
   await db.$transaction([
     // claveActualizadaEn cierra las sesiones que estuvieran abiertas con la contraseña anterior.
+    // PILOTO-001: el enlace llegó a su correo, así que el correo también queda confirmado.
     db.usuario.update({
       where: { id: t.usuarioId },
-      data: { claveHash: await bcrypt.hash(claveNueva, 10), claveActualizadaEn: ahora },
+      data: {
+        claveHash: await bcrypt.hash(claveNueva, 10),
+        claveActualizadaEn: ahora,
+        correoVerificadoEn: t.usuario.correoVerificadoEn ?? ahora,
+      },
     }),
     // Los demás enlaces pendientes de esa cuenta dejan de servir.
     db.tokenRecuperacion.updateMany({ where: { usuarioId: t.usuarioId, usadoEn: null }, data: { usadoEn: ahora } }),
+  ]);
+  return t.usuario;
+}
+
+/**
+ * PILOTO-001: confirma el correo con el enlace de verificación. Devuelve el usuario, o null si el
+ * enlace ya se usó o venció. No cambia la contraseña ni los demás enlaces pendientes.
+ */
+export async function confirmarCorreo(token: string) {
+  const t = await tokenVigente(token, "VERIFICACION");
+  if (!t) return null;
+  const ahora = new Date();
+  const { count } = await db.tokenRecuperacion.updateMany({
+    where: { tokenHash: hashToken(token), usadoEn: null },
+    data: { usadoEn: ahora },
+  });
+  if (count === 0) return null;
+  await db.$transaction([
+    db.usuario.update({ where: { id: t.usuarioId }, data: { correoVerificadoEn: t.usuario.correoVerificadoEn ?? ahora } }),
+    db.tokenRecuperacion.updateMany({
+      where: { usuarioId: t.usuarioId, tipo: "VERIFICACION", usadoEn: null },
+      data: { usadoEn: ahora },
+    }),
   ]);
   return t.usuario;
 }

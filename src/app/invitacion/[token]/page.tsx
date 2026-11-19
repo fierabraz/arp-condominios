@@ -29,6 +29,20 @@ export default async function InvitacionPage({ params }: PageProps<"/invitacion/
     orderBy: { nombre: "asc" },
   });
   const nombre = t.usuario.nombre.split(" ")[0];
+  // PILOTO-001: también se invita al equipo de la administración (subadministradores, asistentes...).
+  if (t.usuario.rol !== "RESIDENTE") {
+    const adm = t.usuario.administradoraId
+      ? await db.administradora.findUnique({ where: { id: t.usuario.administradoraId }, select: { nombre: true } })
+      : null;
+    return (
+      <PantallaIngreso
+        titulo={`¡Hola, ${nombre}! Crea tu contraseña`}
+        descripcion={`Te invitaron a trabajar con ${adm?.nombre ?? MARCA.nombre} en ${MARCA.nombre}. Tu usuario es ${t.usuario.correo}.`}
+      >
+        <ClaveNuevaForm accion={aceptarInvitacion.bind(null, token)} textoBoton="Crear contraseña y entrar" />
+      </PantallaIngreso>
+    );
+  }
   const donde = propiedades.map((p) => p.nombre).join(", ") || MARCA.nombre;
   return (
     <PantallaIngreso

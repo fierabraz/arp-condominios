@@ -2,6 +2,7 @@ import "server-only";
 import { ANCHO, cifras, COLOR, encabezado, generarPdf, MARGEN, subtitulo, tabla } from "@/lib/pdf";
 import { formatoFecha, formatoMoneda, formatoPorcentaje } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
+import { dibujarQr } from "@/lib/qr-pdf";
 import type { datosAviso, datosRendicion } from "@/lib/reportes";
 import type { Informe } from "@/lib/informe-apertura";
 
@@ -13,7 +14,11 @@ function pie(doc: PDFKit.PDFDocument, texto: string) {
   doc.font("Helvetica").fontSize(8).fillColor(COLOR.suave).text(texto, MARGEN, doc.y, { width: ANCHO });
 }
 
-export function pdfAviso(d: DatosAviso) {
+/**
+ * Aviso de cobro en PDF. PAG-001: si se entrega `enlacePago` (el enlace del QR de este aviso),
+ * agrega el código QR y el enlace pulsable para ver el saldo actualizado e informar la transferencia.
+ */
+export function pdfAviso(d: DatosAviso, enlacePago?: string) {
   const { aviso } = d;
   const { condominio } = aviso.periodo;
   const $ = (x: number | { toString(): string }) => formatoMoneda(x, aviso.administradora.moneda);
@@ -37,12 +42,12 @@ export function pdfAviso(d: DatosAviso) {
     cifras(doc, [
       { etiqueta: "Total a pagar", valor: $(d.totalAPagar) },
       { etiqueta: "Vence el", valor: formatoFecha(aviso.vencimiento) },
-      { etiqueta: "Alícuota de la unidad", valor: formatoPorcentaje(aviso.unidad.alicuota) },
+      { etiqueta: "Porcentaje de prorrateo", valor: formatoPorcentaje(aviso.unidad.alicuota) },
     ]);
 
     subtitulo(doc, "Detalle del cobro del mes");
     const filas: { celdas: string[]; fuerte?: boolean }[] = [
-      { celdas: [`Gasto común (${formatoPorcentaje(aviso.unidad.alicuota)} de ${$(d.totalComun)})`, $(aviso.gastoComun)] },
+      { celdas: [`Gasto común (prorrateo ${formatoPorcentaje(aviso.unidad.alicuota)} de ${$(d.totalComun)})`, $(aviso.gastoComun)] },
       { celdas: [`Fondo de reserva (${condominio.porcentajeReserva.toString()} % del gasto común)`, $(aviso.fondoReserva)] },
       ...d.cargos.map((c) => ({ celdas: [`${c.categoria}: ${c.descripcion}`, $(c.monto)] })),
     ];
@@ -78,8 +83,29 @@ export function pdfAviso(d: DatosAviso) {
       );
     }
 
+    if (enlacePago) bloquePago(doc, enlacePago);
+
     pie(doc, `Emitido el ${formatoFecha(aviso.emitidoEn)}. Los pagos se aplican primero a la deuda más antigua.`);
   });
+}
+
+/** Recuadro con el QR y el enlace a la página de pago de este aviso en Convive. */
+function bloquePago(doc: PDFKit.PDFDocument, enlace: string) {
+  const lado = 96;
+  const alto = lado + 16;
+  if (doc.y + alto + 40 > doc.page.height - MARGEN) doc.addPage();
+  const y = doc.y + 4;
+  doc.roundedRect(MARGEN, y, ANCHO, alto, 8).fillAndStroke("#E8F4F1", "#9fd3c7");
+  dibujarQr(doc, enlace, MARGEN + 8, y + 8, lado);
+  const x = MARGEN + lado + 24;
+  const ancho = ANCHO - lado - 36;
+  doc.fillColor(COLOR.texto).font("Helvetica-Bold").fontSize(11).text("Paga o informa tu transferencia", x, y + 12, { width: ancho });
+  doc.font("Helvetica").fontSize(9).fillColor(COLOR.texto).moveDown(0.3)
+    .text("Escanea el código o abre el enlace para ver tu saldo actualizado, los datos para transferir y avisar que ya pagaste. Convive no cobra ni procesa el pago: la transferencia la haces desde tu banco.", { width: ancho });
+  doc.moveDown(0.4).font("Helvetica-Bold").fillColor("#0F6B63").text(enlace, { width: ancho, link: enlace, underline: true });
+  doc.fillColor(COLOR.texto);
+  doc.x = MARGEN;
+  doc.y = y + alto + 10;
 }
 
 export function pdfRendicion(d: DatosRendicion) {

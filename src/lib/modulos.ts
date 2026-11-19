@@ -20,9 +20,11 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
     modulos: [
       { clave: "gasto-comun", texto: "Gasto común", ruta: "/periodos", descripcion: "Períodos mensuales, gastos y emisión de avisos de cobro." },
       { clave: "recaudacion", texto: "Recaudación", ruta: "/pagos", descripcion: "Registro de pagos de cada unidad." },
+      { clave: "transferencias", texto: "Transferencias informadas", ruta: "/transferencias", soloAdmin: true, descripcion: "Transferencias que informan los residentes: verificarlas con la cartola y registrarlas como pago." },
+      { clave: "datos-pago", texto: "Datos para transferir", ruta: "/datos-pago", soloAdmin: true, descripcion: "Cuenta bancaria de la comunidad que ven los residentes al pulsar «Pagar»." },
       { clave: "morosidad", texto: "Morosidad", ruta: "/morosidad", descripcion: "Unidades con cobros vencidos sin pagar." },
       { clave: "registro-correos", texto: "Registro de correos", ruta: "/correos", descripcion: "Avisos de cobro enviados por correo y su estado." },
-      { clave: "pago-en-linea", texto: "Pago en línea", descripcion: "Los residentes pagan su gasto común con tarjeta o transferencia desde su cuenta, y el pago se registra solo." },
+      { clave: "pago-en-linea", texto: "Pago en línea", descripcion: "Pasarela de pago con tarjeta o transferencia automática. Por ahora los residentes transfieren desde su banco e informan el pago (Transferencias informadas)." },
     ],
   },
   {
@@ -44,7 +46,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
       { clave: "egresos", texto: "Egresos", ruta: "/egresos", descripcion: "Todos los gastos registrados en la propiedad." },
       { clave: "fondos", texto: "Fondos", ruta: "/fondos", descripcion: "Fondo de reserva acumulado mes a mes." },
       { clave: "rendiciones", texto: "Rendiciones", ruta: "/rendiciones", descripcion: "Rendición mensual en PDF de cada mes cerrado." },
-      { clave: "conciliacion", texto: "Conciliación bancaria", descripcion: "Cruza la cartola del banco con los pagos y gastos registrados para cuadrar la cuenta." },
+      { clave: "conciliacion", texto: "Conciliación bancaria", ruta: "/conciliacion", descripcion: "Cuentas bancarias, carga de cartolas (Excel o CSV) y consulta de movimientos para cuadrar la cuenta." },
     ],
   },
   {
@@ -53,11 +55,12 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
     icono: "comunidad",
     modulos: [
       { clave: "muro", texto: "Muro de la comunidad", ruta: "/muro", descripcion: "Publicaciones y avisos para los residentes." },
-      { clave: "residentes", texto: "Residentes", ruta: "/unidades", descripcion: "Unidades, alícuotas, propietarios y residentes." },
+      { clave: "residentes", texto: "Residentes", ruta: "/unidades", descripcion: "Unidades, porcentajes de prorrateo, propietarios y residentes." },
       { clave: "estructura", texto: "Estructura física", ruta: "/estructura", descripcion: "Torres, sectores y pisos; estacionamientos y bodegas con su condición y uso; inventario de instalaciones." },
       { clave: "invitaciones", texto: "Invitar residentes", ruta: "/invitaciones", soloAdmin: true, descripcion: "Enlace para que cada residente cree su contraseña, por correo o WhatsApp." },
-      { clave: "importar", texto: "Cargar desde Excel", ruta: "/importar", soloAdmin: true, descripcion: "Carga de una vez las unidades, alícuotas y personas desde una planilla." },
-      { clave: "votaciones", texto: "Votaciones", ruta: "/votaciones", descripcion: "Consultas y votaciones en línea para asambleas, ponderadas por alícuota." },
+      { clave: "solicitudes", texto: "Solicitudes de residentes", ruta: "/solicitudes", soloAdmin: true, descripcion: "Código de la comunidad para que los residentes creen su cuenta, y aprobación de quién accede a cada unidad." },
+      { clave: "importar", texto: "Cargar desde Excel", ruta: "/importar", soloAdmin: true, descripcion: "Carga de una vez las unidades, porcentajes de prorrateo y personas desde una planilla." },
+      { clave: "votaciones", texto: "Votaciones", ruta: "/votaciones", descripcion: "Consultas y votaciones en línea para asambleas, ponderadas por porcentaje de prorrateo." },
     ],
   },
   {
@@ -65,7 +68,7 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
     texto: "Remuneraciones",
     icono: "remuneraciones",
     modulos: [
-      { clave: "remuneraciones", texto: "Remuneraciones", descripcion: "Liquidaciones de sueldo del personal (conserjes, aseo, mantención), con imposiciones." },
+      { clave: "remuneraciones", texto: "Remuneraciones", ruta: "/remuneraciones", soloAdmin: true, descripcion: "Personal de la comunidad y carga mensual de sueldos e imposiciones como egresos (sin cálculo de liquidaciones)." },
     ],
   },
 ];

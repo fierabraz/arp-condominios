@@ -1,3 +1,4 @@
+import { ESTADOS_MES, estadoMes } from "@/lib/cierre";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { Card, PageHeader, Tabla, Vacio } from "@/components/ui";
@@ -61,7 +62,7 @@ export default async function PeriodosPage({ params }: PageProps<"/condominios/[
                       p.estado === "ABIERTO" ? "bg-alerta-suave text-alerta" : "bg-gray-100 text-texto"
                     }`}
                   >
-                    {p.estado === "ABIERTO" ? "Abierto" : "Cerrado"}
+                    {ESTADOS_MES[estadoMes(p)].texto}
                   </span>
                 </td>
                 <td className="text-right tabular-nums">{formatoMoneda(suma(p.gastos.map((g) => g.monto)), moneda)}</td>

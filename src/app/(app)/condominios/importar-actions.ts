@@ -9,8 +9,10 @@ import { registrar } from "@/lib/registro";
 import {
   COLUMNAS,
   columnaDe,
+  cargaParcial,
   hayCambios,
   normalizarTitulo,
+  planificar,
   resumenPlan,
   revisarMapeo,
   type ColumnaLeida,
@@ -22,10 +24,10 @@ import {
 } from "@/lib/importacion";
 import {
   aplicarImportacion,
+  existentes,
   leerArchivo,
   leerHoja,
   MAXIMO_FILAS,
-  planDe,
   type HojaLeida,
   type LecturaArchivo,
 } from "@/lib/importacion-servicio";
@@ -58,6 +60,8 @@ export type EstadoImportacion =
       totalPropiedad: number | null;
       /** true si el total se indicó recién y se guardará al confirmar. */
       totalNuevo: boolean;
+      /** PILOTO-001: si hay errores, lo que se puede cargar dejando fuera las filas y unidades con problemas. */
+      parcial?: { filas: string; unidades: number; filasOmitidas: number[]; unidadesOmitidas: string[] };
     } & DatosHoja)
   | {
       etapa: "listo";
@@ -125,12 +129,24 @@ async function revision(
       errores: lectura.errores.length ? lectura.errores : [{ fila: 0, mensaje: "La planilla no tiene filas con unidades." }],
     };
   }
-  const plan = await planDe(lectura.filas, condominioId, acceso.administradoraId);
+  const ya = await existentes(condominioId, acceso.administradoraId);
+  const plan = planificar(lectura.filas, ya);
+  const errores = conHoja([...lectura.errores, ...plan.errores], datos.nombreHoja).sort((a, b) => a.fila - b.fila);
+  const p = errores.length ? cargaParcial(lectura.filas, ya) : null;
+  const parcial = p
+    ? {
+        filas: JSON.stringify(p.filas),
+        unidades: p.plan.unidades.filter((u) => u.accion !== "igual").length,
+        filasOmitidas: [...new Set([...lectura.errores.map((e) => e.fila), ...p.filasOmitidas])].filter((f) => f > 0).sort((a, b) => a - b),
+        unidadesOmitidas: p.unidadesOmitidas,
+      }
+    : undefined;
   return {
     etapa: "revision",
     ...datos,
     plan,
-    errores: conHoja([...lectura.errores, ...plan.errores], datos.nombreHoja).sort((a, b) => a.fila - b.fila),
+    errores,
+    parcial,
     avisos: lectura.avisos,
     filas: JSON.stringify(lectura.filas),
     hayCambios: hayCambios(plan),
@@ -267,7 +283,10 @@ export async function confirmarImportacion(condominioId: string, _: EstadoImport
     return { etapa: "inicio", errores: [{ fila: 0, mensaje: "No pude leer la planilla revisada. Súbela otra vez." }] };
   }
   try {
-    const r = await aplicarImportacion(acceso.usuario, acceso.administradoraId, condominioId, filas);
+    // PILOTO-001: carga parcial segura (las filas con problemas quedaron fuera en la revisión).
+    const omitidas = String(formData.get("omitidas") ?? "").slice(0, 2000);
+    const nota = formData.get("parcial") === "1" ? ` Carga parcial: quedaron fuera las filas ${omitidas || "con problemas"}.` : "";
+    const r = await aplicarImportacion(acceso.usuario, acceso.administradoraId, condominioId, filas, nota);
     if (!r.ok) {
       return {
         etapa: "inicio",

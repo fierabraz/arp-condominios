@@ -34,7 +34,13 @@ Para administradores (ingresan en /login):
 - Residentes: módulo "Residentes" (Unidades y residentes) lista las unidades; en la ficha de cada unidad se ven propietarios, arrendatarios y ocupantes, su historial y el día de pago propio si lo tiene (si no, usa el día de vencimiento de la comunidad).
 - Apertura financiera: para comunidades que vienen de otra administración, registra deudas, saldos a favor, fondos y cuentas a la fecha de corte.
 - Gasto común (cobro mensual): menú "Gasto común". 1) "Abrir nuevo período" del mes. 2) Entrar al período y agregar los gastos (comunes, o individuales de una unidad). 3) Revisar la vista previa. 4) "Cerrar período y emitir cobros": calcula el aviso de cobro de cada unidad según su alícuota, más fondo de reserva, cargos e interés por mora, y lo emite. 5) "Enviar avisos por correo". Un período cerrado ya no se modifica.
-- Recaudación: módulo "Recaudación", botón "Registrar pago" (monto, fecha, medio: transferencia, efectivo, cheque u otro). Cada pago se aplica primero a la deuda más antigua. Un pago mal ingresado se anula con un motivo: no se borra, queda tachado.
+- Recaudación: módulo "Recaudación", botón "Registrar pago" (monto, fecha, medio: transferencia, efectivo, cheque u otro). Cada pago se aplica primero a la deuda más antigua (la administración puede elegir a qué avisos aplicarlo). Un pago mal ingresado se anula con un motivo: no se borra, queda tachado.
+- Datos para transferir: la cuenta bancaria de la comunidad que ven los residentes al pulsar "Pagar".
+- Transferencias informadas: las que informan los residentes. Quedan "Pendiente de verificación" y NO descuentan deuda hasta que la administración las verifica con la cartola y las registra como pago. Estados: pendiente de verificación, en revisión, verificado y conciliado, rechazado o con diferencias, anulado o reversado.
+- Conciliación bancaria: cuentas bancarias de la comunidad, carga de cartolas del banco (Excel o CSV, arrastrando el archivo), detección de movimientos repetidos y conciliación de abonos con pagos y de cargos con egresos.
+- Cierre del mes: dentro del período, "Cerrar el mes" revisa que todo cuadre, guarda un resumen fijo y bloquea cambios con fecha de ese mes. Los pagos que llegan después se registran con su fecha real. Se puede reabrir dejando registro del motivo.
+- Remuneraciones: personal de la comunidad y carga mensual de sueldos e imposiciones como egresos (no calcula liquidaciones).
+- Solicitudes de residentes: código de la comunidad para que los residentes creen su cuenta, y aprobación de quién accede a cada unidad.
 - Morosidad: unidades con cobros vencidos sin pagar, de mayor a menor deuda.
 - Egresos: todos los gastos registrados. Fondos: fondo de reserva cobrado mes a mes. Rendiciones: rendición mensual en PDF de cada mes cerrado.
 - Registro de correos: avisos de cobro enviados por correo y su estado.
@@ -46,9 +52,9 @@ Para administradores (ingresan en /login):
 - Permisos (solo el administrador principal): crear cuentas de otros administradores o del comité y elegir qué comunidades ve cada uno.
 - Reportes globales: cobranza y morosidad de todas las comunidades. Catálogo de proveedores. Registro de cambios: quién hizo qué y cuándo.
 - Comité: ve su comunidad en modo lectura (no cambia datos).
-- Próximamente (aún no existen): pago en línea, conciliación bancaria, bitácora de conserjería, visitas, encomiendas, remuneraciones.
+- Próximamente (aún no existen): pago en línea con tarjeta o pasarela, bitácora de conserjería, visitas y encomiendas.
 
-Para residentes (ingresan en /login/residentes, con la cuenta que crearon desde la invitación):
+Para residentes (ingresan en /login/residentes, con la cuenta que crearon desde la invitación o con el código de su comunidad y una solicitud que aprueba la administración):
 - Inicio: tarjetas "Quiero informarme", "Quiero realizar una gestión" e "Información urgente", con alertas de deudas, vencimientos y votaciones pendientes. Si tiene varias unidades, arriba puede elegir cuál ver.
 - Mi cuenta: gastos comunes, avisos de cobro (cada uno se descarga en PDF) y pagos registrados.
 - Comunidad: noticias y comunicados de la administración.
@@ -56,7 +62,8 @@ Para residentes (ingresan en /login/residentes, con la cuenta que crearon desde 
 - Votaciones: votan los propietarios; ahí también se ven los resultados.
 - Reservas: pedir un espacio común en un día y turno libre; la administración lo aprueba y el costo llega en el aviso del mes.
 - Mi perfil: datos y cambio de contraseña. ¿Olvidó la contraseña?: en la página de ingreso, "¿Olvidaste tu contraseña? Recupérala aquí".
-- Para pagar: hoy el pago se hace como indique la administración (por ejemplo transferencia) y la administración lo registra en Convive; el pago en línea todavía no está disponible. Si un pago no aparece, hay que avisar a la administración con el comprobante.`;
+- Pagar gastos comunes: muestra cuánto debe y los datos de la cuenta de la comunidad para transferir desde su banco (también con el QR del aviso). Después de transferir, "Informar transferencia" con monto, fecha y número de operación. El pago queda "Pendiente de verificación" y no descuenta la deuda hasta que la administración lo verifica con la cartola. El pago con tarjeta todavía no está disponible.
+- Si un pago no aparece o fue rechazado, hay que hablar con la administración con el comprobante.`;
 
 export type PerfilAsistente = "ADMINISTRADOR" | "COMITE" | "RESIDENTE";
 

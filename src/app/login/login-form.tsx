@@ -4,10 +4,17 @@ import { useActionState } from "react";
 import { Boton, Campo, Input, Mensaje } from "@/components/ui";
 import type { EstadoForm } from "@/lib/forms";
 
-export function LoginForm({ accion }: { accion: (estado: EstadoForm, formData: FormData) => Promise<EstadoForm> }) {
+export function LoginForm({
+  accion,
+  volver,
+}: {
+  accion: (estado: EstadoForm, formData: FormData) => Promise<EstadoForm>;
+  volver?: string | null;
+}) {
   const [estado, enviar, pendiente] = useActionState(accion, {});
   return (
     <form action={enviar} className="space-y-4">
+      {volver && <input type="hidden" name="volver" value={volver} />}
       <Campo etiqueta="Correo" error={estado.errores?.correo}>
         <Input name="correo" type="email" autoComplete="email" required />
       </Campo>

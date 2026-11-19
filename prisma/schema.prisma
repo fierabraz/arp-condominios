@@ -72,6 +72,31 @@ enum PonderacionVoto {
 enum TipoToken {
   RECUPERACION // olvidó su contraseña (vence en 1 hora)
   INVITACION // la administración lo invitó a crear su cuenta (vence en 7 días)
+  VERIFICACION // PILOTO-001: confirma el correo de una cuenta creada por la propia persona (vence en 2 días)
+}
+
+// PILOTO-001: cargo de una cuenta del equipo de la administración. null = administrador
+// (principal si ve todas las comunidades, o asignado a algunas).
+enum CargoEquipo {
+  SUBADMINISTRADOR // administra las comunidades asignadas
+  ASISTENTE // trabajo administrativo en las comunidades asignadas, sin verificar pagos ni banco (salvo permiso)
+  CONSERJE // solo consulta las comunidades asignadas
+  PERSONAL // personal autorizado: solo consulta las comunidades asignadas
+}
+
+// PILOTO-001: relación con la unidad que declara quien pide vincularse. La administración la confirma.
+enum RelacionDeclarada {
+  PROPIETARIO_RESIDENTE
+  PROPIETARIO_NO_RESIDENTE
+  ARRENDATARIO
+  OCUPANTE_AUTORIZADO
+}
+
+enum EstadoSolicitud {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
 }
 
 // COM-001: en qué etapa está la comunidad. Las operaciones de dinero (emitir cobros,
@@ -188,6 +213,9 @@ model Administradora {
   aperturas           Apertura[]
   espaciosReservables EspacioReservable[]
   reservas            Reserva[]
+  cuentasBancarias    CuentaBancaria[]
+  perfilesCartola     PerfilCartola[]
+  solicitudesVinculo  SolicitudVinculo[]
 }
 
 model Usuario {
@@ -212,9 +240,21 @@ model Usuario {
   // Una cuenta desactivada no puede ingresar y sus sesiones abiertas dejan de servir.
   activo             Boolean         @default(true)
   ultimoIngresoEn    DateTime?
+  // PILOTO-001: las cuentas que crea la propia persona (registro público) nacen con null y no
+  // entran hasta confirmar su correo. Las que crea la plataforma o la administración nacen
+  // verificadas (y si son invitaciones, solo sirven con el enlace que llega al correo).
+  correoVerificadoEn DateTime?       @default(now())
+  telefono           String?
+  cargo              CargoEquipo?
+  // Permisos adicionales que el administrador principal da a un subadministrador o asistente.
+  permisosExtra      String[]        @default([])
+  // Código de acceso con que se registró (administradores del piloto).
+  codigoRegistroId   String?
+  codigoRegistro     CodigoRegistro? @relation(fields: [codigoRegistroId], references: [id], onDelete: SetNull)
 
   tokensRecuperacion TokenRecuperacion[]
   asignaciones       AsignacionCondominio[]
+  solicitudesVinculo SolicitudVinculo[]
 
   @@index([administradoraId])
 }
@@ -259,22 +299,28 @@ model Condominio {
   reglamento         String?
   // Información complementaria disponible (texto libre).
   observaciones      String?
+  // FIN-COMP: comunidad ficticia creada para probar (solo en vistas previas o local). Nunca datos reales.
+  demo               Boolean                 @default(false)
   creadoEn           DateTime                @default(now())
 
-  unidades       Unidad[]
-  periodos       Periodo[]
-  usuarios       Usuario[]
-  asignaciones   AsignacionCondominio[]
-  publicaciones  Publicacion[]
-  votaciones     Votacion[]
-  agrupaciones   Agrupacion[]
-  espacios       Espacio[]
-  instalaciones  Instalacion[]
-  apertura       Apertura?
-  reservables    EspacioReservable[]
-  reservas       Reserva[]
-  plano          PlanoComunidad?
-  elementosPlano ElementoPlano[]
+  // PILOTO-001: código que la administración comparte para que los residentes pidan unirse.
+  codigoIncorporacion String?                @unique
+  unidades            Unidad[]
+  periodos            Periodo[]
+  usuarios            Usuario[]
+  asignaciones        AsignacionCondominio[]
+  publicaciones       Publicacion[]
+  votaciones          Votacion[]
+  agrupaciones        Agrupacion[]
+  espacios            Espacio[]
+  instalaciones       Instalacion[]
+  apertura            Apertura?
+  reservables         EspacioReservable[]
+  reservas            Reserva[]
+  plano               PlanoComunidad?
+  elementosPlano      ElementoPlano[]
+  cuentasBanco        CuentaBancaria[]
+  solicitudesVinculo  SolicitudVinculo[]
 
   @@index([administradoraId])
 }
@@ -396,30 +442,33 @@ model Persona {
   vinculos            VinculoUnidad[]
   usuario             Usuario?
   asignacionesEspacio AsignacionEspacio[]
+  solicitudesVinculo  SolicitudVinculo[]
 
   @@index([administradoraId])
 }
 
 model Unidad {
-  id               String         @id @default(cuid())
-  administradoraId String
-  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
-  condominioId     String
-  condominio       Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
-  numero           String
-  tipo             TipoUnidad     @default(DEPARTAMENTO)
+  id                   String         @id @default(cuid())
+  administradoraId     String
+  administradora       Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId         String
+  condominio           Condominio     @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  numero               String
+  tipo                 TipoUnidad     @default(DEPARTAMENTO)
   // Porcentaje de participación en el gasto común (ej. 1.25 = 1,25 %)
-  alicuota         Decimal        @db.Decimal(9, 6)
+  alicuota             Decimal        @db.Decimal(9, 6)
+  // FIN-COMP C: prorrateo puesto por el generador visual (igual para todas). No se emite hasta confirmarlo.
+  prorrateoProvisional Boolean        @default(false)
   // COM-001: dónde está (torre, piso, sector...). Opcional.
-  agrupacionId     String?
-  agrupacion       Agrupacion?    @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
+  agrupacionId         String?
+  agrupacion           Agrupacion?    @relation(fields: [agrupacionId], references: [id], onDelete: SetNull)
   // Día del mes en que vence el cobro de esta unidad (1 a 31; si el mes es más corto, el último día).
   // null: usa el día de vencimiento de la propiedad. Lo define la administración.
-  diaPago          Int?
-  creadoEn         DateTime       @default(now())
+  diaPago              Int?
+  creadoEn             DateTime       @default(now())
 
-  espaciosPropios    Espacio[]           @relation("EspacioUnidadPropia")
-  espaciosVinculados Espacio[]           @relation("EspacioUnidadPrincipal")
+  espaciosPropios    Espacio[]                @relation("EspacioUnidadPropia")
+  espaciosVinculados Espacio[]                @relation("EspacioUnidadPrincipal")
   asignaciones       AsignacionEspacio[]
   personas           UnidadPersona[]
   vinculos           VinculoUnidad[]
@@ -430,6 +479,9 @@ model Unidad {
   deudasApertura     DeudaApertura[]
   creditosApertura   CreditoApertura[]
   reservas           Reserva[]
+  transferencias     TransferenciaInformada[]
+  solicitudesVinculo SolicitudVinculo[]
+  certificados       CertificadoAlDia[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -478,7 +530,21 @@ model Periodo {
   mes              Int
   estado           EstadoPeriodo  @default(ABIERTO)
   vencimiento      DateTime?
+  // Cuándo se emitieron los avisos (estado CERRADO = «Avisos emitidos»).
   cerradoEn        DateTime?
+  // FIN-COMP C · Cierre del mes (tercer estado, «Mes cerrado»): revisado y bloqueado. Los pagos
+  // posteriores se registran con su fecha real (D-FIN-08) y no alteran el cierre.
+  mesCerradoEn     DateTime?
+  mesCerradoPor    String?
+  // Resumen fijo al cerrar: lo que dice el informe de cierre.
+  resumenCierre    Json?
+  // Si se reabrió (solo el principal, con motivo): queda el historial en el registro de cambios.
+  reabiertoEn      DateTime?
+  reabiertoPor     String?
+  motivoReapertura String?
+  // FIN-COMP D: mes de la fecha de corte de una apertura. Sus avisos son las deudas traídas del
+  // sistema anterior; nace emitido y cerrado.
+  deApertura       Boolean        @default(false)
 
   gastos Gasto[]
   avisos AvisoCobro[]
@@ -508,6 +574,22 @@ model Gasto {
   // Si el cargo viene de una reserva de espacio común.
   reserva Reserva?
 
+  // FIN-COMP B · Egreso: proveedor del catálogo, pago al proveedor, respaldos y fondo.
+  proveedorId    String?
+  proveedorRef   Proveedor?               @relation(fields: [proveedorId], references: [id], onDelete: SetNull)
+  estadoPago     EstadoPagoGasto          @default(POR_PAGAR)
+  fechaPago      DateTime?                @db.Date
+  medioPago      MedioPago?
+  pagadoPor      String?
+  // Si se paga con un fondo (p. ej. el de reserva), NO se prorratea en el gasto común: sale del fondo.
+  fondoId        String?
+  fondo          Fondo?                   @relation(fields: [fondoId], references: [id], onDelete: Restrict)
+  respaldos      RespaldoGasto[]
+  conciliaciones ConciliacionMovimiento[]
+  // FIN-COMP D · Remuneraciones básicas: sueldo o imposiciones de un trabajador de la comunidad.
+  trabajadorId   String?
+  trabajador     Trabajador?              @relation(fields: [trabajadorId], references: [id], onDelete: Restrict)
+
   @@index([administradoraId])
   @@index([periodoId])
 }
@@ -529,9 +611,13 @@ model AvisoCobro {
   saldo            Decimal        @db.Decimal(14, 2)
   vencimiento      DateTime
   emitidoEn        DateTime       @default(now())
+  // PAG-001: código del QR y del enlace de pago del aviso. Aleatorio (128 bits), no se puede
+  // adivinar ni deducir de la unidad, y no contiene RUT, montos ni datos personales.
+  codigoPago       String         @unique @default(dbgenerated("replace((gen_random_uuid())::text, '-'::text, ''::text)"))
 
-  aplicaciones AplicacionPago[]
-  envios       EnvioAviso[]
+  aplicaciones   AplicacionPago[]
+  envios         EnvioAviso[]
+  transferencias TransferenciaInformada[]
 
   @@unique([periodoId, unidadId])
   @@index([administradoraId])
@@ -554,7 +640,11 @@ model Pago {
   anuladoPor       String?
   motivoAnulacion  String?
 
-  aplicaciones AplicacionPago[]
+  aplicaciones   AplicacionPago[]
+  // PAG-001: si el pago salió de una transferencia informada y verificada con la cartola.
+  transferencia  TransferenciaInformada?
+  // FIN-COMP A: movimiento(s) de la cartola que respaldan este pago (como máximo uno vigente).
+  conciliaciones ConciliacionMovimiento[]
 
   @@index([administradoraId])
 }
@@ -596,6 +686,7 @@ model Proveedor {
 
   instalaciones        Instalacion[]
   obligacionesApertura ObligacionApertura[]
+  gastos               Gasto[]
 
   @@unique([administradoraId, nombre])
 }
@@ -760,6 +851,9 @@ model PerfilImportacion {
 enum EstadoApertura {
   BORRADOR
   EN_REVISION
+  // FIN-COMP D: sus saldos ya pasaron a las finanzas de Convive (avisos, saldos a favor, fondos,
+  // cuentas y cuentas por pagar). Desde aquí la apertura no se cambia.
+  INCORPORADA
 }
 
 enum EstadoDeudaApertura {
@@ -803,6 +897,8 @@ model Apertura {
   preparadoPor     String
   creadoEn         DateTime       @default(now())
   actualizadoEn    DateTime       @updatedAt
+  incorporadaEn    DateTime?
+  incorporadaPor   String?
 
   deudas       DeudaApertura[]
   creditos     CreditoApertura[]
@@ -1031,4 +1127,465 @@ model ElementoPlano {
 
   @@unique([condominioId, tipo, registroId])
   @@index([administradoraId])
+}
+
+// ── FIN-003.1: importador de cartolas bancarias ──
+// Cada comunidad tiene sus cuentas; cada cuenta, sus importaciones y movimientos. Los movimientos
+// todavía no pagan avisos ni cambian saldos de residentes (eso es FIN-003.2).
+
+enum EstadoConciliacion {
+  PENDIENTE // pendiente de identificar
+  SUGERIDA // coincidencia sugerida (FIN-003.2)
+  CONCILIADO
+  REVISAR // requiere revisión
+}
+
+enum EstadoImportacionCartola {
+  APLICADA // los movimientos nuevos quedaron guardados (FIN-003.2 podrá agregar otros estados)
+}
+
+model CuentaBancaria {
+  id               String             @id @default(cuid())
+  administradoraId String
+  administradora   Administradora     @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String
+  condominio       Condominio         @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  banco            String
+  // Se reutiliza el tipo de cuenta de la apertura (COM-001): corriente, vista, ahorro.
+  tipo             TipoCuentaApertura @default(CORRIENTE)
+  // Últimos 4 dígitos: identifican la cuenta para las cartolas. Convive no guarda claves bancarias.
+  numeroFinal      String
+  alias            String?
+  activa           Boolean            @default(true)
+  creadoPor        String
+  creadoEn         DateTime           @default(now())
+  // PAG-001 · Datos para recibir transferencias de los residentes. Son los datos que la comunidad
+  // ya entrega en sus avisos (no son secretos), pero solo se muestran a los residentes cuando la
+  // cuenta está marcada para recibir pagos Y alguien de la administración los verificó.
+  // Cualquier cambio en estos datos borra la verificación.
+  numeroCuenta     String?
+  titular          String?
+  rutTitular       String?
+  correoPagos      String?
+  recibePagos      Boolean            @default(false)
+  verificadaEn     DateTime?
+  verificadaPor    String?
+
+  importaciones  ImportacionCartola[]
+  movimientos    MovimientoBancario[]
+  transferencias TransferenciaInformada[]
+
+  @@unique([condominioId, banco, numeroFinal])
+  @@index([administradoraId])
+}
+
+// Una cartola importada. El archivo no se guarda: queda su huella (SHA-256) para demostrar de
+// qué archivo salieron los movimientos y reconocerlo si se vuelve a subir.
+model ImportacionCartola {
+  id                 String                   @id @default(cuid())
+  administradoraId   String
+  condominioId       String
+  cuentaId           String
+  cuenta             CuentaBancaria           @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  banco              String
+  archivoNombre      String
+  archivoHuella      String
+  archivoTamano      Int
+  formato            String // XLSX o CSV
+  hojas              String[]
+  perfilNombre       String?
+  desde              DateTime?                @db.Date
+  hasta              DateTime?                @db.Date
+  encontrados        Int
+  nuevos             Int
+  yaRegistrados      Int
+  posiblesDuplicados Int
+  duplicadosOmitidos Int
+  errores            Int
+  // Filas con error (hoja, fila, mensaje), para consultarlas después. Sin datos de contacto.
+  detalleErrores     Json?
+  estado             EstadoImportacionCartola
+  usuarioId          String?
+  usuarioNombre      String
+  creadoEn           DateTime                 @default(now())
+
+  movimientos MovimientoBancario[]
+
+  @@index([cuentaId, creadoEn])
+  @@index([cuentaId, archivoHuella])
+  @@index([condominioId])
+}
+
+model MovimientoBancario {
+  id               String             @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  cuentaId         String
+  cuenta           CuentaBancaria     @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  importacionId    String
+  importacion      ImportacionCartola @relation(fields: [importacionId], references: [id], onDelete: Restrict)
+  fecha            DateTime           @db.Date
+  descripcion      String?
+  referencia       String?
+  // Abono positivo, cargo negativo.
+  monto            Decimal            @db.Decimal(16, 2)
+  saldo            Decimal?           @db.Decimal(16, 2)
+  contraparte      String?
+  rutContraparte   String?
+  // Otros datos que trae el banco (sucursal, canal...): título → valor.
+  otros            Json?
+  hoja             String?
+  fila             Int?
+  // Huella del movimiento: la misma operación da siempre la misma huella. Única por cuenta:
+  // un movimiento no puede quedar guardado dos veces aunque se suba la misma cartola otra vez.
+  huella           String
+  estado           EstadoConciliacion @default(PENDIENTE)
+  nota             String?
+  // FIN-003.2: cuánto del movimiento ya se asignó a pagos o egresos (permite pagos parciales y
+  // transferencias que cubren varias obligaciones, sin pasar del monto del movimiento).
+  montoConciliado  Decimal            @default(0) @db.Decimal(16, 2)
+  creadoEn         DateTime           @default(now())
+
+  // PAG-001: transferencias informadas por residentes que se confirmaron con este movimiento.
+  transferencias TransferenciaInformada[]
+  // FIN-COMP A: a qué se asignó el movimiento (pagos de unidades, otros ingresos...).
+  conciliaciones ConciliacionMovimiento[]
+
+  @@unique([cuentaId, huella])
+  @@index([cuentaId, fecha])
+  @@index([condominioId])
+}
+
+// Cómo leer la cartola de un banco (qué columna es qué y en qué formato vienen fechas y montos).
+// Es de la administradora y no guarda movimientos ni datos personales.
+model PerfilCartola {
+  id               String         @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  banco            String
+  nombre           String
+  // Título de columna normalizado → campo de Convive (o "ignorar").
+  columnas         Json
+  hoja             String?
+  formatoFecha     String         @default("AUTO") // AUTO, DMA, MDA, AMD
+  separadorDecimal String         @default("AUTO") // AUTO, COMA, PUNTO
+  // Con una sola columna de monto: POSITIVO_ABONO (lo normal) o POSITIVO_CARGO.
+  signoMonto       String         @default("POSITIVO_ABONO")
+  creadoPor        String
+  creadoEn         DateTime       @default(now())
+  actualizadoEn    DateTime       @updatedAt
+
+  @@unique([administradoraId, nombre])
+}
+
+// ---------------------------------------------------------------------------
+// PAG-001 · Transferencias informadas por los residentes
+//
+// El residente avisa que transfirió. Eso NO es un pago: no baja la deuda ni crea ingresos.
+// Solo cuando la administración la confirma con un movimiento de la cartola (FIN-003.1) se crea
+// UN Pago (el de siempre, en Recaudación) y se marca el movimiento como conciliado. Así la
+// transferencia, el movimiento, el pago y los avisos pagados quedan unidos y nunca hay dos ingresos.
+
+enum EstadoTransferencia {
+  INFORMADA // el residente la informó; nadie la ha revisado
+  EN_REVISION // pendiente de revisión: ambigua, falta la cartola, monto distinto...
+  CONCILIADA // verificada con la cartola y registrada como pago
+  RECHAZADA // rechazada o con diferencias (con motivo)
+  ANULADA // FIN-COMP A: anulada o reversada (su pago se reversó con motivo; queda en el historial)
+}
+
+model TransferenciaInformada {
+  id               String              @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  unidadId         String
+  unidad           Unidad              @relation(fields: [unidadId], references: [id], onDelete: Restrict)
+  // Aviso desde el que se informó (por ejemplo, al escanear su QR). Solo como referencia.
+  avisoId          String?
+  aviso            AvisoCobro?         @relation(fields: [avisoId], references: [id], onDelete: SetNull)
+  // Cuenta de la comunidad a la que dice haber transferido (la publicada en ese momento).
+  cuentaId         String?
+  cuenta           CuentaBancaria?     @relation(fields: [cuentaId], references: [id], onDelete: SetNull)
+  usuarioId        String?
+  informante       String
+  fecha            DateTime            @db.Date
+  monto            Decimal             @db.Decimal(14, 2)
+  bancoOrigen      String?
+  operacion        String?
+  // Si transfirió otra persona (un familiar, la corredora...).
+  pagadoPor        String?
+  observaciones    String?
+  // Deuda total de la unidad cuando se informó, para mostrar diferencias. No se usa para cobrar.
+  deudaAlInformar  Decimal             @db.Decimal(14, 2)
+  estado           EstadoTransferencia @default(INFORMADA)
+  // Al confirmar: el movimiento de la cartola que la respalda y el pago que se registró.
+  movimientoId     String?
+  movimiento       MovimientoBancario? @relation(fields: [movimientoId], references: [id], onDelete: Restrict)
+  pagoId           String?             @unique
+  pago             Pago?               @relation(fields: [pagoId], references: [id], onDelete: Restrict)
+  nota             String?
+  revisadoPor      String?
+  revisadoEn       DateTime?
+  creadoEn         DateTime            @default(now())
+
+  comprobante    ComprobanteTransferencia?
+  conciliaciones ConciliacionMovimiento[]
+  constancia     ConstanciaPago?
+
+  @@index([condominioId, estado, creadoEn])
+  @@index([unidadId, creadoEn])
+  @@index([administradoraId])
+}
+
+// Comprobante opcional (PDF o imagen, hasta ~900 KB). Se guarda en la base mientras no exista
+// un almacenamiento de archivos (ARC-001). La huella permite avisar si se sube el mismo dos veces.
+model ComprobanteTransferencia {
+  id              String                 @id @default(cuid())
+  transferenciaId String                 @unique
+  transferencia   TransferenciaInformada @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
+  condominioId    String
+  nombre          String
+  tipo            String
+  tamano          Int
+  huella          String
+  datos           Bytes
+  creadoEn        DateTime               @default(now())
+
+  @@index([condominioId, huella])
+}
+
+// ---------------------------------------------------------------------------
+// FIN-COMP · Entrega A · Conciliación de ingresos (FIN-003.2)
+//
+// Cada fila dice: «esta parte del movimiento de la cartola corresponde a esto». Un movimiento puede
+// repartirse en varias filas (pago de dos unidades, abono parcial...), pero la suma vigente nunca
+// pasa del monto del movimiento (MovimientoBancario.montoConciliado + su CHECK). Un pago tiene como
+// máximo UNA conciliación vigente (índice único parcial): la misma plata no se cuenta dos veces.
+// Nada se borra: deshacer una conciliación la marca anulada, con quién, cuándo y por qué.
+
+enum TipoConciliacion {
+  PAGO // pago de una unidad (registrado a mano, desde una transferencia informada o desde la cartola)
+  OTRO_INGRESO // ingreso de la comunidad que no es pago de una unidad (arriendo, intereses, devolución...)
+  EGRESO // FIN-COMP B: cargo de la cartola que corresponde al pago de un gasto (egreso) registrado
+  OTRO_EGRESO // FIN-COMP B: cargo que no es un gasto del mes (comisión bancaria, impuesto, devolución...)
+}
+
+model ConciliacionMovimiento {
+  id               String                  @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  movimientoId     String
+  movimiento       MovimientoBancario      @relation(fields: [movimientoId], references: [id], onDelete: Restrict)
+  tipo             TipoConciliacion
+  monto            Decimal                 @db.Decimal(16, 2)
+  pagoId           String?
+  pago             Pago?                   @relation(fields: [pagoId], references: [id], onDelete: Restrict)
+  transferenciaId  String?
+  transferencia    TransferenciaInformada? @relation(fields: [transferenciaId], references: [id], onDelete: Restrict)
+  gastoId          String?
+  gasto            Gasto?                  @relation(fields: [gastoId], references: [id], onDelete: Restrict)
+  concepto         String?
+  creadoPor        String
+  creadoEn         DateTime                @default(now())
+  anuladaEn        DateTime?
+  anuladaPor       String?
+  motivoAnulacion  String?
+
+  @@index([movimientoId])
+  @@index([pagoId])
+  @@index([gastoId])
+  @@index([condominioId, creadoEn])
+}
+
+// ---------------------------------------------------------------------------
+// PILOTO-001: registro de cuentas.
+
+// Código de acceso que la plataforma (Óscar) entrega para que un administrador cree su cuenta.
+// Solo se guarda el resumen (hash); el código en claro se muestra una vez al crearlo.
+model CodigoRegistro {
+  id          String    @id @default(cuid())
+  etiqueta    String // para quién es, ej. "Leyla, piloto"
+  correo      String? // si se indica, solo ese correo puede usarlo
+  tokenHash   String    @unique
+  usosMaximos Int       @default(1)
+  usos        Int       @default(0)
+  expiraEn    DateTime
+  anuladoEn   DateTime?
+  creadoPor   String
+  creadoEn    DateTime  @default(now())
+
+  usuarios Usuario[]
+}
+
+// Solicitud de una cuenta de residente para vincularse con una unidad. No da acceso a nada
+// hasta que la administración de esa comunidad la aprueba y elige la ficha y la relación.
+model SolicitudVinculo {
+  id                String            @id @default(cuid())
+  usuarioId         String
+  usuario           Usuario           @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  administradoraId  String
+  administradora    Administradora    @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId      String
+  condominio        Condominio        @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  unidadTexto       String // lo que escribió la persona, ej. "Depto 302"
+  relacion          RelacionDeclarada
+  mensaje           String?
+  estado            EstadoSolicitud   @default(PENDIENTE)
+  // Al aprobar: la unidad y la ficha con que quedó vinculada.
+  unidadId          String?
+  unidad            Unidad?           @relation(fields: [unidadId], references: [id], onDelete: SetNull)
+  personaId         String?
+  persona           Persona?          @relation(fields: [personaId], references: [id], onDelete: SetNull)
+  motivo            String? // motivo del rechazo, lo ve la persona
+  revisadoPorNombre String?
+  revisadoEn        DateTime?
+  creadoEn          DateTime          @default(now())
+
+  @@index([condominioId, estado])
+  @@index([usuarioId])
+  @@index([administradoraId])
+}
+
+// PILOTO-001 · Constancia de pago informado (sección 6). Un folio por transferencia informada; cada
+// cambio de estado agrega una VERSIÓN nueva. Las versiones nunca se modifican ni se borran (lo
+// impide la base de datos). El `codigo` va en el QR y permite consultar el estado vigente sin sesión
+// y sin datos personales.
+model ConstanciaPago {
+  id               String                 @id @default(cuid())
+  folio            Int                    @unique @default(autoincrement())
+  administradoraId String
+  condominioId     String
+  transferenciaId  String                 @unique
+  transferencia    TransferenciaInformada @relation(fields: [transferenciaId], references: [id], onDelete: Restrict)
+  codigo           String                 @unique
+  creadoEn         DateTime               @default(now())
+  versiones        ConstanciaVersion[]
+
+  @@index([condominioId])
+}
+
+model ConstanciaVersion {
+  id           String              @id @default(cuid())
+  constanciaId String
+  constancia   ConstanciaPago      @relation(fields: [constanciaId], references: [id], onDelete: Restrict)
+  version      Int
+  estado       EstadoTransferencia
+  // Contenido exacto del documento de esta versión (el PDF se dibuja siempre desde aquí).
+  datos        Json
+  // SHA-256 de `datos`: «código del documento» impreso en el PDF y mostrado en la consulta.
+  huella       String
+  generadaPor  String
+  generadaEn   DateTime            @default(now())
+
+  @@unique([constanciaId, version])
+}
+
+// PILOTO-001 · Certificado de «unidad al día» (sección 7). Solo se emite si la unidad no tiene
+// obligaciones VENCIDAS impagas (estar al día no es tener saldo cero). Lo emite la administración;
+// queda con folio, contenido fijo y código para verificarlo por QR. No se modifica ni se borra.
+model CertificadoAlDia {
+  id               String   @id @default(cuid())
+  folio            Int      @unique @default(autoincrement())
+  administradoraId String
+  condominioId     String
+  unidadId         String
+  unidad           Unidad   @relation(fields: [unidadId], references: [id], onDelete: Restrict)
+  codigo           String   @unique
+  datos            Json
+  huella           String
+  emitidoPor       String
+  emitidoEn        DateTime @default(now())
+
+  @@index([unidadId, emitidoEn])
+  @@index([condominioId])
+}
+
+// FIN-COMP B · Estado de pago de un egreso al proveedor.
+enum EstadoPagoGasto {
+  POR_PAGAR
+  PAGADO
+}
+
+// FIN-COMP B · Documento de respaldo de un egreso (factura, boleta, comprobante). PDF o imagen.
+model RespaldoGasto {
+  id        String   @id @default(cuid())
+  gastoId   String
+  gasto     Gasto    @relation(fields: [gastoId], references: [id], onDelete: Cascade)
+  nombre    String
+  tipo      String
+  tamano    Int
+  huella    String
+  datos     Bytes
+  subidoPor String
+  creadoEn  DateTime @default(now())
+
+  @@index([gastoId])
+}
+
+enum TipoFondo {
+  RESERVA // se alimenta del % de fondo de reserva de cada aviso emitido
+  OTRO // fondos especiales (obras, contingencia...) con aportes registrados a mano
+}
+
+enum TipoMovimientoFondo {
+  APORTE
+  RETIRO
+}
+
+// FIN-COMP B · Fondos de la comunidad. El saldo se calcula: aportes (los del fondo de reserva salen
+// de los avisos emitidos) + aportes manuales − retiros manuales − egresos pagados con el fondo.
+model Fondo {
+  id               String            @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  nombre           String
+  tipo             TipoFondo
+  // Saldo con que se abrió el fondo en Convive (p. ej. el que traía de la administración anterior).
+  saldoInicial     Decimal           @default(0) @db.Decimal(14, 2)
+  activo           Boolean           @default(true)
+  creadoPor        String
+  creadoEn         DateTime          @default(now())
+  movimientos      MovimientoFondo[]
+  gastos           Gasto[]
+
+  @@unique([condominioId, nombre])
+  @@index([administradoraId])
+}
+
+model MovimientoFondo {
+  id          String              @id @default(cuid())
+  fondoId     String
+  fondo       Fondo               @relation(fields: [fondoId], references: [id], onDelete: Restrict)
+  tipo        TipoMovimientoFondo
+  fecha       DateTime            @db.Date
+  monto       Decimal             @db.Decimal(14, 2)
+  descripcion String
+  creadoPor   String
+  creadoEn    DateTime            @default(now())
+  // Anulado, no borrado.
+  anuladoEn   DateTime?
+  anuladoPor  String?
+
+  @@index([fondoId, fecha])
+}
+
+// ── FIN-COMP D · Remuneraciones básicas ──
+// Personal de la comunidad (conserjería, aseo, mantención). Convive NO calcula liquidaciones,
+// imposiciones ni impuestos: registra los montos que informa el contador y los carga cada mes
+// como egresos por pagar del gasto común.
+model Trabajador {
+  id               String   @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  nombre           String
+  cargo            String
+  // Montos mensuales informados por el contador (referencia para cargar el mes).
+  liquido          Decimal  @db.Decimal(14, 2)
+  imposiciones     Decimal  @default(0) @db.Decimal(14, 2)
+  activo           Boolean  @default(true)
+  creadoPor        String
+  creadoEn         DateTime @default(now())
+  gastos           Gasto[]
+
+  @@index([condominioId])
 }

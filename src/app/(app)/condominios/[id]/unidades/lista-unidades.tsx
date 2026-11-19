@@ -97,7 +97,7 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
                   )}
                   {u.residentes && <span className="text-sm">Residente: {u.residentes}</span>}
                   <span className="text-sm text-texto-suave">
-                    {u.tipo} · alícuota {u.alicuota}
+                    {u.tipo} · porcentaje de prorrateo {u.alicuota}
                     {u.diaPago !== null && ` · paga el día ${u.diaPago}`}
                   </span>
                 </>
@@ -122,7 +122,7 @@ export function ListaUnidades({ unidades, base, editable }: { unidades: FilaUnid
                 <tr>
                   <th>Unidad</th>
                   <th>Tipo</th>
-                  <th className="text-right">Alícuota</th>
+                  <th className="text-right">Porcentaje de prorrateo</th>
                   <th>Propietario</th>
                   <th>Residente</th>
                   <th>Estado</th>

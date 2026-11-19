@@ -123,7 +123,7 @@ export function informeApertura(d: DatosInforme): Informe {
     titulo: "2. Estructura",
     cifras: [
       { etiqueta: "Unidades cargadas", valor: e.totalDeclarado ? `${unidades} de ${e.totalDeclarado}` : String(unidades) },
-      { etiqueta: "Suma de alícuotas", valor: formatoPorcentaje(e.sumaAlicuotas, 2) },
+      { etiqueta: "Suma de porcentajes de prorrateo", valor: formatoPorcentaje(e.sumaAlicuotas, 2) },
       { etiqueta: "Torres, sectores o pisos", valor: String(e.agrupaciones) },
       { etiqueta: "Instalaciones", valor: String(e.instalaciones) },
     ],

@@ -15,3 +15,8 @@ export async function origenDelSitio() {
   if (vercel) return `https://${vercel}`;
   return `http://${(await headers()).get("host") ?? "localhost:3000"}`;
 }
+
+/** PAG-001: enlace del QR de un aviso de cobro (abre su página de pago en Convive). */
+export async function enlacePagoAviso(codigoPago: string) {
+  return `${await origenDelSitio()}/pagar/${codigoPago}`;
+}

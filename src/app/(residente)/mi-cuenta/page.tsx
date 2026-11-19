@@ -9,6 +9,7 @@ import { datosInicio } from "../datos-residente";
 import { SelectorUnidad } from "../navegacion-residente";
 import { PanelImportante } from "./panel-importante";
 import { TarjetaAccesos, type Acceso } from "./tarjeta-accesos";
+import { MisSolicitudes } from "./solicitudes/lista";
 
 export default async function InicioResidentePage({ searchParams }: PageProps<"/mi-cuenta">) {
   const usuario = await requirePermiso("portal.residente");
@@ -27,13 +28,18 @@ export default async function InicioResidentePage({ searchParams }: PageProps<"/
   ];
   const gestion: Acceso[] = [
     {
+      texto: "Pagar gastos comunes",
+      icono: "pagar",
+      href: enlace("/mi-cuenta/pagar"),
+      insignia: resumen.deuda > 0 ? "Por pagar" : undefined,
+    },
+    {
       texto: "Participar en votaciones",
       icono: "votar",
       href: enlace("/mi-cuenta/votaciones"),
       insignia: resumen.votacionPendiente ? "Tu voto falta" : undefined,
     },
     { texto: "Cambiar mi contraseña", icono: "clave", href: "/mi-cuenta/perfil" },
-    { texto: "Pagar en línea", icono: "pagar" },
     { texto: "Solicitar certificados", icono: "certificado" },
     { texto: "Enviar solicitudes", icono: "solicitud" },
     { texto: "Reportar incidencias", icono: "incidencia" },
@@ -59,7 +65,14 @@ export default async function InicioResidentePage({ searchParams }: PageProps<"/
       </header>
 
       {datos.todas.length === 0 ? (
-        <Vacio>Tu cuenta aún no está vinculada a ninguna unidad. Contacta a tu administración.</Vacio>
+        // PILOTO-001: la cuenta existe aunque todavía no tenga unidad; aquí ve y envía sus solicitudes.
+        <section aria-label="Tu cuenta aún no tiene unidad" className="space-y-4">
+          <Vacio>
+            Tu cuenta aún no está vinculada a ninguna unidad. Cuando la administración apruebe tu solicitud, aquí verás tu estado
+            de cuenta, tus pagos y la información de tu comunidad.
+          </Vacio>
+          <MisSolicitudes usuarioId={usuario.id} />
+        </section>
       ) : (
         <>
           {/* En el teléfono, lo urgente se ve arriba sin tener que bajar hasta el panel. */}
@@ -100,7 +113,7 @@ export default async function InicioResidentePage({ searchParams }: PageProps<"/
               <ul className="space-y-3">
                 <li>
                   <Link
-                    href={enlace("/mi-cuenta/pagos")}
+                    href={enlace("/mi-cuenta/pagar")}
                     className={`flex min-h-16 items-center gap-3 rounded-2xl px-4 py-3 ${
                       resumen.vencida > 0 ? "bg-naranja-suave" : "bg-convive-suave/70"
                     }`}
