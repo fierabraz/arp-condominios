@@ -20,6 +20,8 @@ export default async function ImportacionPage({ params }: PageProps<"/condominio
     },
   });
   if (!i) notFound();
+  // FIN-003.3: resultado de la verificación automática que corrió con esta cartola.
+  const verificacion = await db.verificacionCartola.findFirst({ where: { importacionId: i.id, condominioId: id, administradoraId }, orderBy: { creadoEn: "desc" } });
   const $ = (n: number) => formatoMoneda(n, moneda);
   const errores = (i.detalleErrores ?? []) as ErrorCartola[];
   const base = `/condominios/${id}/conciliacion`;
@@ -45,6 +47,19 @@ export default async function ImportacionPage({ params }: PageProps<"/condominio
           </BotonLink>
         }
       />
+      {verificacion && (
+        <Card className="mb-6">
+          <h2 className="mb-1 font-bold">Verificación automática de transferencias</h2>
+          <p className="text-sm">
+            {verificacion.revisadas} transferencias pendientes revisadas: <strong>{verificacion.verificadas}</strong> verificadas solas,{" "}
+            <strong>{verificacion.porConfirmar}</strong> por confirmar, <strong>{verificacion.conDiferencias}</strong> con diferencias.{" "}
+            {verificacion.sinTransferencia} abonos de esta cartola sin transferencia informada.
+          </p>
+          <BotonLink href={`/condominios/${id}/transferencias?auto=todas`} variante="secundario" className="mt-3">
+            Ver transferencias en revisión
+          </BotonLink>
+        </Card>
+      )}
       <div className="mb-6 grid gap-4 lg:grid-cols-[2fr_1fr]">
         <Card>
           <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[14rem_1fr]">

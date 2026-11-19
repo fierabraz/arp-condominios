@@ -15,6 +15,8 @@ import { registrar } from "@/lib/registro";
 import { CAMPOS_CARTOLA, revisarMapeoCartola, type EstadoCartola, type MapeoCartola, type OpcionesEnvio } from "@/lib/cartolas";
 import { confirmarCartola, revisarCartola, type CuentaDeCartola } from "@/lib/cartolas-servicio";
 import { normalizarTitulo } from "@/lib/importacion";
+import { puede } from "@/lib/permisos";
+import { cambiarVerificacionAutomatica, ErrorVerificacion, verificarConCartola } from "@/lib/verificacion-automatica-servicio";
 
 const ruta = (condominioId: string) => `/condominios/${condominioId}/conciliacion`;
 
@@ -149,7 +151,23 @@ export async function confirmarCartolaAccion(condominioId: string, cuentaId: str
   if (!envio.ok) return { etapa: "inicio", mensaje: envio.mensaje };
   try {
     const r = await confirmarCartola(a.usuario, cuenta, envio.archivo, envio.opciones);
-    if (r.etapa === "listo") revalidatePath(ruta(condominioId), "layout");
+    if (r.etapa === "listo") {
+      // FIN-003.3: con los movimientos ya guardados, verificar las transferencias informadas pendientes.
+      // Si algo falla aquí, la cartola igual quedó importada y todo se puede hacer a mano.
+      if (puede(a.usuario, "pagos.verificar", condominioId)) {
+        try {
+          r.verificacion = await verificarConCartola(a.usuario, condominioId, r.importacionId);
+        } catch (e) {
+          console.error("Error en la verificación automática:", e);
+          r.verificacion = {
+            activa: true, revisadas: 0, verificadas: 0, porConfirmar: 0, conDiferencias: 0, sinTransferencia: [], totalSinTransferencia: 0,
+            error: "La cartola quedó importada, pero la verificación automática no terminó. Usa «Verificar ahora» en Conciliación bancaria o revisa las transferencias a mano.",
+          };
+        }
+      }
+      revalidatePath(ruta(condominioId), "layout");
+      revalidatePath(`/condominios/${condominioId}/transferencias`);
+    }
     return r;
   } catch (e) {
     console.error("Error al importar cartola:", e);
@@ -236,4 +254,40 @@ export async function marcarMovimiento(condominioId: string, movimientoId: strin
   );
   revalidatePath(`${ruta(condominioId)}/movimientos`);
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// FIN-003.3 · Verificación automática de transferencias informadas
+
+async function accesoVerificacion(condominioId: string) {
+  const { usuario, administradoraId } = await requireAdministradora("pagos.verificar");
+  if (!puedeVerPropiedad(usuario, condominioId) || !puede(usuario, "banco.importar", condominioId)) return null;
+  return { usuario, administradoraId };
+}
+
+/** Activa o desactiva la verificación automática en la comunidad. */
+export async function cambiarVerificacionAccion(condominioId: string, activa: boolean): Promise<EstadoForm> {
+  const a = await accesoVerificacion(condominioId);
+  if (!a) return { mensaje: "Comunidad no encontrada." };
+  try {
+    await cambiarVerificacionAutomatica(a.usuario, condominioId, activa);
+  } catch (e) {
+    if (e instanceof ErrorVerificacion) return { mensaje: e.message };
+    throw e;
+  }
+  revalidatePath(ruta(condominioId));
+  return { ok: true, mensaje: activa ? "Verificación automática activada." : "Verificación automática desactivada." };
+}
+
+/** Vuelve a comparar las transferencias pendientes con las cartolas ya cargadas. */
+export async function verificarAhoraAccion(condominioId: string): Promise<EstadoForm> {
+  const a = await accesoVerificacion(condominioId);
+  if (!a) return { mensaje: "Comunidad no encontrada." };
+  const r = await verificarConCartola(a.usuario, condominioId);
+  if (!r.activa) return { mensaje: "La verificación automática está desactivada en esta comunidad." };
+  revalidatePath(`/condominios/${condominioId}`, "layout");
+  return {
+    ok: true,
+    mensaje: `Listo: ${r.verificadas} verificadas solas, ${r.porConfirmar} por confirmar y ${r.conDiferencias} con diferencias (de ${r.revisadas} pendientes).`,
+  };
 }

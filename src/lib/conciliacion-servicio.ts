@@ -143,6 +143,8 @@ export type DatosIngreso = {
   distribucion?: { avisoId: string; monto: number }[];
   transferenciaId?: string;
   permitirDuplicado?: boolean;
+  /** FIN-003.3: lo hizo la verificación automática al cargar la cartola (queda así en el registro). */
+  automatica?: { motivos: string };
 };
 
 /**
@@ -193,13 +195,18 @@ export async function registrarIngresoDesdeMovimiento(autor: Autor, datos: Datos
           pagoId: pago.id,
           revisadoPor: autor.nombre,
           revisadoEn: new Date(),
-          nota: diferencia ? `Se registró ${formatoMoneda(monto, moneda)} (el residente informó ${formatoMoneda(Number(t.monto), moneda)}).` : t.nota,
+          nota: diferencia
+            ? `Se registró ${formatoMoneda(monto, moneda)} (el residente informó ${formatoMoneda(Number(t.monto), moneda)}).`
+            : datos.automatica
+              ? `Verificada automáticamente con la cartola: ${datos.automatica.motivos}.`.slice(0, 500)
+              : t.nota,
+          ...(datos.automatica ? { autoResultado: "VERIFICADA" as const, autoMovimientoId: m.id, autoMotivos: datos.automatica.motivos, autoEn: new Date() } : {}),
         },
       });
       await sincronizarConstanciaEn(tx, t.id, autor.nombre);
       await registrarEn(tx, {
         autor,
-        accion: "Verificó y concilió una transferencia",
+        accion: datos.automatica ? "Validación automática: verificó y concilió una transferencia" : "Verificó y concilió una transferencia",
         detalle: `Unidad ${unidad.numero}: pago de ${formatoMoneda(monto, moneda)} con el movimiento del ${dia(m.fecha)} (${m.cuenta.banco} ···${m.cuenta.numeroFinal}).`,
         condominioId: datos.condominioId,
         entidad: "TransferenciaInformada",
@@ -210,7 +217,7 @@ export async function registrarIngresoDesdeMovimiento(autor: Autor, datos: Datos
     }
     await registrarEn(tx, {
       autor,
-      accion: "Registró un pago conciliado con la cartola",
+      accion: datos.automatica ? "Validación automática: registró un pago conciliado con la cartola" : "Registró un pago conciliado con la cartola",
       detalle: `Unidad ${unidad.numero}: ${formatoMoneda(monto, moneda)} del ${dia(m.fecha)} (${m.cuenta.banco} ···${m.cuenta.numeroFinal})${datos.distribucion ? ", con distribución elegida" : ""}.`,
       condominioId: datos.condominioId,
       entidad: "Pago",

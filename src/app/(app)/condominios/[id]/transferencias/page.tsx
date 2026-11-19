@@ -7,7 +7,10 @@ import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { buscarCoincidencias, ESTADOS_ABIERTOS, ESTADOS_TRANSFERENCIA } from "@/lib/pagos";
 import { filtroCondominios, puede } from "@/lib/permisos";
 import type { EstadoTransferencia, Prisma } from "@/generated/prisma/client";
+import { RESULTADOS_AUTO } from "@/lib/verificacion-automatica";
 import { condominioVisible } from "../condominio-actual";
+import { confirmarSugerenciaAccion } from "../../transferencias-actions";
+import { BotonServidor } from "../conciliacion/formularios";
 import { ElegirComunidadTransferencias } from "./filtros";
 
 // PAG-001 · Cobranza → Transferencias informadas por los residentes, con el posible movimiento de
@@ -26,14 +29,18 @@ export default async function TransferenciasPage({ params, searchParams }: PageP
   const estado = typeof sp.estado === "string" && (ESTADOS as string[]).includes(sp.estado) ? (sp.estado as EstadoTransferencia) : sp.estado === "todas" ? null : "abiertas";
   const desde = fechaValida(sp.desde);
   const hasta = fechaValida(sp.hasta);
+  // FIN-003.3: filtro por resultado de la verificación automática (?auto=POR_CONFIRMAR, CON_DIFERENCIAS o todas).
+  const auto = sp.auto === "POR_CONFIRMAR" || sp.auto === "CON_DIFERENCIAS" ? sp.auto : sp.auto === "todas" ? "todas" : null;
   const where: Prisma.TransferenciaInformadaWhereInput = {
     condominioId: id,
     administradoraId,
-    ...(estado === "abiertas" ? { estado: { in: ESTADOS_ABIERTOS } } : estado ? { estado } : {}),
+    ...(auto
+      ? { estado: "EN_REVISION", autoResultado: auto === "todas" ? { in: ["POR_CONFIRMAR", "CON_DIFERENCIAS"] } : auto }
+      : estado === "abiertas" ? { estado: { in: ESTADOS_ABIERTOS } } : estado ? { estado } : {}),
     ...(desde || hasta ? { fecha: { ...(desde ? { gte: desde } : {}), ...(hasta ? { lte: hasta } : {}) } } : {}),
   };
 
-  const [comunidades, transferencias, conteo, cuentaPublicada] = await Promise.all([
+  const [comunidades, transferencias, conteo, cuentaPublicada, porAuto] = await Promise.all([
     db.condominio.findMany({ where: { administradoraId, ...filtroCondominios(usuario) }, select: { id: true, nombre: true }, orderBy: { nombre: "asc" } }),
     db.transferenciaInformada.findMany({
       where,
@@ -43,7 +50,17 @@ export default async function TransferenciasPage({ params, searchParams }: PageP
     }),
     db.transferenciaInformada.groupBy({ by: ["estado"], where: { condominioId: id, administradoraId }, _count: true }),
     db.cuentaBancaria.count({ where: { condominioId: id, administradoraId, recibePagos: true, verificadaEn: { not: null } } }),
+    db.transferenciaInformada.groupBy({ by: ["autoResultado"], where: { condominioId: id, administradoraId, estado: "EN_REVISION", autoResultado: { not: null } }, _count: true }),
   ]);
+  const cuentaAuto = (r: "POR_CONFIRMAR" | "CON_DIFERENCIAS") => porAuto.find((p) => p.autoResultado === r)?._count ?? 0;
+  const sugeridos = new Map(
+    (
+      await db.movimientoBancario.findMany({
+        where: { id: { in: transferencias.flatMap((t) => (t.autoMovimientoId && t.estado === "EN_REVISION" ? [t.autoMovimientoId] : [])) }, condominioId: id },
+        select: { id: true, fecha: true, monto: true, montoConciliado: true },
+      })
+    ).map((m) => [m.id, m]),
+  );
 
   // Posibles movimientos: una sola consulta para todas las abiertas, y la comparación en memoria.
   const abiertas = transferencias.filter((t) => ESTADOS_ABIERTOS.includes(t.estado));
@@ -108,6 +125,22 @@ export default async function TransferenciasPage({ params, searchParams }: PageP
           </Link>
         ))}
       </div>
+
+      {(cuentaAuto("POR_CONFIRMAR") > 0 || cuentaAuto("CON_DIFERENCIAS") > 0 || auto) && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-2xl border border-borde bg-white p-3 text-sm">
+          <span className="font-semibold">Verificación automática:</span>
+          {(["POR_CONFIRMAR", "CON_DIFERENCIAS"] as const).map((r) => (
+            <Link key={r} href={`${base}?auto=${r}`} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 ${auto === r ? "border-marca ring-2 ring-convive/30" : "border-borde"}`}>
+              <Insignia tono={RESULTADOS_AUTO[r].tono}>{cuentaAuto(r)}</Insignia> {RESULTADOS_AUTO[r].texto}
+            </Link>
+          ))}
+          {auto && (
+            <Link href={base} className="inline-flex min-h-11 items-center px-2 font-semibold text-marca">
+              Quitar filtro
+            </Link>
+          )}
+        </div>
+      )}
 
       <Card className="mb-6">
         <form className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
@@ -178,9 +211,23 @@ export default async function TransferenciasPage({ params, searchParams }: PageP
                   </td>
                   <td>
                     <Insignia tono={ESTADOS_TRANSFERENCIA[t.estado].tono}>{ESTADOS_TRANSFERENCIA[t.estado].texto}</Insignia>
+                    {t.autoResultado === "VERIFICADA" && t.estado === "CONCILIADA" && <span className="mt-1 block text-xs text-texto-suave">Verificada sola con la cartola</span>}
                   </td>
                   <td className="text-sm">
-                    {t.estado === "CONCILIADA" && t.movimiento ? (
+                    {t.estado === "EN_REVISION" && t.autoResultado && t.autoMovimientoId && sugeridos.get(t.autoMovimientoId) ? (
+                      <div className="space-y-2">
+                        <span className="block">
+                          {formatoFecha(sugeridos.get(t.autoMovimientoId)!.fecha)} · {$(sugeridos.get(t.autoMovimientoId)!.monto)}{" "}
+                          <Insignia tono={RESULTADOS_AUTO[t.autoResultado].tono}>{RESULTADOS_AUTO[t.autoResultado].texto}</Insignia>
+                        </span>
+                        {t.autoMotivos && <span className="block text-xs text-texto-suave">{t.autoMotivos}</span>}
+                        {t.autoResultado === "POR_CONFIRMAR" && (
+                          <BotonServidor accion={confirmarSugerenciaAccion.bind(null, id, t.id)} variante="primario" pendienteTexto="Confirmando…">
+                            Confirmar
+                          </BotonServidor>
+                        )}
+                      </div>
+                    ) : t.estado === "CONCILIADA" && t.movimiento ? (
                       <span className="text-exito">
                         {formatoFecha(t.movimiento.fecha)} · {$(t.movimiento.monto)}
                       </span>
