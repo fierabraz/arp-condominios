@@ -20,9 +20,11 @@ export const GRUPOS_MODULOS: GrupoModulos[] = [
     modulos: [
       { clave: "gasto-comun", texto: "Gasto común", ruta: "/periodos", descripcion: "Períodos mensuales, gastos y emisión de avisos de cobro." },
       { clave: "recaudacion", texto: "Recaudación", ruta: "/pagos", descripcion: "Registro de pagos de cada unidad." },
+      { clave: "transferencias", texto: "Transferencias informadas", ruta: "/transferencias", soloAdmin: true, descripcion: "Transferencias que informan los residentes: verificarlas con la cartola y registrarlas como pago." },
+      { clave: "datos-pago", texto: "Datos para transferir", ruta: "/datos-pago", soloAdmin: true, descripcion: "Cuenta bancaria de la comunidad que ven los residentes al pulsar «Pagar»." },
       { clave: "morosidad", texto: "Morosidad", ruta: "/morosidad", descripcion: "Unidades con cobros vencidos sin pagar." },
       { clave: "registro-correos", texto: "Registro de correos", ruta: "/correos", descripcion: "Avisos de cobro enviados por correo y su estado." },
-      { clave: "pago-en-linea", texto: "Pago en línea", descripcion: "Los residentes pagan su gasto común con tarjeta o transferencia desde su cuenta, y el pago se registra solo." },
+      { clave: "pago-en-linea", texto: "Pago en línea", descripcion: "Pasarela de pago con tarjeta o transferencia automática. Por ahora los residentes transfieren desde su banco e informan el pago (Transferencias informadas)." },
     ],
   },
   {

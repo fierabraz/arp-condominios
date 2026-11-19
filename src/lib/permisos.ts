@@ -101,6 +101,8 @@ export const PERMISOS = {
   "propiedad.administrar": ["PRINCIPAL", "ADMINISTRADOR"],
   /** FIN-003.1: registrar cuentas bancarias, importar cartolas y manejar perfiles de cartola. */
   "banco.importar": ["PRINCIPAL", "ADMINISTRADOR"],
+  /** PAG-001: datos para transferir de la comunidad y verificar las transferencias informadas por residentes. */
+  "pagos.verificar": ["PRINCIPAL", "ADMINISTRADOR"],
   /** Crear propiedades nuevas. */
   "propiedades.crear": ["PRINCIPAL"],
   /** Habilitar o deshabilitar los cobros de una propiedad (COM-001). */

@@ -421,8 +421,8 @@ model Unidad {
   diaPago          Int?
   creadoEn         DateTime       @default(now())
 
-  espaciosPropios    Espacio[]           @relation("EspacioUnidadPropia")
-  espaciosVinculados Espacio[]           @relation("EspacioUnidadPrincipal")
+  espaciosPropios    Espacio[]                @relation("EspacioUnidadPropia")
+  espaciosVinculados Espacio[]                @relation("EspacioUnidadPrincipal")
   asignaciones       AsignacionEspacio[]
   personas           UnidadPersona[]
   vinculos           VinculoUnidad[]
@@ -433,6 +433,7 @@ model Unidad {
   deudasApertura     DeudaApertura[]
   creditosApertura   CreditoApertura[]
   reservas           Reserva[]
+  transferencias     TransferenciaInformada[]
 
   @@unique([condominioId, numero])
   @@index([administradoraId])
@@ -532,9 +533,13 @@ model AvisoCobro {
   saldo            Decimal        @db.Decimal(14, 2)
   vencimiento      DateTime
   emitidoEn        DateTime       @default(now())
+  // PAG-001: código del QR y del enlace de pago del aviso. Aleatorio (128 bits), no se puede
+  // adivinar ni deducir de la unidad, y no contiene RUT, montos ni datos personales.
+  codigoPago       String         @unique @default(dbgenerated("replace((gen_random_uuid())::text, '-'::text, ''::text)"))
 
-  aplicaciones AplicacionPago[]
-  envios       EnvioAviso[]
+  aplicaciones   AplicacionPago[]
+  envios         EnvioAviso[]
+  transferencias TransferenciaInformada[]
 
   @@unique([periodoId, unidadId])
   @@index([administradoraId])
@@ -557,7 +562,9 @@ model Pago {
   anuladoPor       String?
   motivoAnulacion  String?
 
-  aplicaciones AplicacionPago[]
+  aplicaciones  AplicacionPago[]
+  // PAG-001: si el pago salió de una transferencia informada y verificada con la cartola.
+  transferencia TransferenciaInformada?
 
   @@index([administradoraId])
 }
@@ -1040,15 +1047,27 @@ model CuentaBancaria {
   banco            String
   // Se reutiliza el tipo de cuenta de la apertura (COM-001): corriente, vista, ahorro.
   tipo             TipoCuentaApertura @default(CORRIENTE)
-  // Solo los últimos 4 dígitos: Convive no guarda el número completo ni claves bancarias.
+  // Últimos 4 dígitos: identifican la cuenta para las cartolas. Convive no guarda claves bancarias.
   numeroFinal      String
   alias            String?
   activa           Boolean            @default(true)
   creadoPor        String
   creadoEn         DateTime           @default(now())
+  // PAG-001 · Datos para recibir transferencias de los residentes. Son los datos que la comunidad
+  // ya entrega en sus avisos (no son secretos), pero solo se muestran a los residentes cuando la
+  // cuenta está marcada para recibir pagos Y alguien de la administración los verificó.
+  // Cualquier cambio en estos datos borra la verificación.
+  numeroCuenta     String?
+  titular          String?
+  rutTitular       String?
+  correoPagos      String?
+  recibePagos      Boolean            @default(false)
+  verificadaEn     DateTime?
+  verificadaPor    String?
 
-  importaciones ImportacionCartola[]
-  movimientos   MovimientoBancario[]
+  importaciones  ImportacionCartola[]
+  movimientos    MovimientoBancario[]
+  transferencias TransferenciaInformada[]
 
   @@unique([condominioId, banco, numeroFinal])
   @@index([administradoraId])
@@ -1057,32 +1076,32 @@ model CuentaBancaria {
 // Una cartola importada. El archivo no se guarda: queda su huella (SHA-256) para demostrar de
 // qué archivo salieron los movimientos y reconocerlo si se vuelve a subir.
 model ImportacionCartola {
-  id                String                   @id @default(cuid())
-  administradoraId  String
-  condominioId      String
-  cuentaId          String
-  cuenta            CuentaBancaria           @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
-  banco             String
-  archivoNombre     String
-  archivoHuella     String
-  archivoTamano     Int
-  formato           String // XLSX o CSV
-  hojas             String[]
-  perfilNombre      String?
-  desde             DateTime?                @db.Date
-  hasta             DateTime?                @db.Date
-  encontrados       Int
-  nuevos            Int
-  yaRegistrados     Int
+  id                 String                   @id @default(cuid())
+  administradoraId   String
+  condominioId       String
+  cuentaId           String
+  cuenta             CuentaBancaria           @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  banco              String
+  archivoNombre      String
+  archivoHuella      String
+  archivoTamano      Int
+  formato            String // XLSX o CSV
+  hojas              String[]
+  perfilNombre       String?
+  desde              DateTime?                @db.Date
+  hasta              DateTime?                @db.Date
+  encontrados        Int
+  nuevos             Int
+  yaRegistrados      Int
   posiblesDuplicados Int
   duplicadosOmitidos Int
-  errores           Int
+  errores            Int
   // Filas con error (hoja, fila, mensaje), para consultarlas después. Sin datos de contacto.
-  detalleErrores    Json?
-  estado            EstadoImportacionCartola
-  usuarioId         String?
-  usuarioNombre     String
-  creadoEn          DateTime                 @default(now())
+  detalleErrores     Json?
+  estado             EstadoImportacionCartola
+  usuarioId          String?
+  usuarioNombre      String
+  creadoEn           DateTime                 @default(now())
 
   movimientos MovimientoBancario[]
 
@@ -1121,6 +1140,9 @@ model MovimientoBancario {
   montoConciliado  Decimal            @default(0) @db.Decimal(16, 2)
   creadoEn         DateTime           @default(now())
 
+  // PAG-001: transferencias informadas por residentes que se confirmaron con este movimiento.
+  transferencias TransferenciaInformada[]
+
   @@unique([cuentaId, huella])
   @@index([cuentaId, fecha])
   @@index([condominioId])
@@ -1146,4 +1168,77 @@ model PerfilCartola {
   actualizadoEn    DateTime       @updatedAt
 
   @@unique([administradoraId, nombre])
+}
+
+// ---------------------------------------------------------------------------
+// PAG-001 · Transferencias informadas por los residentes
+//
+// El residente avisa que transfirió. Eso NO es un pago: no baja la deuda ni crea ingresos.
+// Solo cuando la administración la confirma con un movimiento de la cartola (FIN-003.1) se crea
+// UN Pago (el de siempre, en Recaudación) y se marca el movimiento como conciliado. Así la
+// transferencia, el movimiento, el pago y los avisos pagados quedan unidos y nunca hay dos ingresos.
+
+enum EstadoTransferencia {
+  INFORMADA // el residente la informó; nadie la ha revisado
+  EN_REVISION // pendiente de revisión: ambigua, falta la cartola, monto distinto...
+  CONCILIADA // verificada con la cartola y registrada como pago
+  RECHAZADA // rechazada o con diferencias (con motivo)
+}
+
+model TransferenciaInformada {
+  id               String              @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  unidadId         String
+  unidad           Unidad              @relation(fields: [unidadId], references: [id], onDelete: Restrict)
+  // Aviso desde el que se informó (por ejemplo, al escanear su QR). Solo como referencia.
+  avisoId          String?
+  aviso            AvisoCobro?         @relation(fields: [avisoId], references: [id], onDelete: SetNull)
+  // Cuenta de la comunidad a la que dice haber transferido (la publicada en ese momento).
+  cuentaId         String?
+  cuenta           CuentaBancaria?     @relation(fields: [cuentaId], references: [id], onDelete: SetNull)
+  usuarioId        String?
+  informante       String
+  fecha            DateTime            @db.Date
+  monto            Decimal             @db.Decimal(14, 2)
+  bancoOrigen      String?
+  operacion        String?
+  // Si transfirió otra persona (un familiar, la corredora...).
+  pagadoPor        String?
+  observaciones    String?
+  // Deuda total de la unidad cuando se informó, para mostrar diferencias. No se usa para cobrar.
+  deudaAlInformar  Decimal             @db.Decimal(14, 2)
+  estado           EstadoTransferencia @default(INFORMADA)
+  // Al confirmar: el movimiento de la cartola que la respalda y el pago que se registró.
+  movimientoId     String?
+  movimiento       MovimientoBancario? @relation(fields: [movimientoId], references: [id], onDelete: Restrict)
+  pagoId           String?             @unique
+  pago             Pago?               @relation(fields: [pagoId], references: [id], onDelete: Restrict)
+  nota             String?
+  revisadoPor      String?
+  revisadoEn       DateTime?
+  creadoEn         DateTime            @default(now())
+
+  comprobante ComprobanteTransferencia?
+
+  @@index([condominioId, estado, creadoEn])
+  @@index([unidadId, creadoEn])
+  @@index([administradoraId])
+}
+
+// Comprobante opcional (PDF o imagen, hasta ~900 KB). Se guarda en la base mientras no exista
+// un almacenamiento de archivos (ARC-001). La huella permite avisar si se sube el mismo dos veces.
+model ComprobanteTransferencia {
+  id              String                 @id @default(cuid())
+  transferenciaId String                 @unique
+  transferencia   TransferenciaInformada @relation(fields: [transferenciaId], references: [id], onDelete: Cascade)
+  condominioId    String
+  nombre          String
+  tipo            String
+  tamano          Int
+  huella          String
+  datos           Bytes
+  creadoEn        DateTime               @default(now())
+
+  @@index([condominioId, huella])
 }

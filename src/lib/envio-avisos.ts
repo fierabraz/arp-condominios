@@ -5,6 +5,7 @@ import { pdfAviso } from "@/lib/documentos";
 import { enviarCorreo, escaparHtml } from "@/lib/correo";
 import { formatoFecha, formatoMoneda } from "@/lib/formato";
 import { nombrePeriodo } from "@/lib/cobro";
+import { enlacePagoAviso } from "@/lib/sitio";
 
 export type ResumenEnvio = { enviados: number; simulados: number; errores: number; sinCorreo: string[] };
 
@@ -33,7 +34,8 @@ export async function enviarAvisosPeriodo(periodoId: string, administradoraId: s
     }
 
     const datos = (await datosAviso(aviso.id, administradoraId))!;
-    const pdf = await pdfAviso(datos);
+    const enlace = await enlacePagoAviso(datos.aviso.codigoPago);
+    const pdf = await pdfAviso(datos, enlace);
     const { aviso: a } = datos;
     const periodo = nombrePeriodo(a.periodo.anio, a.periodo.mes);
     const $ = (x: number) => formatoMoneda(x, a.administradora.moneda);
@@ -45,6 +47,7 @@ export async function enviarAvisosPeriodo(periodoId: string, administradoraId: s
         `Hola ${nombre}:`,
         `Adjuntamos el aviso de cobro de ${periodo} de la unidad ${a.unidad.numero} de ${condominio}.`,
         `Total a pagar: ${$(datos.totalAPagar)}. Vence el ${formatoFecha(a.vencimiento)}.`,
+        `Para ver tu saldo actualizado, los datos para transferir e informar tu pago, entra a: ${enlace}`,
         `Saludos,\n${a.administradora.nombre}`,
       ];
       const resultado = await enviarCorreo({

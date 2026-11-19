@@ -76,8 +76,8 @@ test("SEG-17: catálogo de permisos por perfil (si cambia, esta tabla debe cambi
     Object.entries(cuentas).map(([nombre, a]) => [nombre, Object.keys(PERMISOS).filter((p) => puede(a, p as keyof typeof PERMISOS))]),
   );
   assert.deepEqual(tabla, {
-    principal: ["propiedad.ver", "propiedad.administrar", "banco.importar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
-    asignado: ["propiedad.ver", "propiedad.administrar", "banco.importar"],
+    principal: ["propiedad.ver", "propiedad.administrar", "banco.importar", "pagos.verificar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
+    asignado: ["propiedad.ver", "propiedad.administrar", "banco.importar", "pagos.verificar"],
     comite: ["propiedad.ver"],
     residente: ["portal.residente"],
     plataforma: ["plataforma"],
@@ -99,4 +99,9 @@ test("SEG-17: con una propiedad, además debe alcanzarla", async () => {
   assert.equal(puede(comite, "banco.importar", "B"), false);
   assert.equal(puede(asignado, "banco.importar", "B"), false);
   assert.equal(puede(asignado, "banco.importar", "A"), true);
+  // PAG-001: verificar transferencias informadas, solo administradores de esa propiedad (no el comité).
+  assert.equal(puede(comite, "pagos.verificar", "B"), false);
+  assert.equal(puede(asignado, "pagos.verificar", "B"), false);
+  assert.equal(puede(asignado, "pagos.verificar", "A"), true);
+  assert.equal(puede(residente, "pagos.verificar"), false);
 });
