@@ -76,8 +76,8 @@ test("SEG-17: catálogo de permisos por perfil (si cambia, esta tabla debe cambi
     Object.entries(cuentas).map(([nombre, a]) => [nombre, Object.keys(PERMISOS).filter((p) => puede(a, p as keyof typeof PERMISOS))]),
   );
   assert.deepEqual(tabla, {
-    principal: ["propiedad.ver", "propiedad.administrar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
-    asignado: ["propiedad.ver", "propiedad.administrar"],
+    principal: ["propiedad.ver", "propiedad.administrar", "banco.importar", "propiedades.crear", "propiedad.habilitarCobros", "cuentas.administrar"],
+    asignado: ["propiedad.ver", "propiedad.administrar", "banco.importar"],
     comite: ["propiedad.ver"],
     residente: ["portal.residente"],
     plataforma: ["plataforma"],
@@ -95,4 +95,8 @@ test("SEG-17: con una propiedad, además debe alcanzarla", async () => {
   assert.equal(puede(comite, "propiedad.administrar", "B"), false);
   assert.equal(puede(residente, "propiedad.ver", "A"), false);
   assert.equal(puede(sinAsignar, "propiedad.ver", "A"), false);
+  // FIN-003.1: el comité ve los movimientos bancarios de su propiedad pero no importa cartolas.
+  assert.equal(puede(comite, "banco.importar", "B"), false);
+  assert.equal(puede(asignado, "banco.importar", "B"), false);
+  assert.equal(puede(asignado, "banco.importar", "A"), true);
 });

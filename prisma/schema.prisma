@@ -188,6 +188,8 @@ model Administradora {
   aperturas           Apertura[]
   espaciosReservables EspacioReservable[]
   reservas            Reserva[]
+  cuentasBancarias    CuentaBancaria[]
+  perfilesCartola     PerfilCartola[]
 }
 
 model Usuario {
@@ -275,6 +277,7 @@ model Condominio {
   reservas       Reserva[]
   plano          PlanoComunidad?
   elementosPlano ElementoPlano[]
+  cuentasBanco   CuentaBancaria[]
 
   @@index([administradoraId])
 }
@@ -1011,4 +1014,136 @@ model ElementoPlano {
 
   @@unique([condominioId, tipo, registroId])
   @@index([administradoraId])
+}
+
+// ── FIN-003.1: importador de cartolas bancarias ──
+// Cada comunidad tiene sus cuentas; cada cuenta, sus importaciones y movimientos. Los movimientos
+// todavía no pagan avisos ni cambian saldos de residentes (eso es FIN-003.2).
+
+enum EstadoConciliacion {
+  PENDIENTE // pendiente de identificar
+  SUGERIDA // coincidencia sugerida (FIN-003.2)
+  CONCILIADO
+  REVISAR // requiere revisión
+}
+
+enum EstadoImportacionCartola {
+  APLICADA // los movimientos nuevos quedaron guardados (FIN-003.2 podrá agregar otros estados)
+}
+
+model CuentaBancaria {
+  id               String             @id @default(cuid())
+  administradoraId String
+  administradora   Administradora     @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  condominioId     String
+  condominio       Condominio         @relation(fields: [condominioId], references: [id], onDelete: Cascade)
+  banco            String
+  // Se reutiliza el tipo de cuenta de la apertura (COM-001): corriente, vista, ahorro.
+  tipo             TipoCuentaApertura @default(CORRIENTE)
+  // Solo los últimos 4 dígitos: Convive no guarda el número completo ni claves bancarias.
+  numeroFinal      String
+  alias            String?
+  activa           Boolean            @default(true)
+  creadoPor        String
+  creadoEn         DateTime           @default(now())
+
+  importaciones ImportacionCartola[]
+  movimientos   MovimientoBancario[]
+
+  @@unique([condominioId, banco, numeroFinal])
+  @@index([administradoraId])
+}
+
+// Una cartola importada. El archivo no se guarda: queda su huella (SHA-256) para demostrar de
+// qué archivo salieron los movimientos y reconocerlo si se vuelve a subir.
+model ImportacionCartola {
+  id                String                   @id @default(cuid())
+  administradoraId  String
+  condominioId      String
+  cuentaId          String
+  cuenta            CuentaBancaria           @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  banco             String
+  archivoNombre     String
+  archivoHuella     String
+  archivoTamano     Int
+  formato           String // XLSX o CSV
+  hojas             String[]
+  perfilNombre      String?
+  desde             DateTime?                @db.Date
+  hasta             DateTime?                @db.Date
+  encontrados       Int
+  nuevos            Int
+  yaRegistrados     Int
+  posiblesDuplicados Int
+  duplicadosOmitidos Int
+  errores           Int
+  // Filas con error (hoja, fila, mensaje), para consultarlas después. Sin datos de contacto.
+  detalleErrores    Json?
+  estado            EstadoImportacionCartola
+  usuarioId         String?
+  usuarioNombre     String
+  creadoEn          DateTime                 @default(now())
+
+  movimientos MovimientoBancario[]
+
+  @@index([cuentaId, creadoEn])
+  @@index([cuentaId, archivoHuella])
+  @@index([condominioId])
+}
+
+model MovimientoBancario {
+  id               String             @id @default(cuid())
+  administradoraId String
+  condominioId     String
+  cuentaId         String
+  cuenta           CuentaBancaria     @relation(fields: [cuentaId], references: [id], onDelete: Restrict)
+  importacionId    String
+  importacion      ImportacionCartola @relation(fields: [importacionId], references: [id], onDelete: Restrict)
+  fecha            DateTime           @db.Date
+  descripcion      String?
+  referencia       String?
+  // Abono positivo, cargo negativo.
+  monto            Decimal            @db.Decimal(16, 2)
+  saldo            Decimal?           @db.Decimal(16, 2)
+  contraparte      String?
+  rutContraparte   String?
+  // Otros datos que trae el banco (sucursal, canal...): título → valor.
+  otros            Json?
+  hoja             String?
+  fila             Int?
+  // Huella del movimiento: la misma operación da siempre la misma huella. Única por cuenta:
+  // un movimiento no puede quedar guardado dos veces aunque se suba la misma cartola otra vez.
+  huella           String
+  estado           EstadoConciliacion @default(PENDIENTE)
+  nota             String?
+  // FIN-003.2: cuánto del movimiento ya se asignó a pagos o egresos (permite pagos parciales y
+  // transferencias que cubren varias obligaciones, sin pasar del monto del movimiento).
+  montoConciliado  Decimal            @default(0) @db.Decimal(16, 2)
+  creadoEn         DateTime           @default(now())
+
+  @@unique([cuentaId, huella])
+  @@index([cuentaId, fecha])
+  @@index([condominioId])
+}
+
+// Cómo leer la cartola de un banco (qué columna es qué y en qué formato vienen fechas y montos).
+// Es de la administradora y no guarda movimientos ni datos personales.
+model PerfilCartola {
+  id               String         @id @default(cuid())
+  administradoraId String
+  administradora   Administradora @relation(fields: [administradoraId], references: [id], onDelete: Cascade)
+  banco            String
+  nombre           String
+  // Título de columna normalizado → campo de Convive (o "ignorar").
+  columnas         Json
+  hoja             String?
+  formatoFecha     String         @default("AUTO") // AUTO, DMA, MDA, AMD
+  separadorDecimal String         @default("AUTO") // AUTO, COMA, PUNTO
+  // Con una sola columna de monto: POSITIVO_ABONO (lo normal) o POSITIVO_CARGO.
+  signoMonto       String         @default("POSITIVO_ABONO")
+  creadoPor        String
+  creadoEn         DateTime       @default(now())
+  actualizadoEn    DateTime       @updatedAt
+
+  @@unique([administradoraId, nombre])
 }
