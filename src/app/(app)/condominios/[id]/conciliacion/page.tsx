@@ -49,7 +49,7 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
       _sum: { monto: true },
     }),
   ]);
-  // VER-001: verificación automática de transferencias informadas.
+  // FIN-003.3: verificación automática de transferencias informadas.
   const puedeVerificar = editable && puede(usuario, "pagos.verificar", id);
   const [config, ultimaVerificacion] = await Promise.all([
     db.condominio.findUniqueOrThrow({ where: { id }, select: { verificacionAutomatica: true } }),
@@ -71,9 +71,9 @@ export default async function ConciliacionPage({ params, searchParams }: PagePro
           </p>
           {ultimaVerificacion && (
             <p className="mt-2 text-sm">
-              Última revisión {formatoFechaHora(ultimaVerificacion.creadoEn)} ({ultimaVerificacion.usuarioNombre}):{" "}
-              <strong>{ultimaVerificacion.verificadas}</strong> verificadas solas, <strong>{ultimaVerificacion.porConfirmar}</strong> por confirmar,{" "}
-              <strong>{ultimaVerificacion.conDiferencias}</strong> con diferencias.{" "}
+              Última revisión {formatoFechaHora(ultimaVerificacion.creadoEn)} ({ultimaVerificacion.usuarioNombre}): verificadas solas{" "}
+              <strong>{ultimaVerificacion.verificadas}</strong>, por confirmar <strong>{ultimaVerificacion.porConfirmar}</strong>, con diferencias{" "}
+              <strong>{ultimaVerificacion.conDiferencias}</strong>.{" "}
               {ultimaVerificacion.porConfirmar + ultimaVerificacion.conDiferencias > 0 && (
                 <Link href={`/condominios/${id}/transferencias?auto=todas`} className="font-semibold text-marca underline">
                   Revisar sugerencias

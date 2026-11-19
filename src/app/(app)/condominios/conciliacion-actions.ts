@@ -152,7 +152,7 @@ export async function confirmarCartolaAccion(condominioId: string, cuentaId: str
   try {
     const r = await confirmarCartola(a.usuario, cuenta, envio.archivo, envio.opciones);
     if (r.etapa === "listo") {
-      // VER-001: con los movimientos ya guardados, verificar las transferencias informadas pendientes.
+      // FIN-003.3: con los movimientos ya guardados, verificar las transferencias informadas pendientes.
       // Si algo falla aquí, la cartola igual quedó importada y todo se puede hacer a mano.
       if (puede(a.usuario, "pagos.verificar", condominioId)) {
         try {
@@ -257,7 +257,7 @@ export async function marcarMovimiento(condominioId: string, movimientoId: strin
 }
 
 // ---------------------------------------------------------------------------
-// VER-001 · Verificación automática de transferencias informadas
+// FIN-003.3 · Verificación automática de transferencias informadas
 
 async function accesoVerificacion(condominioId: string) {
   const { usuario, administradoraId } = await requireAdministradora("pagos.verificar");

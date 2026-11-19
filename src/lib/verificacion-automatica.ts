@@ -1,11 +1,11 @@
-// VER-001 · Verificación automática de transferencias informadas con la cartola. Reglas puras
+// FIN-003.3 · Verificación automática de transferencias informadas con la cartola. Reglas puras
 // (sin base de datos) para poder probarlas.
 //
 // Al cargar una cartola se compara cada transferencia informada pendiente con los abonos libres:
 // - VERIFICADA: monto, fecha y número de operación coinciden, con UN solo abono y ese abono no
 //   calza con otra transferencia. Solo en ese caso se registra el pago sin intervención.
 // - POR_CONFIRMAR: coinciden algunos datos (mismo monto, fecha a 1 o 2 días, falta el número de
-//   operación...). Queda «En revisión» con el abono sugerido para confirmarlo con un clic.
+//   operación...). Si la cartola muestra OTRO número de operación, no se sugiere. Queda «En revisión» con el abono sugerido para confirmarlo con un clic.
 // - CON_DIFERENCIAS: el abono parece ser este pago (mismo número de operación o la glosa nombra
 //   la unidad, fecha cercana), pero el monto no calza. Queda «En revisión» para revisarlo a mano.
 // Nunca se rechaza sola una transferencia: «Rechazado» lo decide siempre una persona.
@@ -99,14 +99,17 @@ export function compararConAbono(t: TransferenciaPendiente, a: AbonoLibre): Omit
   let nivel: Nivel | null = null;
   if (montoIgual && dias === 0 && operacion === "coincide") nivel = "EXACTA";
   else if (montoIgual && operacion === "coincide") nivel = "PARCIAL"; // fecha distinta, hasta 7 días
-  else if (montoIgual && dias <= DIAS_CERCA && (operacion === "falta" || dias === 0 || nombra)) nivel = "PARCIAL";
+  else if (montoIgual && dias <= DIAS_CERCA && (operacion === "falta" || nombra)) nivel = "PARCIAL";
   else if (!montoIgual && (operacion === "coincide" || (nombra && dias <= DIAS_CERCA))) nivel = "DIFERENCIA";
   if (!nivel) return null;
   return { nivel, dias, operacion, motivos };
 }
 
+// Orden de preferencia: exactas; después las que comparten n° de operación (es la señal más fuerte
+// de que el abono es ESA transferencia, aunque el monto no calce); después las parciales; al final,
+// las diferencias sin n° de operación. Dentro de cada grupo, la fecha más cercana.
 const rango = (p: Par) =>
-  (p.nivel === "EXACTA" ? 0 : p.nivel === "PARCIAL" ? 1000 : 2000) + (p.operacion === "coincide" ? 0 : 100) + p.dias * 10;
+  (p.nivel === "EXACTA" ? 0 : p.operacion === "coincide" ? 1000 : 2000) + (p.nivel === "DIFERENCIA" ? 500 : 0) + p.dias * 10;
 
 /**
  * Decide qué hacer con cada transferencia pendiente frente a los abonos libres.

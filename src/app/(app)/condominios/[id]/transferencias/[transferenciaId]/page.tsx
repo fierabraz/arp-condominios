@@ -53,7 +53,7 @@ export default async function TransferenciaPage({ params }: PageProps<"/condomin
           take: 10,
         })
       : [],
-    // VER-001: el abono que sugirió la verificación automática.
+    // FIN-003.3: el abono que sugirió la verificación automática.
     abierta && t.autoMovimientoId
       ? db.movimientoBancario.findFirst({ where: { id: t.autoMovimientoId, condominioId: id }, include: { cuenta: { select: { banco: true, numeroFinal: true } } } })
       : null,

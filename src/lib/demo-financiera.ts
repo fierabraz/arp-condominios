@@ -63,7 +63,7 @@ export async function crearComunidadDemo(usuario: UsuarioActual) {
         diaVencimiento: 10,
         totalUnidades: UNIDADES.length,
         demo: true,
-        // VER-001: en la comunidad ficticia la verificación automática parte activada para probarla.
+        // FIN-003.3: en la comunidad ficticia la verificación automática parte activada para probarla.
         verificacionAutomatica: true,
         observaciones: "Comunidad FICTICIA (PILOTO-001) creada para probar el ciclo financiero. No contiene datos reales.",
       },

@@ -20,7 +20,7 @@ export default async function ImportacionPage({ params }: PageProps<"/condominio
     },
   });
   if (!i) notFound();
-  // VER-001: resultado de la verificación automática que corrió con esta cartola.
+  // FIN-003.3: resultado de la verificación automática que corrió con esta cartola.
   const verificacion = await db.verificacionCartola.findFirst({ where: { importacionId: i.id, condominioId: id, administradoraId }, orderBy: { creadoEn: "desc" } });
   const $ = (n: number) => formatoMoneda(n, moneda);
   const errores = (i.detalleErrores ?? []) as ErrorCartola[];

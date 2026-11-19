@@ -635,7 +635,7 @@ export type EstadoCartola =
       omitidos: number;
       errores: number;
       periodo: { desde: string; hasta: string } | null;
-      /** VER-001: resultado de la verificación automática de transferencias (si se pudo correr). */
+      /** FIN-003.3: resultado de la verificación automática de transferencias (si se pudo correr). */
       verificacion?: ResumenVerificacion;
     };
 

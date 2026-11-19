@@ -1,5 +1,5 @@
 import "server-only";
-// VER-001 · Verificación automática de transferencias informadas con la cartola, contra la base.
+// FIN-003.3 · Verificación automática de transferencias informadas con la cartola, contra la base.
 //
 // Se apoya en lo que ya existe, sin duplicarlo:
 // - Para verificar usa registrarIngresoDesdeMovimiento (FIN-COMP A): crea UN pago aplicado a la

@@ -143,7 +143,7 @@ export type DatosIngreso = {
   distribucion?: { avisoId: string; monto: number }[];
   transferenciaId?: string;
   permitirDuplicado?: boolean;
-  /** VER-001: lo hizo la verificación automática al cargar la cartola (queda así en el registro). */
+  /** FIN-003.3: lo hizo la verificación automática al cargar la cartola (queda así en el registro). */
   automatica?: { motivos: string };
 };
 

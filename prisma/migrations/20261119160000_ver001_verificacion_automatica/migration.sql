@@ -1,4 +1,4 @@
--- VER-001 · Verificación automática de transferencias informadas con la cartola.
+-- FIN-003.3 · Verificación automática de transferencias informadas con la cartola.
 -- Aditiva: columnas nuevas con valor por defecto o vacías y una tabla nueva. No toca datos existentes.
 
 -- CreateEnum

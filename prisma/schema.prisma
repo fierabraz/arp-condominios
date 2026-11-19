@@ -305,7 +305,7 @@ model Condominio {
 
   // PILOTO-001: código que la administración comparte para que los residentes pidan unirse.
   codigoIncorporacion String?                @unique
-  // VER-001: al cargar una cartola, verificar solas las transferencias informadas que calzan en
+  // FIN-003.3: al cargar una cartola, verificar solas las transferencias informadas que calzan en
   // monto, fecha y número de operación. Cada comunidad la activa o desactiva (parte desactivada).
   verificacionAutomatica Boolean             @default(false)
   verificaciones      VerificacionCartola[]
@@ -1330,7 +1330,7 @@ model TransferenciaInformada {
   nota             String?
   revisadoPor      String?
   revisadoEn       DateTime?
-  // VER-001 · Resultado de la última verificación automática con la cartola (si la hubo).
+  // FIN-003.3 · Resultado de la última verificación automática con la cartola (si la hubo).
   // POR_CONFIRMAR y CON_DIFERENCIAS dejan la transferencia «En revisión» con el abono sugerido;
   // nunca la rechazan. Si la administración cambia el estado a mano, se borra.
   autoResultado    ResultadoVerificacionAuto?
@@ -1350,7 +1350,7 @@ model TransferenciaInformada {
 
 // Comprobante opcional (PDF o imagen, hasta ~900 KB). Se guarda en la base mientras no exista
 // un almacenamiento de archivos (ARC-001). La huella permite avisar si se sube el mismo dos veces.
-// VER-001 · Verificación automática de transferencias informadas con la cartola.
+// FIN-003.3 · Verificación automática de transferencias informadas con la cartola.
 enum ResultadoVerificacionAuto {
   VERIFICADA // monto, fecha y n° de operación coinciden: se registró el pago solo
   POR_CONFIRMAR // coinciden algunos datos: en revisión con el abono sugerido (confirmar con un clic)

@@ -22,7 +22,7 @@ const a = (id: string, extra: Partial<AbonoLibre> = {}): AbonoLibre => ({
   ...extra,
 });
 
-describe("VER-001 · comparar una transferencia con un abono", () => {
+describe("FIN-003.3 · comparar una transferencia con un abono", () => {
   test("monto, fecha y n° de operación iguales: coincidencia exacta", () => {
     assert.equal(compararConAbono(t("1"), a("A"))?.nivel, "EXACTA");
   });
@@ -56,7 +56,7 @@ describe("VER-001 · comparar una transferencia con un abono", () => {
   });
 });
 
-describe("VER-001 · decidir qué hacer con cada transferencia", () => {
+describe("FIN-003.3 · decidir qué hacer con cada transferencia", () => {
   test("una exacta e inequívoca queda verificada", () => {
     const r = decidirVerificacion([t("1")], [a("A"), a("B", { restante: 70000, referencia: null })]);
     assert.deepEqual(
@@ -99,5 +99,15 @@ describe("VER-001 · decidir qué hacer con cada transferencia", () => {
   test("monto que no calza con n° de operación: con diferencias", () => {
     const r = decidirVerificacion([t("1")], [a("A", { restante: 40000 })]);
     assert.equal(r.decisiones[0].resultado, "CON_DIFERENCIAS");
+  });
+  test("el n° de operación pesa más que un abono parecido sin número", () => {
+    // La 103 informó 105.000 con op. 889900; el banco abonó 100.000 con esa operación. Otro abono de
+    // 105.000 sin número es de la 102 (un día después de lo que ella informó).
+    const r = decidirVerificacion(
+      [t("102", { unidad: "102", operacion: null, fecha: d("2026-11-17"), monto: 105000 }), t("103", { unidad: "103", operacion: "889900", fecha: d("2026-11-18"), monto: 105000 })],
+      [a("SIN-OP", { fecha: d("2026-11-18"), restante: 105000, referencia: null, descripcion: "TRANSF" }), a("OP", { fecha: d("2026-11-18"), restante: 100000, referencia: "889900" })],
+    );
+    const de = Object.fromEntries(r.decisiones.map((x) => [x.transferenciaId, [x.movimientoId, x.resultado]]));
+    assert.deepEqual(de, { "102": ["SIN-OP", "POR_CONFIRMAR"], "103": ["OP", "CON_DIFERENCIAS"] });
   });
 });

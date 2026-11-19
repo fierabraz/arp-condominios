@@ -54,7 +54,7 @@ export async function confirmarTransferenciaAccion(condominioId: string, transfe
 }
 
 /**
- * VER-001: confirma con un clic la sugerencia de la verificación automática (transferencia «por
+ * FIN-003.3: confirma con un clic la sugerencia de la verificación automática (transferencia «por
  * confirmar»): usa el abono sugerido y el monto informado, igual que confirmar a mano.
  */
 export async function confirmarSugerenciaAccion(condominioId: string, transferenciaId: string): Promise<EstadoForm> {

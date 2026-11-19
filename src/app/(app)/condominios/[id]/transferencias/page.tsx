@@ -29,7 +29,7 @@ export default async function TransferenciasPage({ params, searchParams }: PageP
   const estado = typeof sp.estado === "string" && (ESTADOS as string[]).includes(sp.estado) ? (sp.estado as EstadoTransferencia) : sp.estado === "todas" ? null : "abiertas";
   const desde = fechaValida(sp.desde);
   const hasta = fechaValida(sp.hasta);
-  // VER-001: filtro por resultado de la verificación automática (?auto=POR_CONFIRMAR, CON_DIFERENCIAS o todas).
+  // FIN-003.3: filtro por resultado de la verificación automática (?auto=POR_CONFIRMAR, CON_DIFERENCIAS o todas).
   const auto = sp.auto === "POR_CONFIRMAR" || sp.auto === "CON_DIFERENCIAS" ? sp.auto : sp.auto === "todas" ? "todas" : null;
   const where: Prisma.TransferenciaInformadaWhereInput = {
     condominioId: id,

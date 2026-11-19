@@ -29,7 +29,7 @@ import { formatoMoneda } from "@/lib/formato";
 type Accion = (formData: FormData) => Promise<EstadoCartola>;
 type Verificacion = Extract<NonNullable<Extract<EstadoCartola, { etapa: "listo" }>["verificacion"]>, { activa: true }>;
 
-/** VER-001: resumen de la verificación automática al terminar la carga. */
+/** FIN-003.3: resumen de la verificación automática al terminar la carga. */
 function ResumenVerificacionCarga({ r, base, moneda }: { r: Verificacion; base: string; moneda: string }) {
   const transferencias = base.replace(/\/conciliacion$/, "/transferencias");
   if (r.error) return <Mensaje texto={r.error} />;

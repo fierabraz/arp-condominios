@@ -183,7 +183,7 @@ export function MarcarMovimiento({ accion, estado: actual, nota }: { accion: Acc
   );
 }
 
-/** VER-001: botón que llama a una acción del servidor sin formulario y muestra el resultado. */
+/** FIN-003.3: botón que llama a una acción del servidor sin formulario y muestra el resultado. */
 export function BotonServidor({
   accion,
   children,

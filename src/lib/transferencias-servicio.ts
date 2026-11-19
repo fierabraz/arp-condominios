@@ -269,7 +269,7 @@ export async function cambiarEstadoTransferencia(
     if (t.estado === datos.estado && datos.estado === "RECHAZADA") throw new ErrorTransferencia("Ya estaba rechazada.");
     const actualizada = await tx.transferenciaInformada.update({
       where: { id: t.id },
-      // VER-001: la decisión manual reemplaza la sugerencia automática.
+      // FIN-003.3: la decisión manual reemplaza la sugerencia automática.
       data: { estado: datos.estado, nota: datos.nota, revisadoPor: autor.nombre, revisadoEn: new Date(), autoResultado: null, autoMovimientoId: null, autoMotivos: null },
     });
     await registrarEn(tx, {
