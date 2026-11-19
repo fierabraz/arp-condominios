@@ -28,6 +28,7 @@ import {
   Zap,
   type LucideIcon,
   History,
+  Sparkles,
 } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { FAVORITOS_INICIALES, GRUPOS_MODULOS, TODOS_LOS_MODULOS, rutaModulo, type Modulo } from "@/lib/modulos";
@@ -43,6 +44,7 @@ export const ICONOS = {
   inicio: Home,
   registro: History,
   correo: Mail,
+  asistente: Sparkles,
 } satisfies Record<string, LucideIcon>;
 
 const ICONOS_GRUPO: Record<string, LucideIcon> = {

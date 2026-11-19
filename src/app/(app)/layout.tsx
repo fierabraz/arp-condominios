@@ -7,6 +7,7 @@ import { MenuLateral, type EnlaceMenu } from "@/components/menu-lateral";
 import type { Rol } from "@/generated/prisma/enums";
 import { esPrincipal, filtroCondominios, perfilDe, type Perfil } from "@/lib/permisos";
 import { textoPerfil } from "@/lib/cuentas-reglas";
+import { AsistenteFlotante } from "@/components/asistente/asistente-flotante";
 
 function enlaces(rol: Rol, condominioId: string | null, principal: boolean, perfil: Perfil): EnlaceMenu[] {
   switch (rol) {
@@ -16,6 +17,7 @@ function enlaces(rol: Rol, condominioId: string | null, principal: boolean, perf
         { href: "/plataforma/codigos", texto: "Códigos de acceso", icono: "permisos" },
         { href: "/plataforma/usuarios", texto: "Usuarios", icono: "personas" },
         { href: "/plataforma/correo", texto: "Correo", icono: "correo" },
+        { href: "/plataforma/asistente", texto: "Asistente IA", icono: "asistente" },
       ];
     case "ADMINISTRADOR":
       // PILOTO-001: conserje y personal autorizado solo consultan sus comunidades.
@@ -69,6 +71,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       <main className="min-w-0 flex-1 p-4 md:p-8">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
+      <AsistenteFlotante usuario={usuario} />
     </div>
   );
 }
